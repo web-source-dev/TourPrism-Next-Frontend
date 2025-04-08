@@ -1,0 +1,563 @@
+'use client';
+
+import React, { useState, useEffect, ChangeEvent, FormEvent } from 'react';
+import { Box, Button, Typography, CircularProgress, Link as MuiLink, Alert, Paper, TextField } from '@mui/material';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { forgotPassword, verifyResetOTP, resetPassword, resendResetOTP } from '@/services/api';
+
+type ForgotPasswordStep = 'email' | 'otp' | 'password';
+
+export default function ForgotPassword() {
+  const router = useRouter();
+  
+  // Current step in the forgot password flow
+  const [currentStep, setCurrentStep] = useState<ForgotPasswordStep>('email');
+  
+  // OTP related states
+  const [otpValues, setOtpValues] = useState<string[]>(Array(6).fill(''));
+  const [userId, setUserId] = useState('');
+  const [timer, setTimer] = useState(0);
+  
+  // Form states
+  const [formData, setFormData] = useState({
+    email: '',
+    newPassword: '',
+    confirmPassword: ''
+  });
+  
+  const [errors, setErrors] = useState<{ [key: string]: string }>({});
+  const [isLoading, setIsLoading] = useState(false);
+  const [success, setSuccess] = useState(false);
+  
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    if (timer > 0) {
+      interval = setInterval(() => {
+        setTimer(prev => prev - 1);
+      }, 1000);
+    }
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [timer]);
+  
+  const handleChange = (e: ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setFormData({
+      ...formData,
+      [name]: value
+    });
+    
+    if (errors[name]) {
+      setErrors({
+        ...errors,
+        [name]: ''
+      });
+    }
+  };
+  
+  const validateEmail = () => {
+    const newErrors: { [key: string]: string } = {};
+    
+    if (!formData.email.trim()) {
+      newErrors.email = 'Email is required';
+    } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
+      newErrors.email = 'Please enter a valid email address';
+    }
+    
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+  
+  const validateOTP = () => {
+    if (otpValues.some(val => val === '')) {
+      setErrors({
+        ...errors,
+        otp: 'Please enter the complete 6-digit OTP'
+      });
+      return false;
+    }
+    
+    handleSubmitOTP();
+    return true;
+  };
+  
+  const validatePassword = () => {
+    const newErrors: { [key: string]: string } = {};
+    
+    if (!formData.newPassword) {
+      newErrors.newPassword = 'Please enter a new password';
+    } else if (formData.newPassword.length < 6) {
+      newErrors.newPassword = 'Password must be at least 6 characters long';
+    }
+    
+    if (!formData.confirmPassword) {
+      newErrors.confirmPassword = 'Please confirm your new password';
+    } else if (formData.confirmPassword !== formData.newPassword) {
+      newErrors.confirmPassword = 'Passwords do not match';
+    }
+    
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+  
+  const handleOTPPaste = (e: React.ClipboardEvent) => {
+    e.preventDefault();
+    
+    const pastedData = e.clipboardData.getData('text/plain');
+    
+    if (/^\d{6}$/.test(pastedData)) {
+      const newOtpValues = pastedData.split('').map(char => char);
+      setOtpValues(newOtpValues);
+      
+      if (newOtpValues.every(val => val !== '')) {
+        validateOTP();
+      }
+    }
+  };
+  
+  const handleOTPChange = (index: number, value: string) => {
+    if (value && !/^\d*$/.test(value)) return;
+    
+    const newOtpValues = [...otpValues];
+    newOtpValues[index] = value.slice(-1);
+    setOtpValues(newOtpValues);
+    
+    if (value && index < 5) {
+      const nextInput = document.getElementById(`otp-input-${index + 1}`);
+      if (nextInput) {
+        nextInput.focus();
+      }
+    }
+    
+    if (newOtpValues.every(val => val !== '')) {
+      validateOTP();
+    }
+  };
+  
+  const handleOTPKeyDown = (e: React.KeyboardEvent, index: number) => {
+    // Move to previous input when backspace is pressed and input is empty
+    if (e.key === 'Backspace' && !otpValues[index] && index > 0) {
+      // Focus on previous input field
+      const prevInput = document.getElementById(`otp-input-${index - 1}`);
+      if (prevInput) {
+        prevInput.focus();
+      }
+    }
+    
+    // Move to next input when a digit is entered
+    if (/^\d$/.test(e.key) && index < otpValues.length - 1) {
+      // Focus on next input field after a slight delay to allow current input to update
+      setTimeout(() => {
+        const nextInput = document.getElementById(`otp-input-${index + 1}`);
+        if (nextInput) {
+          nextInput.focus();
+        }
+      }, 10);
+    }
+  };
+  
+  const handleResendOTP = async () => {
+    setIsLoading(true);
+    
+    try {
+      await resendResetOTP({ userId });
+      setTimer(30); // Reset countdown timer
+      
+      setErrors({
+        ...errors,
+        otp: 'OTP sent successfully!',
+        otpSuccess: 'true'
+      });
+    } catch (error) {
+      console.error('Error resending OTP:', error);
+      setErrors({
+        ...errors,
+        otp: 'Failed to resend OTP. Please try again.'
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  
+  const handleSubmitEmail = async (e: FormEvent) => {
+    e.preventDefault();
+    
+    if (!validateEmail()) {
+      return;
+    }
+    
+    setIsLoading(true);
+    setErrors({});
+    
+    try {
+      const response = await forgotPassword({ email: formData.email });
+      
+      // Set userId for OTP verification and move to OTP step
+      setUserId(response.userId);
+      setCurrentStep('otp');
+      setTimer(30); // Start 30 second countdown for OTP resend
+    } catch (error) {
+      console.error('Error requesting password reset:', error);
+      setErrors({
+        ...errors,
+        form: 'Failed to request password reset. Please check your email and try again.'
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  
+  const handleSubmitOTP = async () => {
+    if (isLoading) return;
+    
+    setIsLoading(true);
+    setErrors({});
+    
+    try {
+      const otp = otpValues.join('');
+      await verifyResetOTP({ userId, otp });
+      
+      // Move to password reset step
+      setCurrentStep('password');
+    } catch (error) {
+      console.error('OTP verification error:', error);
+      setErrors({
+        ...errors,
+        otp: 'Invalid OTP. Please try again.'
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  
+  const handleSubmitPassword = async (e: FormEvent) => {
+    e.preventDefault();
+    
+    if (!validatePassword()) {
+      return;
+    }
+    
+    setIsLoading(true);
+    setErrors({});
+    
+    try {
+      await resetPassword({
+        userId,
+        otp: otpValues.join(''),
+        newPassword: formData.newPassword
+      });
+      
+      setSuccess(true);
+      
+      // Redirect to login page after a delay
+      setTimeout(() => {
+        router.push('/login');
+      }, 3000);
+    } catch (error) {
+      console.error('Password reset error:', error);
+      setErrors({
+        ...errors,
+        form: 'Failed to reset password. Please try again.'
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  
+  return (
+    <Box sx={{ 
+      display: 'flex',
+      minHeight: '100vh',
+      bgcolor: 'background.default'
+    }}>
+      <Box sx={{ 
+        display: { xs: 'none', md: 'flex' },
+        width: '50%',
+        bgcolor: '#f5f5f5',
+        alignItems: 'center',
+        justifyContent: 'center',
+        position: 'relative',
+        overflow: 'hidden'
+      }}>
+        <Box
+          component="img"
+          src="/images/forgot-password.webp"
+          alt="Forgot Password"
+          sx={{
+            width: '100%',
+            height: '100%',
+            objectFit: 'cover'
+          }}
+        />
+      </Box>
+      
+      <Box sx={{ 
+        width: { xs: '100%', md: '50%' },
+        display: 'flex',
+        flexDirection: 'column',
+        justifyContent: 'center',
+        alignItems: 'center',
+        p: { xs: 2, sm: 4 }
+      }}>
+        <Paper elevation={0} sx={{ 
+          width: '100%', 
+          maxWidth: 480,
+          p: { xs: 3, sm: 4 },
+          borderRadius: 3,
+          boxShadow: { xs: 'none', sm: '0px 4px 20px rgba(0, 0, 0, 0.05)' }
+        }}>
+          <Link href="/" passHref>
+            <Box 
+              component="img" 
+              src="/logo.png" 
+              alt="Logo" 
+              sx={{ height: 40, mb: 4, cursor: 'pointer', display: 'block', mx: 'auto' }}
+            />
+          </Link>
+          
+          {success ? (
+            // Success message
+            <Box sx={{ textAlign: 'center' }}>
+              <Box
+                component="img"
+                src="/images/success-check.png"
+                alt="Success"
+                sx={{ width: 80, height: 80, mb: 3 }}
+              />
+              
+              <Typography variant="h5" sx={{ mb: 2, fontWeight: 'bold' }}>
+                Password Reset Successful
+              </Typography>
+              
+              <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
+                Your password has been reset successfully. You will be redirected to the login page shortly.
+              </Typography>
+              
+              <Button
+                variant="contained"
+                onClick={() => router.push('/login')}
+                sx={{
+                  bgcolor: 'black',
+                  color: 'white',
+                  py: 1.5,
+                  px: 4,
+                  borderRadius: 2,
+                  '&:hover': { bgcolor: '#333' }
+                }}
+              >
+                Go to Login
+              </Button>
+            </Box>
+          ) : (
+            <>
+              <Typography variant="h4" component="h1" align="center" sx={{ mb: 1, fontWeight: 'bold' }}>
+                {currentStep === 'email' ? 'Forgot Password' : 
+                  currentStep === 'otp' ? 'Verify Your Email' : 
+                  'Reset Password'}
+              </Typography>
+              
+              <Typography variant="body1" color="text.secondary" align="center" sx={{ mb: 4 }}>
+                {currentStep === 'email' ? 'Enter your email to receive a verification code' : 
+                  currentStep === 'otp' ? 'Enter the 6-digit code sent to your email' : 
+                  'Create a new password for your account'}
+              </Typography>
+              
+              {errors.form && (
+                <Alert severity="error" sx={{ mb: 3 }}>
+                  {errors.form}
+                </Alert>
+              )}
+              
+              {currentStep === 'email' && (
+                <Box component="form" onSubmit={handleSubmitEmail}>
+                  <Box sx={{ mb: 4 }}>
+                    <Typography variant="body2" sx={{ mb: 1, fontWeight: 500 }}>
+                      Email Address
+                    </Typography>
+                    <TextField
+                      fullWidth
+                      name="email"
+                      placeholder="your@email.com"
+                      value={formData.email}
+                      onChange={handleChange}
+                      error={!!errors.email}
+                      helperText={errors.email}
+                      InputProps={{
+                        sx: { borderRadius: 2 }
+                      }}
+                    />
+                  </Box>
+                  
+                  <Button
+                    type="submit"
+                    fullWidth
+                    variant="contained"
+                    disabled={isLoading}
+                    sx={{
+                      bgcolor: 'black',
+                      color: 'white',
+                      py: 1.5,
+                      borderRadius: 2,
+                      '&:hover': {
+                        bgcolor: '#333'
+                      }
+                    }}
+                  >
+                    {isLoading ? <CircularProgress size={24} sx={{ color: 'white' }} /> : 'Send Verification Code'}
+                  </Button>
+                  
+                  <Box sx={{ mt: 4, textAlign: 'center' }}>
+                    <Typography variant="body2" display="inline">
+                      Remember your password?{' '}
+                    </Typography>
+                    <Link href="/login" passHref>
+                      <MuiLink 
+                        underline="hover" 
+                        sx={{ color: 'black', fontWeight: 'bold' }}
+                      >
+                        Sign In
+                      </MuiLink>
+                    </Link>
+                  </Box>
+                </Box>
+              )}
+              
+              {currentStep === 'otp' && (
+                <Box component="form">
+                  <Box sx={{ display: 'flex', justifyContent: 'center', gap: 1, mb: 3 }}>
+                    {otpValues.map((value, index) => (
+                      <TextField
+                        key={index}
+                        id={`otp-input-${index}`}
+                        value={value}
+                        onChange={(e) => handleOTPChange(index, e.target.value)}
+                        onKeyDown={(e) => handleOTPKeyDown(e, index)}
+                        onPaste={index === 0 ? handleOTPPaste : undefined}
+                        inputProps={{ 
+                          maxLength: 1,
+                          style: { textAlign: 'center', fontSize: '1.5rem', paddingTop: 8, paddingBottom: 8 }
+                        }}
+                        sx={{ 
+                          width: 45,
+                          '& .MuiOutlinedInput-root': {
+                            borderRadius: 2
+                          }
+                        }}
+                        autoFocus={index === 0}
+                      />
+                    ))}
+                  </Box>
+                  
+                  {errors.otp && (
+                    <Alert 
+                      severity={errors.otpSuccess ? "success" : "error"} 
+                      sx={{ mb: 3 }}
+                    >
+                      {errors.otp}
+                    </Alert>
+                  )}
+                  
+                  <Box sx={{ textAlign: 'center', mb: 3 }}>
+                    {timer > 0 ? (
+                      <Typography variant="body2" color="text.secondary">
+                        Resend OTP in {timer} seconds
+                      </Typography>
+                    ) : (
+                      <Button 
+                        onClick={handleResendOTP}
+                        disabled={isLoading}
+                        sx={{ textTransform: 'none', color: 'black' }}
+                      >
+                        Resend OTP
+                      </Button>
+                    )}
+                  </Box>
+                  
+                  <Button
+                    fullWidth
+                    variant="contained"
+                    disabled={isLoading || otpValues.some(val => val === '')}
+                    onClick={validateOTP}
+                    sx={{
+                      bgcolor: 'black',
+                      color: 'white',
+                      py: 1.5,
+                      borderRadius: 2,
+                      '&:hover': {
+                        bgcolor: '#333'
+                      }
+                    }}
+                  >
+                    {isLoading ? <CircularProgress size={24} sx={{ color: 'white' }} /> : 'Verify OTP'}
+                  </Button>
+                </Box>
+              )}
+              
+              {currentStep === 'password' && (
+                <Box component="form" onSubmit={handleSubmitPassword}>
+                  <Box sx={{ mb: 3 }}>
+                    <Typography variant="body2" sx={{ mb: 1, fontWeight: 500 }}>
+                      New Password
+                    </Typography>
+                    <TextField
+                      fullWidth
+                      type="password"
+                      name="newPassword"
+                      placeholder="Enter your new password"
+                      value={formData.newPassword}
+                      onChange={handleChange}
+                      error={!!errors.newPassword}
+                      helperText={errors.newPassword}
+                      InputProps={{
+                        sx: { borderRadius: 2 }
+                      }}
+                    />
+                  </Box>
+                  
+                  <Box sx={{ mb: 4 }}>
+                    <Typography variant="body2" sx={{ mb: 1, fontWeight: 500 }}>
+                      Confirm New Password
+                    </Typography>
+                    <TextField
+                      fullWidth
+                      type="password"
+                      name="confirmPassword"
+                      placeholder="Confirm your new password"
+                      value={formData.confirmPassword}
+                      onChange={handleChange}
+                      error={!!errors.confirmPassword}
+                      helperText={errors.confirmPassword}
+                      InputProps={{
+                        sx: { borderRadius: 2 }
+                      }}
+                    />
+                  </Box>
+                  
+                  <Button
+                    type="submit"
+                    fullWidth
+                    variant="contained"
+                    disabled={isLoading}
+                    sx={{
+                      bgcolor: 'black',
+                      color: 'white',
+                      py: 1.5,
+                      borderRadius: 2,
+                      '&:hover': {
+                        bgcolor: '#333'
+                      }
+                    }}
+                  >
+                    {isLoading ? <CircularProgress size={24} sx={{ color: 'white' }} /> : 'Reset Password'}
+                  </Button>
+                </Box>
+              )}
+            </>
+          )}
+        </Paper>
+      </Box>
+    </Box>
+  );
+} 
