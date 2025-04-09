@@ -20,11 +20,15 @@ import {
 import { FilterOptions } from '../types';
 
 const INCIDENT_TYPES = [
-  'Scam',
-  'Theft',
-  'Crime',
-  'Weather',
-  'Public Disorder'
+  "Rain",
+  "Strike",
+  "Protest",
+  "Cyber Attack",
+  "Fire",
+  "Fog",
+  "Data Breach",
+  "Storm",
+  "Flood"
 ];
 
 const SORT_OPTIONS = [

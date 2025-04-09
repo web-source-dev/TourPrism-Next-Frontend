@@ -767,28 +767,28 @@ export default function Feed() {
               <Paper key={`alert-${alert._id}-${index}`} sx={{ py: 0.5, borderRadius: 2, boxShadow: 'none' }}>
                 {/* Alert Header */}
                 <Typography variant="subtitle1" sx={{ fontWeight: 500 }}>
-                  {alert.title || "Road Closures in 48h : Fringe Festival Protest"}
+                  {alert.title || ""}
                 </Typography>
 
                 {/* Alert Metadata */}
                 <Box sx={{ display: 'flex', gap: 1, color: 'text.secondary', fontSize: '0.85rem', mb: 0.5 }}>
                   <Box component="span" sx={{ display: 'flex', alignItems: 'center' }}>
                     <i className="ri-bus-2-line" style={{ fontSize: '1rem', marginRight: '4px' }}></i>
-                    {alert.alertCategory || "Transport"}
+                    {alert.alertCategory || ""}
                   </Box>
                   <Box component="span" sx={{ display: 'flex', alignItems: 'center' }}>
                     <i className="ri-map-pin-line" style={{ fontSize: '1rem', marginRight: '4px' }}></i>
-                    {alert.city || "Princess Street"}
+                    {alert.city || "EdinBurgh"}
                   </Box>
                   <Box component="span" sx={{ display: 'flex', alignItems: 'center' }}>
                     <i className="ri-time-line" style={{ fontSize: '1rem', marginRight: '4px' }}></i>
-                    {alert.createdAt ? formatTime(alert.createdAt) : "26h"}
+                    {alert.createdAt ? formatTime(alert.createdAt) : ""}
                   </Box>
                 </Box>
 
                 {/* Alert Content - Combined description and recommended action */}
                 <Typography variant="body2" sx={{ mb: 1 }}>
-                  {alert.description || "Roads closures expected, resulting in delayed check-ins."}
+                  {alert.description || ""}
                   {alert.recommendedAction && ` ${alert.recommendedAction}`}
                 </Typography>
 
@@ -802,18 +802,20 @@ export default function Feed() {
                         alert.risk === 'Low' ? '#e6f4ea' :
                           alert.risk === 'Medium' ? '#fff4e5' :
                             alert.risk === 'High' ? '#fdecea' :
+                            alert.risk === 'Critical' ? '#fbe9e7' :
                               'transparent',
                       borderRadius: 1,
                       color:
                         alert.risk === 'Low' ? '#00855b' :
                           alert.risk === 'Medium' ? '#c17e00' :
                             alert.risk === 'High' ? '#d32f2f' :
+                            alert.risk === 'Critical' ? '#b71c1c' : 
                               'inherit',
                       fontWeight: 500,
-                      fontSize: '0.85rem'
+                      fontSize: '0.85rem',
                     }}
                   >
-                    {alert.risk}
+                   {alert.risk} : {alert.impact}
                   </Box>
                 )}
 

@@ -247,23 +247,45 @@ export default function CreateAlertPage() {
           <Divider sx={{ mb: 3 }} />
           
           <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, mb: 4 }}>
-            <TextField
-              name="alertCategory"
-              label="Alert Category"
-              variant="outlined"
-              value={formValues.alertCategory || ''}
-              onChange={handleInputChange}
-              sx={{ flex: '1 1 45%', minWidth: '250px' }}
-            />
+            <FormControl sx={{ flex: '1 1 45%', minWidth: '250px' }}>
+              <InputLabel id="alert-category-label">Alert Category</InputLabel>
+              <Select
+                labelId="alert-category-label"
+                id="alertCategory"
+                name="alertCategory"
+                value={formValues.alertCategory || ''}
+                label="Alert Category"
+                onChange={handleSelectChange}
+              >
+                <MenuItem value="Weather">Weather</MenuItem>
+                <MenuItem value="Transport">Transport</MenuItem>
+                <MenuItem value="Civil Unrest">Civil Unrest</MenuItem>
+                <MenuItem value="General Safety">General Safety</MenuItem>
+                <MenuItem value="Natural Disaster">Natural Disaster</MenuItem>
+              </Select>
+            </FormControl>
             
-            <TextField
-              name="alertType"
-              label="Alert Type"
-              variant="outlined"
-              value={formValues.alertType || ''}
-              onChange={handleInputChange}
-              sx={{ flex: '1 1 45%', minWidth: '250px' }}
-            />
+            <FormControl sx={{ flex: '1 1 45%', minWidth: '250px' }}>
+              <InputLabel id="alert-type-label">Alert Type</InputLabel>
+              <Select
+                labelId="alert-type-label"
+                id="alertType"
+                name="alertType"
+                value={formValues.alertType || ''}
+                label="Alert Type"
+                onChange={handleSelectChange}
+              >
+                <MenuItem value="Rain">Rain</MenuItem>
+                <MenuItem value="Strike">Strike</MenuItem>
+                <MenuItem value="Protest">Protest</MenuItem>
+                <MenuItem value="Cyber Attack">Cyber Attack</MenuItem>
+                <MenuItem value="Fire">Fire</MenuItem>
+                <MenuItem value="Fog">Fog</MenuItem>
+                <MenuItem value="Data Breach">Data Breach</MenuItem>
+                <MenuItem value="Storm">Storm</MenuItem>
+                <MenuItem value="Flood">Flood</MenuItem>
+              </Select>
+            </FormControl>
             
             <FormControl sx={{ flex: '1 1 30%', minWidth: '200px' }}>
               <InputLabel id="risk-label">Risk Level</InputLabel>
@@ -275,29 +297,21 @@ export default function CreateAlertPage() {
                 label="Risk Level"
                 onChange={handleSelectChange}
               >
-                <MenuItem value="low">Low</MenuItem>
-                <MenuItem value="medium">Medium</MenuItem>
-                <MenuItem value="high">High</MenuItem>
-                <MenuItem value="critical">Critical</MenuItem>
+                <MenuItem value="Low">Low</MenuItem>
+                <MenuItem value="Medium">Medium</MenuItem>
+                <MenuItem value="High">High</MenuItem>
+                <MenuItem value="Critical">Critical</MenuItem>
               </Select>
             </FormControl>
             
-            <FormControl sx={{ flex: '1 1 30%', minWidth: '200px' }}>
-              <InputLabel id="impact-label">Impact</InputLabel>
-              <Select
-                labelId="impact-label"
-                id="impact"
-                name="impact"
-                value={formValues.impact || ''}
-                label="Impact"
-                onChange={handleSelectChange}
-              >
-                <MenuItem value="minimal">Minimal</MenuItem>
-                <MenuItem value="moderate">Moderate</MenuItem>
-                <MenuItem value="significant">Significant</MenuItem>
-                <MenuItem value="severe">Severe</MenuItem>
-              </Select>
-            </FormControl>
+            <TextField
+              name="impact"
+              label="Impact"
+              variant="outlined"
+              value={formValues.impact || ''}
+              onChange={handleInputChange}
+              sx={{ flex: '1 1 30%', minWidth: '200px' }}
+            />
             
             <FormControl sx={{ flex: '1 1 30%', minWidth: '200px' }}>
               <InputLabel id="priority-label">Priority</InputLabel>
