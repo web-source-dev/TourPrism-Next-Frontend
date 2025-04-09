@@ -1,13 +1,15 @@
 'use client';
 
-import React, { useState, useEffect, ChangeEvent, FormEvent } from 'react';
+import React, { useState, useEffect, ChangeEvent, FormEvent, Suspense } from 'react';
 import { Box, Button, Typography, CircularProgress, Link as MuiLink, Alert, Divider, Paper, TextField, InputAdornment } from '@mui/material';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { login, googleLogin, verifyOTP, resendOTP } from '@/services/api';
 import { useAuth } from '@/context/AuthContext';
 import Image from 'next/image';
-export default function Login() {
+
+// Create a client component that uses useSearchParams
+function LoginContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { isAuthenticated, setUser } = useAuth();
@@ -509,5 +511,14 @@ export default function Login() {
         </Paper>
       </Box>
     </Box>
+  );
+}
+
+// This is the main component that Next.js will use
+export default function Login() {
+  return (
+    <Suspense fallback={<div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}><CircularProgress /></div>}>
+      <LoginContent />
+    </Suspense>
   );
 } 
