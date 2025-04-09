@@ -79,24 +79,24 @@ const BulkAlertUpload = () => {
 
   // Sample data for field descriptions
   const fieldDescriptions = [
-    { field: 'alertCategory', description: 'Main category of the alert (Transport, Health, Safety, Weather, Scam, Crime, Other)', required: false },
-    { field: 'alertType', description: 'Specific type of the alert (Scam, Theft, Crime, Weather, Public Disorder, Other)', required: false },
+    { field: 'alertCategory', description: 'Main category of the alert (Weather, Transport, Civil Unrest, General Safety, Natural Disaster)', required: true },
+    { field: 'alertType', description: 'Specific type of the alert (Rain, Strike, Protest, Cyber Attack, Fire, Fog, Data Breach, Storm, Flood)', required: true },
     { field: 'title', description: 'Short, descriptive title for the alert', required: true },
     { field: 'description', description: 'Detailed description of the alert situation', required: true },
-    { field: 'risk', description: 'Risk level (Low, Medium, High, Critical)', required: false },
-    { field: 'impact', description: 'Description of impact on travelers', required: false },
-    { field: 'priority', description: 'Priority level (Low, Medium, High)', required: false },
-    { field: 'targetAudience', description: 'Target audience for this alert (e.g., Tourists, Business Travelers)', required: false },
-    { field: 'recommendedAction', description: 'Recommended actions for users', required: false },
+    { field: 'risk', description: 'Risk level (Low, Medium, High, Critical)', required: true },
+    { field: 'impact', description: 'Description of impact on travelers', required: true },
+    { field: 'priority', description: 'Priority level (Low, Medium, High)', required: true },
+    { field: 'targetAudience', description: 'Target audience for this alert (e.g., Tourists, Business Travelers)', required: true },
+    { field: 'recommendedAction', description: 'Recommended actions for users', required: true },
     { field: 'latitude', description: 'Latitude coordinate (decimal format)', required: true },
     { field: 'longitude', description: 'Longitude coordinate (decimal format)', required: true },
     { field: 'city', description: 'City name', required: true },
-    { field: 'country', description: 'Country name', required: false },
-    { field: 'expectedStart', description: 'Expected start date/time of the alert (ISO format: YYYY-MM-DDTHH:MM:SS.sssZ)', required: false },
-    { field: 'expectedEnd', description: 'Expected end date/time of the alert (ISO format: YYYY-MM-DDTHH:MM:SS.sssZ)', required: false },
-    { field: 'linkToSource', description: 'URL link to source information', required: false },
-    { field: 'status', description: 'Status (pending, approved, rejected, published)', required: false },
-    { field: 'addToEmailSummary', description: 'Include in email summaries (true/false)', required: false }
+    { field: 'country', description: 'Country name', required: true },
+    { field: 'expectedStart', description: 'Expected start date/time of the alert (ISO format: YYYY-MM-DDTHH:MM:SS.sssZ)', required: true },
+    { field: 'expectedEnd', description: 'Expected end date/time of the alert (ISO format: YYYY-MM-DDTHH:MM:SS.sssZ)', required: true },
+    { field: 'linkToSource', description: 'URL link to source information', required: true },
+    { field: 'status', description: 'Status (pending, approved, rejected, published)', required: true },
+    { field: 'addToEmailSummary', description: 'Include in email summaries (true/false)', required: true }
   ];
 
   return (

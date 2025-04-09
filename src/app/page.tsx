@@ -179,6 +179,8 @@ export default function Home() {
                 borderColor: '#e0e0e0'
               }
             }}
+            
+            onClick={() => router.push('/feed')}
           >
             <Box sx={{ display: 'flex', alignItems: 'center' }}>
               <Box sx={{
@@ -188,7 +190,6 @@ export default function Home() {
                 backgroundColor: '#4CAF50',
                 mr: 1.5
               }}
-              onClick={() => router.push('/feed')}
               />
               <Typography>View Edinburgh Alerts Now</Typography>
             </Box>

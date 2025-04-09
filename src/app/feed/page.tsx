@@ -606,7 +606,7 @@ export default function Feed() {
 
   return (
     <Layout onFilterOpen={() => isAuthenticated ? setIsFilterDrawerOpen(true) : setLoginDialogOpen(true)}>
-      <Box sx={{ p: 2, maxWidth: 800, mx: 'auto' }}>
+      <Box sx={{ p: 2, maxWidth: 1500, mx: 'auto' }}>
         <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <Box>
             <Typography variant="h6" sx={{ fontWeight: 'bold' }}>

@@ -12,7 +12,10 @@ import {
   ListItem, 
   ListItemText, 
   Badge,
-  Button
+  Button,
+  Menu,
+  MenuItem,
+  Divider
 } from '@mui/material';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
@@ -33,11 +36,15 @@ const Layout = ({ children, isFooter = true, onFilterOpen }: LayoutProps) => {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [notificationDrawerOpen, setNotificationDrawerOpen] = useState(false);
-  const { isAuthenticated, logout } = useAuth();
+  const { isAuthenticated, logout, user } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
   const [isClient, setIsClient] = useState(false);
   const isFeedPage = pathname === '/feed';
+  
+  // Profile menu state
+  const [profileAnchorEl, setProfileAnchorEl] = useState<null | HTMLElement>(null);
+  const isProfileMenuOpen = Boolean(profileAnchorEl);
 
   // Use useEffect to mark when component is mounted on client
   useEffect(() => {
@@ -99,6 +106,25 @@ const Layout = ({ children, isFooter = true, onFilterOpen }: LayoutProps) => {
     }
   };
 
+  const handleProfileMenu = (event: React.MouseEvent<HTMLElement>) => {
+    setProfileAnchorEl(event.currentTarget);
+  };
+
+  const handleProfileMenuClose = () => {
+    setProfileAnchorEl(null);
+  };
+
+  const handleProfileClick = () => {
+    handleProfileMenuClose();
+    router.push('/profile');
+  };
+
+  const handleLogoutClick = () => {
+    handleProfileMenuClose();
+    logout();
+    router.push('/');
+  };
+
   const drawer = (
     <Box sx={{ width: 300 }}>
       <Box sx={{ p: 3, display: 'flex', alignItems: 'flex-end', justifyContent: 'flex-end' }}>
@@ -140,10 +166,9 @@ const Layout = ({ children, isFooter = true, onFilterOpen }: LayoutProps) => {
     <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', p: 0, m: 0 }}>
       <Box sx={{ 
         px: { xs: 3, sm: 3, md: 3 }, 
-        py: 1, 
+        py: 0.5, 
         mx: { xs: 1, sm: 1.5, md: 3.5 },
         my: 1.5,
-        height: { sm: '30px', md: '80px' },
         bgcolor: '#EBEBEC', 
         borderRadius: 50,
         boxShadow: 'none'
@@ -191,7 +216,7 @@ const Layout = ({ children, isFooter = true, onFilterOpen }: LayoutProps) => {
             {isFeedPage && (
               <Typography
                 sx={{
-                  display: { xs: 'flex', sm: 'none' },
+                  display: { xs: 'flex' },
                   alignItems: 'center',
                   ml: 2,
                   fontWeight: 'medium',
@@ -253,6 +278,17 @@ const Layout = ({ children, isFooter = true, onFilterOpen }: LayoutProps) => {
             {/* Notification and filter icons for logged in users */}
             {isAuthenticated && (
               <>
+                <IconButton 
+                  onClick={(e) => handleProfileMenu(e)}
+                  sx={{
+                    color: 'black',
+                    '&:hover': {
+                      bgcolor: 'rgba(0, 0, 0, 0.04)'
+                    }
+                  }}
+                >
+                  <i className="ri-user-3-line"></i>
+                </IconButton>
                 <IconButton
                   onClick={() => setNotificationDrawerOpen(true)}
                   sx={{ 
@@ -366,6 +402,34 @@ const Layout = ({ children, isFooter = true, onFilterOpen }: LayoutProps) => {
         notifications={notifications}
         onNotificationUpdate={fetchNotifications}
       />
+
+      {/* Profile Menu */}
+      <Menu
+        anchorEl={profileAnchorEl}
+        open={isProfileMenuOpen}
+        onClose={handleProfileMenuClose}
+        PaperProps={{
+          elevation: 3,
+          sx: {
+            minWidth: 200,
+            borderRadius: 2,
+            mt: 1.5,
+          },
+        }}
+        transformOrigin={{ horizontal: 'right', vertical: 'top' }}
+        anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
+      >
+        <MenuItem disabled sx={{ opacity: 0.7, fontWeight: 'medium' }}>
+          {user?.email || 'User Email'}
+        </MenuItem>
+        <MenuItem onClick={handleProfileClick}>
+          <ListItemText primary="Profile" />
+        </MenuItem>
+        <Divider />
+        <MenuItem onClick={handleLogoutClick}>
+          <ListItemText primary="Logout" />
+        </MenuItem>
+      </Menu>
     </Box>
   );
 };
