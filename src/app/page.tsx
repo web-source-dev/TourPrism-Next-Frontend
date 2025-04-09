@@ -161,7 +161,8 @@ export default function Home() {
         <Box sx={{ 
           display: 'flex', 
           justifyContent: 'center', 
-          my: 8 
+          mt: 4,
+          mb:8 
         }}>
           <Button
             variant="outlined"
