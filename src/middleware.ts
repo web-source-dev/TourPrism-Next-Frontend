@@ -10,6 +10,7 @@ const publicPaths = [
   '/about',
   '/pricing',
   '/ambassadors',
+  '/session-expired'
   // Add other public paths here
 ];
 

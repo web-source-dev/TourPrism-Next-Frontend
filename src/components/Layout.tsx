@@ -218,7 +218,7 @@ const Layout = ({ children, isFooter = true, onFilterOpen }: LayoutProps) => {
                 sx={{
                   display: { xs: 'flex' },
                   alignItems: 'center',
-                  ml: 2,
+                  ml: 0.5,
                   fontWeight: 'medium',
                   fontSize: '18px',
                   color: 'black'
