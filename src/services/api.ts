@@ -183,9 +183,13 @@ export const googleLogin = (): void => {
 export const handleGoogleCallback = async (token: string): Promise<User> => {
   if (token && typeof window !== 'undefined') {
     localStorage.setItem('token', token);
+    // Also set in cookies for middleware
+    Cookies.set('token', token, { path: '/' });
+    
     // Fetch user data using the token
     try {
       const response: CustomAxiosResponse<User> = await api.get('/auth/user/profile');
+      // Store the complete user object for consistent auth
       localStorage.setItem('user', JSON.stringify(response.data));
       return response.data;
     } catch (error) {

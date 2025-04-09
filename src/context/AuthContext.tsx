@@ -8,6 +8,8 @@ import Cookies from 'js-cookie';
 // Public routes that don't require authentication
 // Keep this in sync with the list in ProtectedRoute.tsx
 const publicRoutes = ['/', '/login', '/signup', '/forgot-password', '/feed', '/about', '/pricing', '/ambassadors'];
+// Auth process routes should never redirect, even during auth loading
+const authProcessRoutes = ['/auth/google/callback'];
 
 interface AuthContextType {
   user: User | null;
@@ -53,9 +55,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             // Clear any existing cookies if no token in localStorage
             Cookies.remove('token', { path: '/' });
             
-            // Only redirect to login if not on a public route
+            // Only redirect to login if not on a public route or auth process route
             const isPublicRoute = publicRoutes.some(route => pathname === route);
-            if (!isPublicRoute && typeof window !== 'undefined') {
+            const isAuthProcessRoute = authProcessRoutes.some(route => pathname.startsWith(route));
+            
+            if (!isPublicRoute && !isAuthProcessRoute && typeof window !== 'undefined') {
               router.push('/login?from=' + pathname);
             }
           }

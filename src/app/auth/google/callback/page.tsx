@@ -33,6 +33,9 @@ function GoogleCallbackClient() {
           // Use the handleGoogleCallback function from api.ts
           const user = await handleGoogleCallback(token);
           
+          // Store user in localStorage first to ensure AuthContext can find it
+          localStorage.setItem('user', JSON.stringify(user));
+          
           // Set user in auth context
           setUser(user);
           

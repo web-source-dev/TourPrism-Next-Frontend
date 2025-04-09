@@ -39,7 +39,7 @@ export default function Feed() {
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
   const [isFilterDrawerOpen, setIsFilterDrawerOpen] = useState(false);
-  const [locationConfirmed, setLocationConfirmed] = useState(false);
+  const [locationConfirmed, setLocationConfirmed] = useState(true);
   const [locationError, setLocationError] = useState<string | null>(null);
   const [locationLoading, setLocationLoading] = useState(false);
   const [city, setCity] = useState<string | null>(null);
@@ -177,19 +177,18 @@ export default function Feed() {
     const storedLng = localStorage.getItem('selectedLng');
 
     if (storedCity && storedLat && storedLng) {
+      // Use stored location if available
       setCity(storedCity);
       setCoords({
         latitude: parseFloat(storedLat),
         longitude: parseFloat(storedLng)
       });
       setLocationConfirmed(true);
-      
-      // Initial location is set, but we'll delay fetching alerts
-      // to ensure authentication state is properly loaded
     } else {
-      handleUseMyLocation();
+      // Use Edinburgh as default location instead of requesting user location
+      handleSelectEdinburgh();
     }
-  }, [handleUseMyLocation]); // Remove fetchLocationAlerts from dependencies
+  }, []); // No dependencies needed for initial setup
 
   // Add a separate effect to fetch alerts after authentication state is ready
   useEffect(() => {
@@ -302,12 +301,13 @@ export default function Feed() {
     try {
       const cityName = await getCityFromCoordinates(latitude, longitude);
 
-      // Store location in localStorage
+      // Store location in localStorage for persistence across page refreshes
       localStorage.setItem('selectedCity', cityName);
       localStorage.setItem('selectedLat', latitude.toString());
       localStorage.setItem('selectedLng', longitude.toString());
       localStorage.setItem('locationAccuracy', accuracy.toString());
 
+      // Update state
       setCity(cityName);
       setCoords({ latitude, longitude });
       setLocationConfirmed(true);
@@ -341,21 +341,38 @@ export default function Feed() {
 
   const handleSelectEdinburgh = () => {
     const edinburghCoords = { latitude: 55.9533, longitude: -3.1883 };
+    
+    // Save to localStorage for persistence across page refreshes
     localStorage.setItem('selectedCity', 'Edinburgh');
     localStorage.setItem('selectedLat', edinburghCoords.latitude.toString());
     localStorage.setItem('selectedLng', edinburghCoords.longitude.toString());
 
+    // Update state
     setCity('Edinburgh');
     setCoords(edinburghCoords);
     setLocationConfirmed(true);
+    
+    // Fetch alerts for Edinburgh
     fetchLocationAlerts('Edinburgh', edinburghCoords);
   };
 
   const handleContinueWithLocation = () => {
-    setLocationConfirmed(true);
-    if (city && coords) {
-      fetchLocationAlerts(city, coords);
+    // Ensure we have valid location data
+    if (!city || !coords) {
+      // If no valid location data, default to Edinburgh
+      handleSelectEdinburgh();
+      return;
     }
+    
+    // If we already have location data in state but it's not in localStorage (after reset),
+    // save it to localStorage again
+    localStorage.setItem('selectedCity', city);
+    localStorage.setItem('selectedLat', coords.latitude.toString());
+    localStorage.setItem('selectedLng', coords.longitude.toString());
+    
+    // Confirm location and fetch alerts
+    setLocationConfirmed(true);
+    fetchLocationAlerts(city, coords);
   };
 
   const handleResetLocation = () => {
@@ -365,12 +382,11 @@ export default function Feed() {
       return;
     }
     
+    // Instead of clearing storage immediately, show location selection UI
     setLocationConfirmed(false);
-    setCity(null);
-    setCoords(null);
-    localStorage.removeItem('selectedCity');
-    localStorage.removeItem('selectedLat');
-    localStorage.removeItem('selectedLng');
+    
+    // Keep the current location data in state for reference
+    // This allows the user to see their current location while selecting a new one
   };
 
   const handleLogin = () => {
@@ -519,11 +535,14 @@ export default function Feed() {
       <Layout>
         <Box sx={{ p: 2, display: 'flex', flexDirection: 'column', alignItems: 'center', mt: 4 }}>
           <Typography variant="h5" gutterBottom sx={{ fontWeight: 'bold', mb: 2 }}>
-            Choose Your Location
+            {city ? 'Change Your Location' : 'Choose Your Location'}
           </Typography>
 
           <Typography variant="body1" sx={{ mb: 3, textAlign: 'center' }}>
-            For a personalized experience, please share your location or select Edinburgh
+            {city 
+              ? `Currently showing alerts for ${city}. Select a new location or continue with the current one.`
+              : 'To show relevant alerts, please select a location.'
+            }
           </Typography>
 
           {locationError && (
@@ -560,7 +579,7 @@ export default function Feed() {
                 borderRadius: 3
               }}
             >
-              Continue with Edinburgh
+              Use Edinburgh as location
             </Button>
 
             {city && coords && (

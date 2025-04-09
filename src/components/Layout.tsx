@@ -140,7 +140,7 @@ const Layout = ({ children, isFooter = true, onFilterOpen }: LayoutProps) => {
     <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', p: 0, m: 0 }}>
       <Box sx={{ 
         px: { xs: 3, sm: 3, md: 3 }, 
-        py: 1.5, 
+        py: 1, 
         mx: { xs: 1, sm: 1.5, md: 3.5 },
         my: 1.5,
         height: { sm: '30px', md: '80px' },
@@ -153,11 +153,11 @@ const Layout = ({ children, isFooter = true, onFilterOpen }: LayoutProps) => {
           sx={{ 
             display: 'flex', 
             justifyContent: 'space-between',
-            minHeight: { xs: '48px', sm: '56px' }
+            minHeight: { xs: '40px', sm: '50px' }
           }}
         >
           {/* Left side of header */}
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center' }}>
             {/* Mobile menu icon - only on mobile */}
             <IconButton
               color="inherit"
@@ -170,6 +170,7 @@ const Layout = ({ children, isFooter = true, onFilterOpen }: LayoutProps) => {
             </IconButton>
 
             {/* Logo */}
+            {!isFeedPage && (
             <Typography
               component={Link}
               href="/"
@@ -184,6 +185,7 @@ const Layout = ({ children, isFooter = true, onFilterOpen }: LayoutProps) => {
             >
               <span style={{ color: '#0066FF' }}>t</span>
             </Typography>
+            )}
             
             {/* Feed text - only on feed page */}
             {isFeedPage && (
@@ -227,7 +229,7 @@ const Layout = ({ children, isFooter = true, onFilterOpen }: LayoutProps) => {
           </Box>
 
           {/* Right side of header */}
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center' }}>
             {/* Login button for non-logged in users */}
             {!isAuthenticated && (
               <Button 
