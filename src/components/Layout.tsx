@@ -21,6 +21,7 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useAuth } from '../context/AuthContext';
 import NotificationDrawer from './NotificationDrawer';
+import Banner from './Banner';
 import { getNotifications } from '../services/api';
 import { NotificationsNone } from '@mui/icons-material';
 import { Notification } from '../types';
@@ -281,6 +282,7 @@ const Layout = ({ children, isFooter = true, onFilterOpen }: LayoutProps) => {
                 <IconButton 
                   onClick={(e) => handleProfileMenu(e)}
                   sx={{
+                    display:{xs:'none',md:'block'},
                     color: 'black',
                     '&:hover': {
                       bgcolor: 'rgba(0, 0, 0, 0.04)'
@@ -337,6 +339,9 @@ const Layout = ({ children, isFooter = true, onFilterOpen }: LayoutProps) => {
       >
         {drawer}
       </Drawer>
+
+      {/* Display Banner for authenticated users */}
+      {isAuthenticated && <Banner />}
 
       <Container component="main" sx={{ flex: 1, py: 4, px: 0 }}>
         {children}

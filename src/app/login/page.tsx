@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, ChangeEvent, FormEvent, Suspense } from 'react';
-import { Box, Button, Typography, CircularProgress, Link as MuiLink, Alert, Divider, Paper, TextField, InputAdornment } from '@mui/material';
+import { Box, Button, Typography, CircularProgress, Link as MuiLink, Alert, Divider, Paper, TextField, InputAdornment, Fade } from '@mui/material';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { login, googleLogin, verifyOTP, resendOTP, ApiError } from '@/services/api';
@@ -14,6 +14,9 @@ function LoginContent() {
   const searchParams = useSearchParams();
   const { isAuthenticated, setUser } = useAuth();
   const redirectTo = searchParams.get('from') || '/feed';
+
+  // Add page loading state
+  const [isPageLoading, setIsPageLoading] = useState(true);
 
   // OTP related states
   const [otpValues, setOtpValues] = useState<string[]>(Array(6).fill(''));
@@ -33,6 +36,15 @@ function LoginContent() {
 
   // Add new state to track verification reason
   const [verificationReason, setVerificationReason] = useState<'email' | 'mfa'>('email');
+
+  // Initialize the component and set loading to false after a delay
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setIsPageLoading(false);
+    }, 1000); // 1 second loading screen for better UX
+
+    return () => clearTimeout(timer);
+  }, []);
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -258,279 +270,302 @@ function LoginContent() {
       minHeight: '100vh',
       bgcolor: 'background.default'
     }}>
-      <Box sx={{ 
-        display: { xs: 'none', md: 'flex' },
-        width: '50%',
-        bgcolor: '#f5f5f5',
-        alignItems: 'center',
-        justifyContent: 'center',
-        position: 'relative',
-        overflow: 'hidden'
-      }}>
-        <Box
-          component="img"
-          src="/t.png"
-          alt="Login"
-          sx={{
-            width: '100%',
-            height: '100%',
-            objectFit: 'cover'
-          }}
-        />
-      </Box>
-      
-      <Box sx={{ 
-        width: { xs: '100%', md: '50%' },
-        display: 'flex',
-        flexDirection: 'column',
-        justifyContent: 'center',
-        alignItems: 'center',
-        p: { xs: 0, sm: 0 }
-      }}>
-        <Paper elevation={0} sx={{ 
-          width: '100%', 
-          maxWidth: 480,
-          p: { xs: 3, sm: 4 },
-          borderRadius: 3,
-          boxShadow: { xs: 'none', sm: '0px 4px 20px rgba(0, 0, 0, 0.05)' }
+      {isPageLoading ? (
+        // Loading screen
+        <Box sx={{
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          width: '100%',
+          height: '100vh'
         }}>
-         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1, mb: 8 }}>
-          <Link href="/" passHref>
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1, mb: 3 }}>
             <Box
               component="img"
               src="/t.png"
               alt="Logo"
-              sx={{ height: 28, cursor: 'pointer', display: 'block' }}
+              sx={{ height: 40, display: 'block' }}
             />
-          </Link>
-          <Typography variant="h6" sx={{ fontWeight: 600, color: '#000', fontSize: '20px' }}>
-            tourprism
-          </Typography>
-         </Box>
-     
-          
-          {errors.form && (
-            <Alert severity="error" sx={{ mb: 3 }}>
-              {errors.form}
-            </Alert>
-          )}
-          
-          {otpStep ? (
-            // OTP Form
-            <Box component="form">
-              <Typography variant="h6" sx={{ textAlign: 'center', mb: 3, fontWeight: 500 }}>
-                {verificationReason === 'email' 
-                  ? 'Verify Your Email Address' 
-                  : 'Two-Factor Authentication'}
-              </Typography>
-              <Typography variant="body2" sx={{ textAlign: 'center', mb: 4, color: 'text.secondary' }}>
-                {verificationReason === 'email'
-                  ? 'Please enter the 6-digit code sent to your email address to verify your account.'
-                  : 'Please enter the 6-digit security code sent to your email for authentication.'}
-              </Typography>
-              
-              <Box sx={{ display: 'flex', justifyContent: 'center', gap: 1, mb: 3 }}>
-                {otpValues.map((value, index) => (
-                  <TextField
-                    key={index}
-                    id={`otp-input-${index}`}
-                    value={value}
-                    onChange={(e) => handleOTPChange(index, e.target.value)}
-                    onPaste={index === 0 ? handleOTPPaste : undefined}
-                    inputProps={{ 
-                      maxLength: 1,
-                      style: { textAlign: 'center', fontSize: '1.5rem', paddingTop: 8, paddingBottom: 8, fontWeight: 500 }
-                    }}
-                    sx={{ 
-                      width: 45,
-                      '& .MuiOutlinedInput-root': {
-                        borderRadius: 2,
-                        height: 45
-                      }
-                    }}
-                    autoFocus={index === 0}
+            <Typography variant="h5" sx={{ fontWeight: 600, color: '#000' }}>
+              tourprism
+            </Typography>
+          </Box>
+          <CircularProgress size={40} sx={{ color: 'black' }} />
+        </Box>
+      ) : (
+        // Main content (wrap existing content with Fade for smooth transition)
+        <Fade in={!isPageLoading} timeout={500}>
+          <Box sx={{ display: 'flex', width: '100%' }}>
+            <Box sx={{ 
+              display: { xs: 'none', md: 'flex' },
+              width: '50%',
+              bgcolor: '#ffffff',
+              alignItems: 'center',
+              justifyContent: 'center',
+              position: 'relative',
+              overflow: 'hidden'
+            }}>
+              <Box
+                component="img"
+                src="/t.png"
+                alt="Login"
+                sx={{
+                  width: '60%',
+                  height: '60%',
+                  objectFit: 'cover',
+                }}
+              />
+            </Box>
+            
+            <Box sx={{ 
+              width: { xs: '100%', md: '50%' },
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'center',
+              alignItems: 'center',
+              p: { xs: 0, sm: 0 }
+            }}>
+              <Paper elevation={0} sx={{ 
+                width: '100%', 
+                maxWidth: 480,
+                p: { xs: 3, sm: 4 },
+                borderRadius: 3,
+              }}>
+               <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1, mb: 8 }}>
+                <Link href="/" passHref>
+                  <Box
+                    component="img"
+                    src="/t.png"
+                    alt="Logo"
+                    sx={{ height: 28, cursor: 'pointer', display: 'block' }}
                   />
-                ))}
-              </Box>
-              
-              {errors.otp && (
-                <Alert 
-                  severity={errors.otpSuccess ? "success" : "error"} 
-                  sx={{ mb: 3 }}
-                >
-                  {errors.otp}
-                </Alert>
-              )}
-              
-              <Box sx={{ textAlign: 'center', mb: 3 }}>
-                {timer > 0 ? (
-                  <Typography variant="body2" color="text.secondary">
-                    Resend OTP in {timer} seconds
-                  </Typography>
-                ) : (
-                  <Button 
-                    onClick={handleResendOTP}
-                    disabled={isLoading}
-                    sx={{ textTransform: 'none', color: 'black' }}
-                  >
-                    Resend OTP
-                  </Button>
-                )}
-              </Box>
-              
-              <Button
-                fullWidth
-                variant="contained"
-                disabled={isLoading || otpValues.some(val => val === '')}
-                onClick={validateOTP}
-                sx={{
-                  bgcolor: 'black',
-                  color: 'white',
-                  py: 1.5,
-                  borderRadius: 2,
-                  '&:hover': {
-                    bgcolor: '#333'
-                  }
-                }}
-              >
-                {isLoading ? <CircularProgress size={24} sx={{ color: 'white' }} /> : 'Verify OTP'}
-              </Button>
-            </Box>
-          ) : (
-            // Login Form
-            <Box component="form" onSubmit={handleSubmit}>
-              <Box sx={{ mb: 1 }}>
-                <Typography variant="body2" sx={{ mb: 1, fontWeight: 500 }}>
-                  Email Address
-                </Typography>
-                <TextField
-                  fullWidth
-                  name="email"
-                  placeholder="your@email.com"
-                  value={formData.email}
-                  onChange={handleChange}
-                  error={!!errors.email}
-                  helperText={errors.email}
-                  InputProps={{
-                    startAdornment: (
-                      <InputAdornment position="start">
-                        <i className="ri-mail-line"></i>
-                      </InputAdornment>
-                    ),
-                    sx: { borderRadius: 2,
-                      height: 45
-                    }
-                  }}
-                />
-              </Box>
-              
-              <Box sx={{ mb: 2 }}>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-                  <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                    Password
-                  </Typography>
-                  <Link href="/forgot-password" passHref>
-                    <MuiLink 
-                      underline="hover" 
-                      sx={{ color: 'black', fontWeight: 500, fontSize: '0.875rem' }}
-                    >
-                      Forgot Password?
-                    </MuiLink>
-                  </Link>
-                </Box>
-                <TextField
-                  fullWidth
-                  type={showPassword ? "text" : "password"}
-                  name="password"
-                  placeholder="Enter your password"
-                  value={formData.password}
-                  onChange={handleChange}
-                  error={!!errors.password}
-                  helperText={errors.password}
-                  InputProps={{
-                    startAdornment: (
-                      <InputAdornment position="start">
-                        <i className="ri-lock-line"></i>
-                      </InputAdornment>
-                    ),
-                    endAdornment: (
-                      <InputAdornment position="end">
-                        <Button
-                          onClick={togglePasswordVisibility}
-                          tabIndex={-1}
-                          sx={{ minWidth: 'auto', p: 0.5 }}
-                        >
-                          <i className={showPassword ? "ri-eye-off-line" : "ri-eye-line"}></i>
-                        </Button>
-                      </InputAdornment>
-                    ),
-                    sx: { borderRadius: 2,
-                      height: 45
-                    }
-                  }}
-                />
-              </Box>
-              
-              <Button
-                type="submit"
-                fullWidth
-                variant="contained"
-                disabled={isLoading}
-                sx={{
-                  bgcolor: 'black',
-                  color: 'white',
-                  py: 1.5,
-                  borderRadius: 2,
-                  height: 45,
-                  '&:hover': {
-                    bgcolor: '#333'
-                  }
-                }}
-              >
-                {isLoading ? <CircularProgress size={24} sx={{ color: 'white' }} /> : 'Sign In'}
-              </Button>
-
-              <Box sx={{ mt: 2, textAlign: 'center' }}>
-                <Link href="/signup" passHref>
-                  <MuiLink 
-                    underline="hover" 
-                    sx={{ color: '#056CF2' }}
-                  >
-                    Sign Up
-                  </MuiLink>
                 </Link>
-              </Box>
-              
-              <Divider sx={{ my: 3 }}>
-                <Typography variant="body2" color="text.secondary">
-                  OR
+                <Typography variant="h6" sx={{ fontWeight: 600, color: '#000', fontSize: '20px' }}>
+                  tourprism
                 </Typography>
-              </Divider>
-              
-              <Button
-                fullWidth
-                variant="outlined"
-                onClick={handleGoogleLogin}
-                startIcon={<Image src="/images/pngwing.png" alt="Google" width={20} height={20} />}
-                sx={{
-                  borderColor: '#ddd',
-                  color: '#333',
-                  py: 1.5,
-                  borderRadius: 10,
-                  height: 45,
-                  textTransform: 'none',
-                  '&:hover': {
-                    borderColor: '#ccc',
-                    bgcolor: 'rgba(0,0,0,0.02)'
-                  }
-                }}
-              >
-                Continue with Google
-              </Button>
+               </Box>
+           
+                
+                {errors.form && (
+                  <Alert severity="error" sx={{ mb: 3 }}>
+                    {errors.form}
+                  </Alert>
+                )}
+                
+                {otpStep ? (
+                  // OTP Form
+                  <Box component="form">
+                    <Typography variant="h6" sx={{ textAlign: 'center', mb: 3, fontWeight: 500 }}>
+                      {verificationReason === 'email' 
+                        ? 'Verify Your Email Address' 
+                        : 'Two-Factor Authentication'}
+                    </Typography>
+                    <Typography variant="body2" sx={{ textAlign: 'center', mb: 4, color: 'text.secondary' }}>
+                      {verificationReason === 'email'
+                        ? 'Please enter the 6-digit code sent to your email address to verify your account.'
+                        : 'Please enter the 6-digit security code sent to your email for authentication.'}
+                    </Typography>
+                    
+                    <Box sx={{ display: 'flex', justifyContent: 'center', gap: 1, mb: 3 }}>
+                      {otpValues.map((value, index) => (
+                        <TextField
+                          key={index}
+                          id={`otp-input-${index}`}
+                          value={value}
+                          onChange={(e) => handleOTPChange(index, e.target.value)}
+                          onPaste={index === 0 ? handleOTPPaste : undefined}
+                          inputProps={{ 
+                            maxLength: 1,
+                            style: { textAlign: 'center', fontSize: '1.5rem', paddingTop: 8, paddingBottom: 8, fontWeight: 500 }
+                          }}
+                          sx={{ 
+                            width: 45,
+                            '& .MuiOutlinedInput-root': {
+                              borderRadius: 2,
+                              height: 45
+                            }
+                          }}
+                          autoFocus={index === 0}
+                        />
+                      ))}
+                    </Box>
+                    
+                    {errors.otp && (
+                      <Alert 
+                        severity={errors.otpSuccess ? "success" : "error"} 
+                        sx={{ mb: 3 }}
+                      >
+                        {errors.otp}
+                      </Alert>
+                    )}
+                    
+                    <Box sx={{ textAlign: 'center', mb: 3 }}>
+                      {timer > 0 ? (
+                        <Typography variant="body2" color="text.secondary">
+                          Resend OTP in {timer} seconds
+                        </Typography>
+                      ) : (
+                        <Button 
+                          onClick={handleResendOTP}
+                          disabled={isLoading}
+                          sx={{ textTransform: 'none', color: 'black' }}
+                        >
+                          Resend OTP
+                        </Button>
+                      )}
+                    </Box>
+                    
+                    <Button
+                      fullWidth
+                      variant="contained"
+                      disabled={isLoading || otpValues.some(val => val === '')}
+                      onClick={validateOTP}
+                      sx={{
+                        bgcolor: 'black',
+                        color: 'white',
+                        py: 1.5,
+                        borderRadius: 2,
+                        '&:hover': {
+                          bgcolor: '#333'
+                        }
+                      }}
+                    >
+                      {isLoading ? <CircularProgress size={24} sx={{ color: 'white' }} /> : 'Verify OTP'}
+                    </Button>
+                  </Box>
+                ) : (
+                  // Login Form
+                  <Box component="form" onSubmit={handleSubmit}>
+                    <Box sx={{ mb: 3 }}>
+                      <TextField
+                        fullWidth
+                        name="email"
+                        placeholder="your@email.com"
+                        value={formData.email}
+                        onChange={handleChange}
+                        error={!!errors.email}
+                        helperText={errors.email}
+                        InputProps={{
+                          startAdornment: (
+                            <InputAdornment position="start">
+                              <i className="ri-mail-line"></i>
+                            </InputAdornment>
+                          ),
+                          sx: { borderRadius: 2,
+                            height: 45
+                          }
+                        }}
+                      />
+                    </Box>
+                    
+                    <Box sx={{ mb: 2 }}>
+                      <TextField
+                        fullWidth
+                        type={showPassword ? "text" : "password"}
+                        name="password"
+                        placeholder="Enter your password"
+                        value={formData.password}
+                        onChange={handleChange}
+                        error={!!errors.password}
+                        helperText={errors.password}
+                        InputProps={{
+                          startAdornment: (
+                            <InputAdornment position="start">
+                              <i className="ri-lock-line"></i>
+                            </InputAdornment>
+                          ),
+                          endAdornment: (
+                            <InputAdornment position="end">
+                              <Button
+                                onClick={togglePasswordVisibility}
+                                tabIndex={-1}
+                                sx={{ minWidth: 'auto', p: 0.5 }}
+                              >
+                                <i className={showPassword ? "ri-eye-off-line" : "ri-eye-line"}></i>
+                              </Button>
+                            </InputAdornment>
+                          ),
+                          sx: { borderRadius: 2,
+                            height: 45
+                          }
+                        }}
+                      />
+                      <Box sx={{display:'flex',justifyContent:'end',mt:2}}>
+                      <Link href="/forgot-password" passHref>
+                          <MuiLink 
+                            underline="hover" 
+                            sx={{ color: 'black', fontWeight: 500, fontSize: '0.875rem' }}
+                          >
+                            Forgot Password?
+                          </MuiLink>
+                        </Link>
+                      </Box>
+                    </Box>
+                    
+                    <Button
+                      type="submit"
+                      fullWidth
+                      variant="contained"
+                      disabled={isLoading}
+                      sx={{
+                        bgcolor: 'black',
+                        color: 'white',
+                        py: 1.5,
+                        borderRadius: 2,
+                        height: 45,
+                        '&:hover': {
+                          bgcolor: '#333'
+                        }
+                      }}
+                    >
+                      {isLoading ? <CircularProgress size={24} sx={{ color: 'white' }} /> : 'Sign In'}
+                    </Button>
+
+                    <Box sx={{ mt: 2, textAlign: 'center' }}>
+                      <Link href="/signup" passHref>
+                        <MuiLink 
+                          underline="hover" 
+                          sx={{ color: '#056CF2' }}
+                        >
+                          Sign Up
+                        </MuiLink>
+                      </Link>
+                    </Box>
+                    
+                    <Divider sx={{ my: 3 }}>
+                      <Typography variant="body2" color="text.secondary">
+                        OR
+                      </Typography>
+                    </Divider>
+                    
+                    <Button
+                      fullWidth
+                      variant="outlined"
+                      onClick={handleGoogleLogin}
+                      startIcon={<Image src="/images/pngwing.png" alt="Google" width={20} height={20} />}
+                      sx={{
+                        borderColor: '#ddd',
+                        color: '#333',
+                        py: 1.5,
+                        borderRadius: 10,
+                        height: 45,
+                        textTransform: 'none',
+                        '&:hover': {
+                          borderColor: '#ccc',
+                          bgcolor: 'rgba(0,0,0,0.02)'
+                        }
+                      }}
+                    >
+                      Continue with Google
+                    </Button>
+                  </Box>
+                )}
+              </Paper>
             </Box>
-          )}
-        </Paper>
-      </Box>
+          </Box>
+        </Fade>
+      )}
     </Box>
   );
 }
@@ -538,7 +573,29 @@ function LoginContent() {
 // This is the main component that Next.js will use
 export default function Login() {
   return (
-    <Suspense fallback={<div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}><CircularProgress /></div>}>
+    <Suspense fallback={
+      <Box sx={{
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        width: '100%',
+        height: '100vh'
+      }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1, mb: 3 }}>
+          <Box
+            component="img"
+            src="/t.png"
+            alt="Logo"
+            sx={{ height: 40, display: 'block' }}
+          />
+          <Typography variant="h5" sx={{ fontWeight: 600, color: '#000' }}>
+            tourprism
+          </Typography>
+        </Box>
+        <CircularProgress size={40} sx={{ color: 'black' }} />
+      </Box>
+    }>
       <LoginContent />
     </Suspense>
   );

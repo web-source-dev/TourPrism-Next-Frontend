@@ -534,7 +534,7 @@ export default function Feed() {
   if (!locationConfirmed) {
     return (
       <Layout>
-        <Box sx={{ p: 2, display: 'flex', flexDirection: 'column', alignItems: 'center', mt: 4 }}>
+        <Box sx={{ p: 2, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
           <Typography variant="h5" gutterBottom sx={{ fontWeight: 'bold', mb: 2 }}>
             {city ? 'Change Your Location' : 'Choose Your Location'}
           </Typography>
@@ -607,7 +607,7 @@ export default function Feed() {
 
   return (
     <Layout onFilterOpen={() => isAuthenticated ? setIsFilterDrawerOpen(true) : setLoginDialogOpen(true)}>
-      <Box sx={{ p: 2, maxWidth: 1500, mx: 'auto' }}>
+      <Box sx={{ px: 2, maxWidth: 1500, mx: 'auto' }}>
         <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <Box>
             <Typography variant="h6" sx={{ fontWeight: 'bold' }}>

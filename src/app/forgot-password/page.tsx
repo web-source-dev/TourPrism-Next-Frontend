@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, ChangeEvent, FormEvent } from 'react';
-import { Box, Button, Typography, CircularProgress, Link as MuiLink, Alert, Paper, TextField, InputAdornment } from '@mui/material';
+import { Box, Button, Typography, CircularProgress, Link as MuiLink, Alert, Paper, TextField, InputAdornment, Fade } from '@mui/material';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { forgotPassword, verifyResetOTP, resetPassword, resendResetOTP, ApiError } from '@/services/api';
@@ -10,6 +10,9 @@ type ForgotPasswordStep = 'email' | 'otp' | 'password';
 
 export default function ForgotPassword() {
   const router = useRouter();
+
+  // Add page loading state
+  const [isPageLoading, setIsPageLoading] = useState(true);
 
   // Current step in the forgot password flow
   const [currentStep, setCurrentStep] = useState<ForgotPasswordStep>('email');
@@ -32,6 +35,15 @@ export default function ForgotPassword() {
   // Add password visibility states
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
+  // Initialize the component and set loading to false after a delay
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setIsPageLoading(false);
+    }, 2000); // 1 second loading screen for better UX
+
+    return () => clearTimeout(timer);
+  }, []);
 
   useEffect(() => {
     let interval: NodeJS.Timeout;
@@ -288,343 +300,372 @@ export default function ForgotPassword() {
       minHeight: '100vh',
       bgcolor: 'background.default'
     }}>
-      <Box sx={{
-        display: { xs: 'none', md: 'flex' },
-        width: '50%',
-        bgcolor: '#f5f5f5',
-        alignItems: 'center',
-        justifyContent: 'center',
-        position: 'relative',
-        overflow: 'hidden'
-      }}>
-        <Box
-          component="img"
-          src="/t.png"
-          alt="Forgot Password"
-          sx={{
-            width: '100%',
-            height: '100%',
-            objectFit: 'cover'
-          }}
-        />
-      </Box>
-
-      <Box sx={{
-        width: { xs: '100%', md: '50%' },
-        display: 'flex',
-        flexDirection: 'column',
-        justifyContent: 'center',
-        alignItems: 'center',
-        p: { xs: 0, sm: 0 }
-      }}>
-        <Paper elevation={0} sx={{
+      {isPageLoading ? (
+        // Loading screen
+        <Box sx={{
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
           width: '100%',
-          maxWidth: 480,
-          p: { xs: 3, sm: 4 },
-          borderRadius: 3,
-          boxShadow: { xs: 'none', sm: '0px 4px 20px rgba(0, 0, 0, 0.05)' }
+          height: '100vh'
         }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1, mb: 4 }}>
-            <Link href="/" passHref>
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1, mb: 3 }}>
+            <Box
+              component="img"
+              src="/t.png"
+              alt="Logo"
+              sx={{ height: 32, display: 'block' }}
+            />
+            <Typography variant="h5" sx={{ fontWeight: 600, color: '#000' }}>
+              tourprism
+            </Typography>
+          </Box>
+          <CircularProgress size={40} sx={{ color: 'black' }} />
+        </Box>
+      ) : (
+        // Main content (wrap existing content with Fade for smooth transition)
+        <Fade in={!isPageLoading} timeout={500}>
+          <Box sx={{ display: 'flex', width: '100%' }}>
+            <Box sx={{
+              display: { xs: 'none', md: 'flex' },
+              width: '50%',
+              bgcolor: '#ffffff',
+              alignItems: 'center',
+              justifyContent: 'center',
+              position: 'relative',
+              overflow: 'hidden'
+            }}>
               <Box
                 component="img"
                 src="/t.png"
-                alt="Logo"
-                sx={{ height: 28, cursor: 'pointer', display: 'block' }}
-              />
-            </Link>
-            <Typography variant="h6" sx={{ fontWeight: 600, color: '#000', fontSize: '20px' }}>
-              tourprism
-            </Typography>
-
-          </Box>
-          {success ? (
-            // Success message
-            <Box sx={{ textAlign: 'center' }}>
-              <Box
-                component="img"
-                src="/images/success-check.png"
-                alt="Success"
-                sx={{ width: 80, height: 80, mb: 3 }}
-              />
-
-              <Typography variant="h5" sx={{ mb: 2, fontWeight: 'bold' }}>
-                Password Reset Successful
-              </Typography>
-
-              <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
-                Your password has been reset successfully. You will be redirected to the login page shortly.
-              </Typography>
-
-              <Button
-                variant="contained"
-                onClick={() => router.push('/login')}
+                alt="Forgot Password"
                 sx={{
-                  bgcolor: 'black',
-                  color: 'white',
-                  py: 1.5,
-                  px: 4,
-                  borderRadius: 2,
-                  '&:hover': { bgcolor: '#333' }
+                  width: '60%',
+                  height: '60%',
+                  objectFit: 'cover',
+                  mixBlendMode:'multiply'
                 }}
-              >
-                Go to Login
-              </Button>
+              />
             </Box>
-          ) : (
-            <>
-              <Typography variant="h4" component="h1" align="center" sx={{ mb: 2, fontWeight: 'bold', fontSize: '24px' }}>
-                {currentStep === 'email' ? 'Forgot Password' :
-                  currentStep === 'otp' ? 'Verify Your Email' :
-                    'Reset Password'}
-              </Typography>
 
-              <Typography variant="body1" color="text.secondary" align="center" sx={{ mb: 4, fontSize: '14px' }}>
-                {currentStep === 'email' ? 'Enter your email to receive a verification code' :
-                  currentStep === 'otp' ? 'Enter the 6-digit code sent to your email' :
-                    'Create a new password for your account'}
-              </Typography>
-
-              {errors.form && (
-                <Alert severity="error" sx={{ mb: 3 }}>
-                  {errors.form}
-                </Alert>
-              )}
-
-              {currentStep === 'email' && (
-                <Box component="form" onSubmit={handleSubmitEmail}>
-                  <Box sx={{ mb: 4 }}>
-                    <Typography variant="body2" sx={{ mb: 1, fontWeight: 500 }}>
-                      Email Address
-                    </Typography>
-                    <TextField
-                      fullWidth
-                      name="email"
-                      placeholder="your@email.com"
-                      value={formData.email}
-                      onChange={handleChange}
-                      error={!!errors.email}
-                      helperText={errors.email}
-                      InputProps={{
-                        startAdornment: (
-                          <InputAdornment position="start">
-                            <i className="ri-mail-line"></i>
-                          </InputAdornment>
-                        ),
-                        sx: {
-                          borderRadius: 2,
-                          height: 45
-                        }
-                      }}
+            <Box sx={{
+              width: { xs: '100%', md: '50%' },
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'center',
+              alignItems: 'center',
+              p: { xs: 0, sm: 0 }
+            }}>
+              <Paper elevation={0} sx={{
+                width: '100%',
+                maxWidth: 480,
+                p: { xs: 3, sm: 4 },
+                borderRadius: 3,
+              }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1, mb: 4 }}>
+                  <Link href="/" passHref>
+                    <Box
+                      component="img"
+                      src="/t.png"
+                      alt="Logo"
+                      sx={{ height: 28, cursor: 'pointer', display: 'block' }}
                     />
-                  </Box>
+                  </Link>
+                  <Typography variant="h6" sx={{ fontWeight: 600, color: '#000', fontSize: '20px' }}>
+                    tourprism
+                  </Typography>
 
-                  <Button
-                    type="submit"
-                    fullWidth
-                    variant="contained"
-                    disabled={isLoading}
-                    sx={{
-                      bgcolor: 'black',
-                      color: 'white',
-                      py: 1.5,
-                      borderRadius: 2,
-                      '&:hover': {
-                        bgcolor: '#333'
-                      }
-                    }}
-                  >
-                    {isLoading ? <CircularProgress size={24} sx={{ color: 'white' }} /> : 'Send Verification Code'}
-                  </Button>
-
-                  <Box sx={{ mt: 4, textAlign: 'center' }}>
-                    <Typography variant="body2" display="inline">
-                      Remember your password?{' '}
-                    </Typography>
-                    <Link href="/login" passHref>
-                      <MuiLink
-                        underline="hover"
-                        sx={{ color: 'black', fontWeight: 'bold' }}
-                      >
-                        Sign In
-                      </MuiLink>
-                    </Link>
-                  </Box>
                 </Box>
-              )}
+                {success ? (
+                  // Success message
+                  <Box sx={{ textAlign: 'center' }}>
+                    <Box
+                      component="img"
+                      src="/images/success-check.png"
+                      alt="Success"
+                      sx={{ width: 80, height: 80, mb: 3 }}
+                    />
 
-              {currentStep === 'otp' && (
-                <Box component="form">
-                  <Box sx={{ display: 'flex', justifyContent: 'center', gap: 1, mb: 3 }}>
-                    {otpValues.map((value, index) => (
-                      <TextField
-                        key={index}
-                        id={`otp-input-${index}`}
-                        value={value}
-                        onChange={(e) => handleOTPChange(index, e.target.value)}
-                        onKeyDown={(e) => handleOTPKeyDown(e, index)}
-                        onPaste={index === 0 ? handleOTPPaste : undefined}
-                        inputProps={{
-                          maxLength: 1,
-                          style: { textAlign: 'center', fontSize: '1.5rem', paddingTop: 8, paddingBottom: 8 }
-                        }}
-                        sx={{
-                          width: 45,
-                          '& .MuiOutlinedInput-root': {
-                            borderRadius: 2
-                          }
-                        }}
-                        autoFocus={index === 0}
-                      />
-                    ))}
-                  </Box>
+                    <Typography variant="h5" sx={{ mb: 2, fontWeight: 'bold' }}>
+                      Password Reset Successful
+                    </Typography>
 
-                  {errors.otp && (
-                    <Alert
-                      severity={errors.otpSuccess ? "success" : "error"}
-                      sx={{ mb: 3 }}
+                    <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
+                      Your password has been reset successfully. You will be redirected to the login page shortly.
+                    </Typography>
+
+                    <Button
+                      variant="contained"
+                      onClick={() => router.push('/login')}
+                      sx={{
+                        bgcolor: 'black',
+                        color: 'white',
+                        py: 1.5,
+                        px: 4,
+                        borderRadius: 2,
+                        '&:hover': { bgcolor: '#333' }
+                      }}
                     >
-                      {errors.otp}
-                    </Alert>
-                  )}
+                      Go to Login
+                    </Button>
+                  </Box>
+                ) : (
+                  <>
+                    <Typography variant="h4" component="h1" align="center" sx={{ mb: 2, fontWeight: 'bold', fontSize: '24px' }}>
+                      {currentStep === 'email' ? 'Forgot Password' :
+                        currentStep === 'otp' ? 'Verify Your Email' :
+                          'Reset Password'}
+                    </Typography>
 
-                  <Box sx={{ textAlign: 'center', mb: 3 }}>
-                    {timer > 0 ? (
-                      <Typography variant="body2" color="text.secondary">
-                        Resend OTP in {timer} seconds
-                      </Typography>
-                    ) : (
-                      <Button
-                        onClick={handleResendOTP}
-                        disabled={isLoading}
-                        sx={{ textTransform: 'none', color: 'black' }}
-                      >
-                        Resend OTP
-                      </Button>
+                    <Typography variant="body1" color="text.secondary" align="center" sx={{ mb: 4, fontSize: '14px' }}>
+                      {currentStep === 'email' ? 'Enter your email to receive a verification code' :
+                        currentStep === 'otp' ? 'Enter the 6-digit code sent to your email' :
+                          'Create a new password for your account'}
+                    </Typography>
+
+                    {errors.form && (
+                      <Alert severity="error" sx={{ mb: 3 }}>
+                        {errors.form}
+                      </Alert>
                     )}
-                  </Box>
 
-                  <Button
-                    fullWidth
-                    variant="contained"
-                    disabled={isLoading || otpValues.some(val => val === '')}
-                    onClick={validateOTP}
-                    sx={{
-                      bgcolor: 'black',
-                      color: 'white',
-                      py: 1.5,
-                      borderRadius: 2,
-                      '&:hover': {
-                        bgcolor: '#333'
-                      }
-                    }}
-                  >
-                    {isLoading ? <CircularProgress size={24} sx={{ color: 'white' }} /> : 'Verify OTP'}
-                  </Button>
-                </Box>
-              )}
+                    {currentStep === 'email' && (
+                      <Box component="form" onSubmit={handleSubmitEmail}>
+                        <Box sx={{ mb: 4 }}>
+                          <Typography variant="body2" sx={{ mb: 1, fontWeight: 500 }}>
+                            Email Address
+                          </Typography>
+                          <TextField
+                            fullWidth
+                            name="email"
+                            placeholder="your@email.com"
+                            value={formData.email}
+                            onChange={handleChange}
+                            error={!!errors.email}
+                            helperText={errors.email}
+                            InputProps={{
+                              startAdornment: (
+                                <InputAdornment position="start">
+                                  <i className="ri-mail-line"></i>
+                                </InputAdornment>
+                              ),
+                              sx: {
+                                borderRadius: 2,
+                                height: 45
+                              }
+                            }}
+                          />
+                        </Box>
 
-              {currentStep === 'password' && (
-                <Box component="form" onSubmit={handleSubmitPassword}>
-                  <Box sx={{ mb: 3 }}>
-                    <Typography variant="body2" sx={{ mb: 1, fontWeight: 500 }}>
-                      New Password
-                    </Typography>
-                    <TextField
-                      fullWidth
-                      type={showNewPassword ? "text" : "password"}
-                      name="newPassword"
-                      placeholder="Enter your new password"
-                      value={formData.newPassword}
-                      onChange={handleChange}
-                      error={!!errors.newPassword}
-                      helperText={errors.newPassword}
-                      InputProps={{
-                        startAdornment: (
-                          <InputAdornment position="start">
-                            <i className="ri-lock-line"></i>
-                          </InputAdornment>
-                        ),
-                        endAdornment: (
-                          <InputAdornment position="end">
-                            <Button
-                              onClick={toggleNewPasswordVisibility}
-                              tabIndex={-1}
-                              sx={{ minWidth: 'auto', p: 0.5 }}
+                        <Box sx={{ my: 4, textAlign: 'center' }}>
+                          <Typography variant="body2" display="inline">
+                            Remember your password?{' '}
+                          </Typography>
+                          <Link href="/login" passHref>
+                            <MuiLink
+                              underline="hover"
+                              sx={{ color: '#056CF2' }}
                             >
-                              <i className={showNewPassword ? "ri-eye-off-line" : "ri-eye-line"}></i>
-                            </Button>
-                          </InputAdornment>
-                        ),
-                        sx: {
-                          borderRadius: 2,
-                          height: 45
-                        }
-                      }}
-                    />
-                  </Box>
+                              Sign In
+                            </MuiLink>
+                          </Link>
+                        </Box>
+                        <Button
+                          type="submit"
+                          fullWidth
+                          variant="contained"
+                          disabled={isLoading}
+                          sx={{
+                            bgcolor: 'black',
+                            color: 'white',
+                            py: 1.5,
+                            borderRadius: 2,
+                            '&:hover': {
+                              bgcolor: '#333'
+                            }
+                          }}
+                        >
+                          {isLoading ? <CircularProgress size={24} sx={{ color: 'white' }} /> : 'Send Verification Code'}
+                        </Button>
+                      </Box>
+                    )}
 
-                  <Box sx={{ mb: 4 }}>
-                    <Typography variant="body2" sx={{ mb: 1, fontWeight: 500 }}>
-                      Confirm New Password
-                    </Typography>
-                    <TextField
-                      fullWidth
-                      type={showConfirmPassword ? "text" : "password"}
-                      name="confirmPassword"
-                      placeholder="Confirm your new password"
-                      value={formData.confirmPassword}
-                      onChange={handleChange}
-                      error={!!errors.confirmPassword}
-                      helperText={errors.confirmPassword}
-                      InputProps={{
-                        startAdornment: (
-                          <InputAdornment position="start">
-                            <i className="ri-lock-line"></i>
-                          </InputAdornment>
-                        ),
-                        endAdornment: (
-                          <InputAdornment position="end">
+                    {currentStep === 'otp' && (
+                      <Box component="form">
+                        <Box sx={{ display: 'flex', justifyContent: 'center', gap: 1, mb: 3 }}>
+                          {otpValues.map((value, index) => (
+                            <TextField
+                              key={index}
+                              id={`otp-input-${index}`}
+                              value={value}
+                              onChange={(e) => handleOTPChange(index, e.target.value)}
+                              onKeyDown={(e) => handleOTPKeyDown(e, index)}
+                              onPaste={index === 0 ? handleOTPPaste : undefined}
+                              inputProps={{
+                                maxLength: 1,
+                                style: { textAlign: 'center', fontSize: '1.5rem', paddingTop: 8, paddingBottom: 8 }
+                              }}
+                              sx={{
+                                width: 45,
+                                '& .MuiOutlinedInput-root': {
+                                  borderRadius: 2
+                                }
+                              }}
+                              autoFocus={index === 0}
+                            />
+                          ))}
+                        </Box>
+
+                        {errors.otp && (
+                          <Alert
+                            severity={errors.otpSuccess ? "success" : "error"}
+                            sx={{ mb: 3 }}
+                          >
+                            {errors.otp}
+                          </Alert>
+                        )}
+
+                        <Box sx={{ textAlign: 'center', mb: 3 }}>
+                          {timer > 0 ? (
+                            <Typography variant="body2" color="text.secondary">
+                              Resend OTP in {timer} seconds
+                            </Typography>
+                          ) : (
                             <Button
-                              onClick={toggleConfirmPasswordVisibility}
-                              tabIndex={-1}
-                              sx={{ minWidth: 'auto', p: 0.5 }}
+                              onClick={handleResendOTP}
+                              disabled={isLoading}
+                              sx={{ textTransform: 'none', color: 'black' }}
                             >
-                              <i className={showConfirmPassword ? "ri-eye-off-line" : "ri-eye-line"}></i>
+                              Resend OTP
                             </Button>
-                          </InputAdornment>
-                        ),
-                        sx: {
-                          borderRadius: 2,
-                          height: 45
-                        }
-                      }}
-                    />
-                  </Box>
+                          )}
+                        </Box>
 
-                  <Button
-                    type="submit"
-                    fullWidth
-                    variant="contained"
-                    disabled={isLoading}
-                    sx={{
-                      bgcolor: 'black',
-                      color: 'white',
-                      py: 1.5,
-                      borderRadius: 2,
-                      '&:hover': {
-                        bgcolor: '#333'
-                      }
-                    }}
-                  >
-                    {isLoading ? <CircularProgress size={24} sx={{ color: 'white' }} /> : 'Reset Password'}
-                  </Button>
-                </Box>
-              )}
-            </>
-          )}
-        </Paper>
-      </Box>
+                        <Button
+                          fullWidth
+                          variant="contained"
+                          disabled={isLoading || otpValues.some(val => val === '')}
+                          onClick={validateOTP}
+                          sx={{
+                            bgcolor: 'black',
+                            color: 'white',
+                            py: 1.5,
+                            borderRadius: 2,
+                            '&:hover': {
+                              bgcolor: '#333'
+                            }
+                          }}
+                        >
+                          {isLoading ? <CircularProgress size={24} sx={{ color: 'white' }} /> : 'Verify OTP'}
+                        </Button>
+                      </Box>
+                    )}
+
+                    {currentStep === 'password' && (
+                      <Box component="form" onSubmit={handleSubmitPassword}>
+                        <Box sx={{ mb: 3 }}>
+                          <Typography variant="body2" sx={{ mb: 1, fontWeight: 500 }}>
+                            New Password
+                          </Typography>
+                          <TextField
+                            fullWidth
+                            type={showNewPassword ? "text" : "password"}
+                            name="newPassword"
+                            placeholder="Enter your new password"
+                            value={formData.newPassword}
+                            onChange={handleChange}
+                            error={!!errors.newPassword}
+                            helperText={errors.newPassword}
+                            InputProps={{
+                              startAdornment: (
+                                <InputAdornment position="start">
+                                  <i className="ri-lock-line"></i>
+                                </InputAdornment>
+                              ),
+                              endAdornment: (
+                                <InputAdornment position="end">
+                                  <Button
+                                    onClick={toggleNewPasswordVisibility}
+                                    tabIndex={-1}
+                                    sx={{ minWidth: 'auto', p: 0.5 }}
+                                  >
+                                    <i className={showNewPassword ? "ri-eye-off-line" : "ri-eye-line"}></i>
+                                  </Button>
+                                </InputAdornment>
+                              ),
+                              sx: {
+                                borderRadius: 2,
+                                height: 45
+                              }
+                            }}
+                          />
+                        </Box>
+
+                        <Box sx={{ mb: 4 }}>
+                          <Typography variant="body2" sx={{ mb: 1, fontWeight: 500 }}>
+                            Confirm New Password
+                          </Typography>
+                          <TextField
+                            fullWidth
+                            type={showConfirmPassword ? "text" : "password"}
+                            name="confirmPassword"
+                            placeholder="Confirm your new password"
+                            value={formData.confirmPassword}
+                            onChange={handleChange}
+                            error={!!errors.confirmPassword}
+                            helperText={errors.confirmPassword}
+                            InputProps={{
+                              startAdornment: (
+                                <InputAdornment position="start">
+                                  <i className="ri-lock-line"></i>
+                                </InputAdornment>
+                              ),
+                              endAdornment: (
+                                <InputAdornment position="end">
+                                  <Button
+                                    onClick={toggleConfirmPasswordVisibility}
+                                    tabIndex={-1}
+                                    sx={{ minWidth: 'auto', p: 0.5 }}
+                                  >
+                                    <i className={showConfirmPassword ? "ri-eye-off-line" : "ri-eye-line"}></i>
+                                  </Button>
+                                </InputAdornment>
+                              ),
+                              sx: {
+                                borderRadius: 2,
+                                height: 45
+                              }
+                            }}
+                          />
+                        </Box>
+
+                        <Button
+                          type="submit"
+                          fullWidth
+                          variant="contained"
+                          disabled={isLoading}
+                          sx={{
+                            bgcolor: 'black',
+                            color: 'white',
+                            py: 1.5,
+                            borderRadius: 2,
+                            '&:hover': {
+                              bgcolor: '#333'
+                            }
+                          }}
+                        >
+                          {isLoading ? <CircularProgress size={24} sx={{ color: 'white' }} /> : 'Reset Password'}
+                        </Button>
+                      </Box>
+                    )}
+                  </>
+                )}
+              </Paper>
+            </Box>
+          </Box>
+        </Fade>
+      )}
     </Box>
   );
 } 
