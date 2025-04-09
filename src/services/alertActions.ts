@@ -1,8 +1,16 @@
 import { api } from './api';
 
+interface AlertActionResponse {
+  following?: boolean;
+  numberOfFollows?: number;
+  likes?: number;
+  liked?: boolean;
+  flagged?: boolean;
+}
+
 export const followAlert = async (alertId: string) => {
   try {
-    const response = await api.post(`/api/alerts/${alertId}/follow`);
+    const response = await api.post<AlertActionResponse>(`/api/alerts/${alertId}/follow`);
     return {
       following: response.data.following,
       numberOfFollows: response.data.numberOfFollows
@@ -14,7 +22,7 @@ export const followAlert = async (alertId: string) => {
 
 export const likeAlert = async (alertId: string) => {
   try {
-    const response = await api.post(`/api/alerts/${alertId}/like`);
+    const response = await api.post<AlertActionResponse>(`/api/alerts/${alertId}/like`);
     return {
       likes: response.data.likes,
       liked: response.data.liked
@@ -26,7 +34,7 @@ export const likeAlert = async (alertId: string) => {
 
 export const flagAlert = async (alertId: string) => {
   try {
-    const response = await api.post(`/api/alerts/${alertId}/flag`);
+    const response = await api.post<AlertActionResponse>(`/api/alerts/${alertId}/flag`);
     return {
       flagged: response.data.flagged
     };
@@ -37,7 +45,7 @@ export const flagAlert = async (alertId: string) => {
 
 export const shareAlert = async (alertId: string) => {
   try {
-    const response = await api.post(`/api/alerts/${alertId}/share`);
+    const response = await api.post<AlertActionResponse>(`/api/alerts/${alertId}/share`);
     return response.data;
   } catch (error) {
     throw error;
