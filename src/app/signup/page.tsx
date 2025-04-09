@@ -4,7 +4,7 @@ import React, { useState, useEffect, ChangeEvent, FormEvent } from 'react';
 import { Box, Button, Typography, CircularProgress, Link as MuiLink, Alert, Divider, Paper, TextField, InputAdornment } from '@mui/material';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { register, googleLogin, verifyOTP, resendOTP } from '@/services/api';
+import { register, googleLogin, verifyOTP, resendOTP, ApiError } from '@/services/api';
 import { useAuth } from '@/context/AuthContext';
 import Image from 'next/image';
 export default function SignUp() {
@@ -160,11 +160,12 @@ export default function SignUp() {
         otp: 'OTP sent successfully!',
         otpSuccess: 'true'
       });
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Error resending OTP:', error);
+      const apiError = error as ApiError;
       setErrors({
         ...errors,
-        otp: 'Failed to resend OTP. Please try again.'
+        otp: apiError.message || 'Failed to resend OTP. Please try again.'
       });
     } finally {
       setIsLoading(false);
@@ -191,11 +192,12 @@ export default function SignUp() {
       setUserId(response.userId || '');
       setOtpStep(true);
       setTimer(30); // Start 30 second countdown for OTP resend
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Registration error:', error);
+      const apiError = error as ApiError;
       setErrors({
         ...errors,
-        form: 'Registration failed. This email may already be registered.'
+        form: apiError.message || 'Registration failed. This email may already be registered.'
       });
     } finally {
       setIsLoading(false);
@@ -219,11 +221,12 @@ export default function SignUp() {
       
       setUser(response.user);
       router.push('/feed');
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('OTP verification error:', error);
+      const apiError = error as ApiError;
       setErrors({
         ...errors,
-        otp: 'Invalid OTP. Please try again.'
+        otp: apiError.message || 'Invalid OTP. Please try again.'
       });
     } finally {
       setIsLoading(false);

@@ -4,7 +4,7 @@ import React, { useState, useEffect, ChangeEvent, FormEvent, Suspense } from 're
 import { Box, Button, Typography, CircularProgress, Link as MuiLink, Alert, Divider, Paper, TextField, InputAdornment } from '@mui/material';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { login, googleLogin, verifyOTP, resendOTP } from '@/services/api';
+import { login, googleLogin, verifyOTP, resendOTP, ApiError } from '@/services/api';
 import { useAuth } from '@/context/AuthContext';
 import Image from 'next/image';
 
@@ -157,11 +157,12 @@ function LoginContent() {
         otp: 'OTP sent successfully!',
         otpSuccess: 'true'
       });
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Error resending OTP:', error);
+      const apiError = error as ApiError;
       setErrors({
         ...errors,
-        otp: 'Failed to resend OTP. Please try again.'
+        otp: apiError.message || 'Failed to resend OTP. Please try again.'
       });
     } finally {
       setIsLoading(false);
@@ -199,11 +200,12 @@ function LoginContent() {
         setUser(response.user);
         router.push(redirectTo);
       }
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Login error:', error);
+      const apiError = error as ApiError;
       setErrors({
         ...errors,
-        form: 'Invalid email or password. Please try again.'
+        form: apiError.message || 'Invalid email or password. Please try again.'
       });
     } finally {
       setIsLoading(false);
@@ -227,11 +229,12 @@ function LoginContent() {
       
       setUser(response.user);
       router.push(redirectTo);
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('OTP verification error:', error);
+      const apiError = error as ApiError;
       setErrors({
         ...errors,
-        otp: 'Invalid OTP. Please try again.'
+        otp: apiError.message || 'Invalid OTP. Please try again.'
       });
     } finally {
       setIsLoading(false);

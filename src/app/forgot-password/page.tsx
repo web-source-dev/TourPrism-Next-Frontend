@@ -4,7 +4,7 @@ import React, { useState, useEffect, ChangeEvent, FormEvent } from 'react';
 import { Box, Button, Typography, CircularProgress, Link as MuiLink, Alert, Paper, TextField, InputAdornment } from '@mui/material';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { forgotPassword, verifyResetOTP, resetPassword, resendResetOTP } from '@/services/api';
+import { forgotPassword, verifyResetOTP, resetPassword, resendResetOTP, ApiError } from '@/services/api';
 
 type ForgotPasswordStep = 'email' | 'otp' | 'password';
 
@@ -170,11 +170,12 @@ export default function ForgotPassword() {
         otp: 'OTP sent successfully!',
         otpSuccess: 'true'
       });
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Error resending OTP:', error);
+      const apiError = error as ApiError;
       setErrors({
         ...errors,
-        otp: 'Failed to resend OTP. Please try again.'
+        otp: apiError.message || 'Failed to resend OTP. Please try again.'
       });
     } finally {
       setIsLoading(false);
@@ -198,11 +199,12 @@ export default function ForgotPassword() {
       setUserId(response.userId);
       setCurrentStep('otp');
       setTimer(30); // Start 30 second countdown for OTP resend
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Error requesting password reset:', error);
+      const apiError = error as ApiError;
       setErrors({
         ...errors,
-        form: 'Failed to request password reset. Please check your email and try again.'
+        form: apiError.message || 'Failed to request password reset. Please check your email and try again.'
       });
     } finally {
       setIsLoading(false);
@@ -221,11 +223,12 @@ export default function ForgotPassword() {
 
       // Move to password reset step
       setCurrentStep('password');
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('OTP verification error:', error);
+      const apiError = error as ApiError;
       setErrors({
         ...errors,
-        otp: 'Invalid OTP. Please try again.'
+        otp: apiError.message || 'Invalid OTP. Please try again.'
       });
     } finally {
       setIsLoading(false);
@@ -255,11 +258,12 @@ export default function ForgotPassword() {
       setTimeout(() => {
         router.push('/login');
       }, 3000);
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Password reset error:', error);
+      const apiError = error as ApiError;
       setErrors({
         ...errors,
-        form: 'Failed to reset password. Please try again.'
+        form: apiError.message || 'Failed to reset password. Please try again.'
       });
     } finally {
       setIsLoading(false);

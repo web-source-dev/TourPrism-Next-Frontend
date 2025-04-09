@@ -92,8 +92,34 @@ const getErrorMessage = (error: CustomAxiosError): string => {
       'Email already verified': 'Your email is already verified.',
       'Please wait before requesting another OTP': 'Please wait a moment before requesting another verification code.',
       'This email is registered with Google. Please continue with Google login.': 'This email is linked to a Google account. Please use Google Sign In instead.',
+      'Server error': 'We encountered a problem with our server. Please try again later.',
+      'No token provided': 'Your session has expired. Please sign in again.',
+      'Invalid token': 'Your session is invalid. Please sign in again.',
+      'Password must be at least 6 characters long': 'Please use a password that is at least 6 characters long.',
+      'The password provided is too weak': 'Please use a stronger password with a mix of letters, numbers, and symbols.',
+      'Registration successful. Please check your email for verification code.': 'Registration successful! Please check your email for a verification code.',
+      'OTP verified successfully': 'Verification successful!',
+      'Password reset successful': 'Your password has been reset successfully!'
     };
     return messageMap[backendMessage] || backendMessage;
+  }
+
+  // Handle HTTP status code based errors
+  if (error.response) {
+    switch (error.response.status) {
+      case 400:
+        return 'The request contains invalid data. Please check your input and try again.';
+      case 401:
+        return 'You need to be logged in to perform this action.';
+      case 403:
+        return 'You do not have permission to perform this action.';
+      case 404:
+        return 'The requested resource was not found.';
+      case 429:
+        return 'Too many requests. Please try again later.';
+      case 500:
+        return 'Server error. Please try again later.';
+    }
   }
 
   // Default error message
@@ -193,8 +219,7 @@ export const handleGoogleCallback = async (token: string): Promise<User> => {
       localStorage.setItem('user', JSON.stringify(response.data));
       return response.data;
     } catch (error) {
-      const axiosError = error as CustomAxiosError;
-      throw axiosError.response?.data || { message: 'An error occurred' };
+      throw new Error(getErrorMessage(error as CustomAxiosError));
     }
   }
   throw new Error('No token provided');
@@ -215,8 +240,7 @@ export const forgotPassword = async (data: { email: string }): Promise<{ userId:
     const response: CustomAxiosResponse<{ userId: string }> = await api.post('/auth/forgot-password', data);
     return response.data;
   } catch (error) {
-    const axiosError = error as CustomAxiosError;
-    throw axiosError.response?.data || { message: 'An error occurred' };
+    throw new Error(getErrorMessage(error as CustomAxiosError));
   }
 };
 
@@ -231,7 +255,7 @@ export const verifyOTP = async (data: OTPVerifyRequest): Promise<AuthResponse> =
     }
     return response.data;
   } catch (error) {
-    throw { message: getErrorMessage(error as CustomAxiosError) };
+    throw new Error(getErrorMessage(error as CustomAxiosError));
   }
 };
 
@@ -240,7 +264,7 @@ export const verifyResetOTP = async (data: OTPVerifyRequest): Promise<{ success:
     const response: CustomAxiosResponse<{ success: boolean }> = await api.post('/auth/verify-reset-otp', data);
     return response.data;
   } catch (error) {
-    throw { message: getErrorMessage(error as CustomAxiosError) };
+    throw new Error(getErrorMessage(error as CustomAxiosError));
   }
 };
 
@@ -249,7 +273,7 @@ export const resetPassword = async (data: PasswordResetRequest): Promise<{ succe
     const response: CustomAxiosResponse<{ success: boolean }> = await api.post('/auth/reset-password', data);
     return response.data;
   } catch (error) {
-    throw { message: getErrorMessage(error as CustomAxiosError) };
+    throw new Error(getErrorMessage(error as CustomAxiosError));
   }
 };
 
@@ -258,7 +282,7 @@ export const resendOTP = async (data: { userId: string }): Promise<{ success: bo
     const response: CustomAxiosResponse<{ success: boolean }> = await api.post('/auth/resend-otp', data);
     return response.data;
   } catch (error) {
-    throw { message: getErrorMessage(error as CustomAxiosError) };
+    throw new Error(getErrorMessage(error as CustomAxiosError));
   }
 };
 
@@ -267,7 +291,7 @@ export const resendResetOTP = async (data: { userId: string }): Promise<{ succes
     const response: CustomAxiosResponse<{ success: boolean }> = await api.post('/auth/resend-reset-otp', data);
     return response.data;
   } catch (error) {
-    throw { message: getErrorMessage(error as CustomAxiosError) };
+    throw new Error(getErrorMessage(error as CustomAxiosError));
   }
 };
 
@@ -282,8 +306,7 @@ export const createAlert = async (formData: FormData): Promise<Alert> => {
     
     return response.data;
   } catch (error) {
-    const axiosError = error as CustomAxiosError;
-    throw axiosError.response?.data || { message: 'An error occurred' };
+    throw new Error(getErrorMessage(error as CustomAxiosError));
   }
 };
 
@@ -292,8 +315,7 @@ export const getAlerts = async (filters = {}): Promise<{ alerts: Alert[], totalC
     const response: CustomAxiosResponse<{ alerts: Alert[], totalCount: number }> = await api.get('/api/alerts', { params: filters });
     return response.data;
   } catch (error) {
-    const axiosError = error as CustomAxiosError;
-    throw axiosError.response?.data || { message: 'An error occurred' };
+    throw new Error(getErrorMessage(error as CustomAxiosError));
   }
 };
 
@@ -302,8 +324,7 @@ export const getAlertById = async (alertId: string): Promise<Alert> => {
     const response: CustomAxiosResponse<Alert> = await api.get(`/api/alerts/${alertId}`);
     return response.data;
   } catch (error) {
-    const axiosError = error as CustomAxiosError;
-    throw axiosError.response?.data || { message: 'An error occurred' };
+    throw new Error(getErrorMessage(error as CustomAxiosError));
   }
 };
 
@@ -312,8 +333,7 @@ export const getUserAlerts = async (): Promise<Alert[]> => {
     const response: CustomAxiosResponse<Alert[]> = await api.get('/api/alerts/user/my-alerts');
     return response.data;
   } catch (error) {
-    const axiosError = error as CustomAxiosError;
-    throw axiosError.response?.data || { message: 'An error occurred' };
+    throw new Error(getErrorMessage(error as CustomAxiosError));
   }
 };
 
@@ -404,8 +424,7 @@ export const getNotifications = async (): Promise<Notification[]> => {
     const response: CustomAxiosResponse<Notification[]> = await api.get('/api/notifications');
     return response.data;
   } catch (error) {
-    const axiosError = error as CustomAxiosError;
-    throw axiosError.response?.data || { message: 'Error fetching notifications' };
+    throw new Error(getErrorMessage(error as CustomAxiosError));
   }
 };
 
@@ -414,8 +433,7 @@ export const markAsRead = async (notificationId: string): Promise<{ success: boo
     const response: CustomAxiosResponse<{ success: boolean }> = await api.patch(`/api/notifications/${notificationId}/read`);
     return response.data;
   } catch (error) {
-    const axiosError = error as CustomAxiosError;
-    throw axiosError.response?.data || { message: 'Error marking notification as read' };
+    throw new Error(getErrorMessage(error as CustomAxiosError));
   }
 };
 
@@ -424,8 +442,7 @@ export const deleteNotification = async (notificationId: string): Promise<{ succ
     const response: CustomAxiosResponse<{ success: boolean }> = await api.delete(`/api/notifications/${notificationId}`);
     return response.data;
   } catch (error) {
-    const axiosError = error as CustomAxiosError;
-    throw axiosError.response?.data || { message: 'Error deleting notification' };
+    throw new Error(getErrorMessage(error as CustomAxiosError));
   }
 };
 
@@ -434,8 +451,7 @@ export const markAllAsRead = async (): Promise<{ success: boolean }> => {
     const response: CustomAxiosResponse<{ success: boolean }> = await api.patch('/api/notifications/mark-all-read');
     return response.data;
   } catch (error) {
-    const axiosError = error as CustomAxiosError;
-    throw axiosError.response?.data || { message: 'Error marking all notifications as read' };
+    throw new Error(getErrorMessage(error as CustomAxiosError));
   }
 };
 
@@ -523,6 +539,14 @@ interface DashboardStats {
   }[];
   totalSubscribers: number;
   activeUsers: number;
+}
+
+// Define a type for API errors that can be used in catch blocks
+export interface ApiError extends Error {
+  message: string;
+  code?: string;
+  status?: number;
+  data?: unknown;
 }
 
 export const getDashboardStats = async (): Promise<DashboardStats> => {
