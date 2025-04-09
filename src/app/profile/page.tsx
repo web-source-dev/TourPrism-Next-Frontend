@@ -22,6 +22,7 @@ import {
 } from '@mui/material';
 import PersonIcon from '@mui/icons-material/Person';
 import SaveIcon from '@mui/icons-material/Save';
+import Layout from '@/components/Layout';
 
 export default function ProfilePage() {
   const [user, setUser] = useState<User | null>(null);
@@ -137,7 +138,8 @@ export default function ProfilePage() {
   }
 
   return (
-    <Box sx={{ maxWidth: '1000px', margin: '0 auto', padding: '2rem 1rem' }}>
+    <Layout>
+    <Box sx={{ maxWidth: '1000px', margin: '0 auto', padding: '0 1rem' }}>
       <Paper elevation={3} sx={{ borderRadius: '12px', overflow: 'hidden' }}>
         <Box 
           sx={{ 
@@ -294,5 +296,6 @@ export default function ProfilePage() {
         </Alert>
       </Snackbar>
     </Box>
+    </Layout>
   );
 } 
