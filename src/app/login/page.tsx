@@ -1,12 +1,12 @@
 'use client';
 
-import React, { useState, useEffect, ChangeEvent, FormEvent, KeyboardEvent } from 'react';
-import { Box, Button, Typography, CircularProgress, Link as MuiLink, Alert, Divider, Paper, TextField } from '@mui/material';
+import React, { useState, useEffect, ChangeEvent, FormEvent } from 'react';
+import { Box, Button, Typography, CircularProgress, Link as MuiLink, Alert, Divider, Paper, TextField, InputAdornment } from '@mui/material';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { login, googleLogin, verifyOTP, resendOTP } from '@/services/api';
 import { useAuth } from '@/context/AuthContext';
-
+import Image from 'next/image';
 export default function Login() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -26,6 +26,9 @@ export default function Login() {
   });
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
   const [isLoading, setIsLoading] = useState(false);
+
+  // Add new state to track verification reason
+  const [verificationReason, setVerificationReason] = useState<'email' | 'mfa'>('email');
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -84,42 +87,6 @@ export default function Login() {
     // Validate OTP immediately if all digits are filled
     if (newOtpValues.every(val => val !== '')) {
       validateOTP();
-    }
-  };
-
-  const handleOTPKeyDown = (e: KeyboardEvent<HTMLInputElement>, index: number) => {
-    // Handle backspace to clear current box and move to previous
-    if (e.key === 'Backspace') {
-      if (index > 0 && otpValues[index] === '') {
-        const newOtpValues = [...otpValues];
-        newOtpValues[index - 1] = '';
-        setOtpValues(newOtpValues);
-        
-        // Focus previous input
-        const prevInput = document.getElementById(`otp-input-${index - 1}`);
-        if (prevInput) {
-          prevInput.focus();
-        }
-      } else if (otpValues[index] !== '') {
-        // Clear current box
-        const newOtpValues = [...otpValues];
-        newOtpValues[index] = '';
-        setOtpValues(newOtpValues);
-      }
-    }
-    
-    // Handle arrow left/right for navigation
-    if (e.key === 'ArrowLeft' && index > 0) {
-      const prevInput = document.getElementById(`otp-input-${index - 1}`);
-      if (prevInput) {
-        prevInput.focus();
-      }
-    }
-    if (e.key === 'ArrowRight' && index < 5) {
-      const nextInput = document.getElementById(`otp-input-${index + 1}`);
-      if (nextInput) {
-        nextInput.focus();
-      }
     }
   };
 
@@ -212,11 +179,14 @@ export default function Login() {
     try {
       const response = await login(formData);
       
-      // Handle MFA if required
-      if (response.requireMFA) {
+      // Handle MFA or email verification if required
+      if (response.requireMFA || response.needsVerification) {
         setOtpStep(true);
         setUserId(response.userId || '');
         setTimer(30); // Start 30 second countdown for OTP resend
+        
+        // Set verification reason based on response
+        setVerificationReason(response.needsVerification ? 'email' : 'mfa');
       } else {
         // Standard login
         if (typeof window !== 'undefined') {
@@ -287,7 +257,7 @@ export default function Login() {
       }}>
         <Box
           component="img"
-          src="/images/login-image.webp"
+          src="/t.png"
           alt="Login"
           sx={{
             width: '100%',
@@ -303,7 +273,7 @@ export default function Login() {
         flexDirection: 'column',
         justifyContent: 'center',
         alignItems: 'center',
-        p: { xs: 2, sm: 4 }
+        p: { xs: 0, sm: 0 }
       }}>
         <Paper elevation={0} sx={{ 
           width: '100%', 
@@ -312,22 +282,20 @@ export default function Login() {
           borderRadius: 3,
           boxShadow: { xs: 'none', sm: '0px 4px 20px rgba(0, 0, 0, 0.05)' }
         }}>
+         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1, mb: 8 }}>
           <Link href="/" passHref>
-            <Box 
-              component="img" 
-              src="/logo.png" 
-              alt="Logo" 
-              sx={{ height: 40, mb: 4, cursor: 'pointer', display: 'block', mx: 'auto' }}
+            <Box
+              component="img"
+              src="/t.png"
+              alt="Logo"
+              sx={{ height: 28, cursor: 'pointer', display: 'block' }}
             />
           </Link>
-          
-          <Typography variant="h4" component="h1" align="center" sx={{ mb: 1, fontWeight: 'bold' }}>
-            {otpStep ? 'Enter OTP' : 'Welcome Back'}
+          <Typography variant="h6" sx={{ fontWeight: 600, color: '#000', fontSize: '20px' }}>
+            tourprism
           </Typography>
-          
-          <Typography variant="body1" color="text.secondary" align="center" sx={{ mb: 4 }}>
-            {otpStep ? 'Please enter the 6-digit code sent to your email' : 'Sign in to continue to TourPrism'}
-          </Typography>
+         </Box>
+     
           
           {errors.form && (
             <Alert severity="error" sx={{ mb: 3 }}>
@@ -338,6 +306,17 @@ export default function Login() {
           {otpStep ? (
             // OTP Form
             <Box component="form">
+              <Typography variant="h6" sx={{ textAlign: 'center', mb: 3, fontWeight: 500 }}>
+                {verificationReason === 'email' 
+                  ? 'Verify Your Email Address' 
+                  : 'Two-Factor Authentication'}
+              </Typography>
+              <Typography variant="body2" sx={{ textAlign: 'center', mb: 4, color: 'text.secondary' }}>
+                {verificationReason === 'email'
+                  ? 'Please enter the 6-digit code sent to your email address to verify your account.'
+                  : 'Please enter the 6-digit security code sent to your email for authentication.'}
+              </Typography>
+              
               <Box sx={{ display: 'flex', justifyContent: 'center', gap: 1, mb: 3 }}>
                 {otpValues.map((value, index) => (
                   <TextField
@@ -348,12 +327,13 @@ export default function Login() {
                     onPaste={index === 0 ? handleOTPPaste : undefined}
                     inputProps={{ 
                       maxLength: 1,
-                      style: { textAlign: 'center', fontSize: '1.5rem', paddingTop: 8, paddingBottom: 8 }
+                      style: { textAlign: 'center', fontSize: '1.5rem', paddingTop: 8, paddingBottom: 8, fontWeight: 500 }
                     }}
                     sx={{ 
                       width: 45,
                       '& .MuiOutlinedInput-root': {
-                        borderRadius: 2
+                        borderRadius: 2,
+                        height: 45
                       }
                     }}
                     autoFocus={index === 0}
@@ -407,7 +387,7 @@ export default function Login() {
           ) : (
             // Login Form
             <Box component="form" onSubmit={handleSubmit}>
-              <Box sx={{ mb: 3 }}>
+              <Box sx={{ mb: 1 }}>
                 <Typography variant="body2" sx={{ mb: 1, fontWeight: 500 }}>
                   Email Address
                 </Typography>
@@ -420,12 +400,19 @@ export default function Login() {
                   error={!!errors.email}
                   helperText={errors.email}
                   InputProps={{
-                    sx: { borderRadius: 2 }
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <i className="ri-mail-line"></i>
+                      </InputAdornment>
+                    ),
+                    sx: { borderRadius: 2,
+                      height: 45
+                    }
                   }}
                 />
               </Box>
               
-              <Box sx={{ mb: 4 }}>
+              <Box sx={{ mb: 2 }}>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
                   <Typography variant="body2" sx={{ fontWeight: 500 }}>
                     Password
@@ -449,7 +436,14 @@ export default function Login() {
                   error={!!errors.password}
                   helperText={errors.password}
                   InputProps={{
-                    sx: { borderRadius: 2 }
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <i className="ri-lock-line"></i>
+                      </InputAdornment>
+                    ),
+                    sx: { borderRadius: 2,
+                      height: 45
+                    }
                   }}
                 />
               </Box>
@@ -464,6 +458,7 @@ export default function Login() {
                   color: 'white',
                   py: 1.5,
                   borderRadius: 2,
+                  height: 45,
                   '&:hover': {
                     bgcolor: '#333'
                   }
@@ -471,6 +466,17 @@ export default function Login() {
               >
                 {isLoading ? <CircularProgress size={24} sx={{ color: 'white' }} /> : 'Sign In'}
               </Button>
+
+              <Box sx={{ mt: 2, textAlign: 'center' }}>
+                <Link href="/signup" passHref>
+                  <MuiLink 
+                    underline="hover" 
+                    sx={{ color: '#056CF2' }}
+                  >
+                    Sign Up
+                  </MuiLink>
+                </Link>
+              </Box>
               
               <Divider sx={{ my: 3 }}>
                 <Typography variant="body2" color="text.secondary">
@@ -482,12 +488,13 @@ export default function Login() {
                 fullWidth
                 variant="outlined"
                 onClick={handleGoogleLogin}
-                startIcon={<i className="ri-google-fill" style={{ fontSize: 18 }}></i>}
+                startIcon={<Image src="/images/pngwing.png" alt="Google" width={20} height={20} />}
                 sx={{
                   borderColor: '#ddd',
                   color: '#333',
                   py: 1.5,
-                  borderRadius: 2,
+                  borderRadius: 10,
+                  height: 45,
                   textTransform: 'none',
                   '&:hover': {
                     borderColor: '#ccc',
@@ -497,20 +504,6 @@ export default function Login() {
               >
                 Continue with Google
               </Button>
-              
-              <Box sx={{ mt: 4, textAlign: 'center' }}>
-                <Typography variant="body2" display="inline">
-                  Don&apos;t have an account?{' '}
-                </Typography>
-                <Link href="/signup" passHref>
-                  <MuiLink 
-                    underline="hover" 
-                    sx={{ color: 'black', fontWeight: 'bold' }}
-                  >
-                    Sign Up
-                  </MuiLink>
-                </Link>
-              </Box>
             </Box>
           )}
         </Paper>

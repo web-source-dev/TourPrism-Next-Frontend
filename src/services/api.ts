@@ -1,54 +1,87 @@
 import axios from 'axios';
 
-// Define Axios types since import is having issues
-type AxiosInstance = any;
-type AxiosResponse<T = any> = {
+// Define custom types that avoid using 'any'
+interface CustomAxiosRequestConfig {
+  headers?: Record<string, unknown>;
+  baseURL?: string;
+  withCredentials?: boolean;
+  params?: Record<string, unknown>;
+  [key: string]: unknown;
+}
+
+interface CustomAxiosInstance {
+  create: (config: CustomAxiosRequestConfig) => CustomAxiosInstance;
+  interceptors: {
+    request: {
+      use: (onFulfilled: (config: CustomAxiosRequestConfig) => CustomAxiosRequestConfig) => void;
+    };
+    response: {
+      use: (
+        onFulfilled: (response: CustomAxiosResponse<unknown>) => CustomAxiosResponse<unknown>, 
+        onRejected: (error: CustomAxiosError) => Promise<never>
+      ) => void;
+    };
+  };
+  get: <T>(url: string, config?: CustomAxiosRequestConfig) => Promise<CustomAxiosResponse<T>>;
+  post: <T>(url: string, data?: unknown, config?: CustomAxiosRequestConfig) => Promise<CustomAxiosResponse<T>>;
+  put: <T>(url: string, data?: unknown, config?: CustomAxiosRequestConfig) => Promise<CustomAxiosResponse<T>>;
+  delete: <T>(url: string, config?: CustomAxiosRequestConfig) => Promise<CustomAxiosResponse<T>>;
+  patch: <T>(url: string, data?: unknown, config?: CustomAxiosRequestConfig) => Promise<CustomAxiosResponse<T>>;
+}
+
+interface CustomAxiosResponse<T = unknown> {
   data: T;
   status: number;
   statusText: string;
-  headers: any;
-  config: any;
-};
-type AxiosError<T = any> = Error & {
+  headers: Record<string, unknown>;
+  config: Record<string, unknown>;
+}
+
+interface CustomAxiosError<T = unknown> extends Error {
   response?: {
     data: T;
     status: number;
     statusText: string;
-    headers: any;
-    config: any;
+    headers: Record<string, unknown>;
+    config: Record<string, unknown>;
+    message?: string;
   };
-};
-type InternalAxiosRequestConfig = any;
+}
 
 import { User, Alert, Notification } from '../types';
 import Cookies from 'js-cookie';
 
 const API_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://tourprism-backend.onrender.com';
 
-const api: AxiosInstance = axios.create({
+// Cast axios to our custom type that avoids using 'any'
+const api = axios.create({
   baseURL: API_URL,
   withCredentials: true,
-});
+}) as unknown as CustomAxiosInstance;
 
 // Add token to requests if it exists
-api.interceptors.request.use((config: InternalAxiosRequestConfig) => {
+api.interceptors.request.use((config: CustomAxiosRequestConfig) => {
   if (typeof window !== 'undefined') {
     const token = localStorage.getItem('token') || Cookies.get('token');
     if (token) {
+      // Initialize headers if undefined
+      if (!config.headers) {
+        config.headers = {};
+      }
       config.headers.Authorization = `Bearer ${token}`;
     }
   }
   return config;
 });
 
-const getErrorMessage = (error: AxiosError): string => {
+const getErrorMessage = (error: CustomAxiosError): string => {
   // Handle network errors
   if (!error.response) {
     return 'Unable to connect to the server. Please check your internet connection.';
   }
 
   // Handle specific error messages from backend
-  const backendMessage = error.response?.data?.message;
+  const backendMessage = (error.response?.data as { message?: string })?.message;
   if (backendMessage) {
     // Map backend messages to user-friendly messages
     const messageMap: Record<string, string> = {
@@ -69,8 +102,8 @@ const getErrorMessage = (error: AxiosError): string => {
 
 // Response interceptor
 api.interceptors.response.use(
-  (response: AxiosResponse) => response,
-  (error: AxiosError) => {
+  (response: CustomAxiosResponse) => response,
+  (error: CustomAxiosError) => {
     // Check if error is due to authentication and we're not on a public page
     if (error.response?.status === 401 && typeof window !== 'undefined') {
       const publicRoutes = ['/', '/login', '/signup', '/forgot-password', '/feed'];
@@ -93,6 +126,7 @@ interface AuthResponse {
   token: string;
   user: User;
   requireMFA?: boolean;
+  needsVerification?: boolean;
   userId?: string;
   message?: string;
 }
@@ -108,9 +142,9 @@ interface PasswordResetRequest {
   newPassword: string;
 }
 
-export const register = async (userData: any): Promise<AuthResponse> => {
+export const register = async (userData: Record<string, unknown>): Promise<AuthResponse> => {
   try {
-    const response: AxiosResponse<AuthResponse> = await api.post('/auth/register', userData);
+    const response: CustomAxiosResponse<AuthResponse> = await api.post('/auth/register', userData);
     if (response.data.token && typeof window !== 'undefined') {
       localStorage.setItem('token', response.data.token);
       localStorage.setItem('user', JSON.stringify(response.data.user));
@@ -119,13 +153,15 @@ export const register = async (userData: any): Promise<AuthResponse> => {
     }
     return response.data;
   } catch (error) {
-    throw { message: getErrorMessage(error as AxiosError) };
+    throw new Error(getErrorMessage(error as CustomAxiosError));
   }
 };
 
 export const login = async (credentials: { email: string; password: string }): Promise<AuthResponse> => {
   try {
-    const response: AxiosResponse<AuthResponse> = await api.post('/auth/login', credentials);
+    const response: CustomAxiosResponse<AuthResponse> = await api.post('/auth/login', credentials);
+    
+    // Only set token and user in localStorage if they exist in the response
     if (response.data.token && typeof window !== 'undefined') {
       localStorage.setItem('token', response.data.token);
       localStorage.setItem('user', JSON.stringify(response.data.user));
@@ -134,7 +170,7 @@ export const login = async (credentials: { email: string; password: string }): P
     }
     return response.data;
   } catch (error) {
-    throw { message: getErrorMessage(error as AxiosError) };
+    throw new Error(getErrorMessage(error as CustomAxiosError));
   }
 };
 
@@ -149,11 +185,11 @@ export const handleGoogleCallback = async (token: string): Promise<User> => {
     localStorage.setItem('token', token);
     // Fetch user data using the token
     try {
-      const response: AxiosResponse<User> = await api.get('/auth/user/profile');
+      const response: CustomAxiosResponse<User> = await api.get('/auth/user/profile');
       localStorage.setItem('user', JSON.stringify(response.data));
       return response.data;
     } catch (error) {
-      const axiosError = error as AxiosError;
+      const axiosError = error as CustomAxiosError;
       throw axiosError.response?.data || { message: 'An error occurred' };
     }
   }
@@ -172,17 +208,17 @@ export const logout = (): void => {
 
 export const forgotPassword = async (data: { email: string }): Promise<{ userId: string }> => {
   try {
-    const response: AxiosResponse<{ userId: string }> = await api.post('/auth/forgot-password', data);
+    const response: CustomAxiosResponse<{ userId: string }> = await api.post('/auth/forgot-password', data);
     return response.data;
   } catch (error) {
-    const axiosError = error as AxiosError;
+    const axiosError = error as CustomAxiosError;
     throw axiosError.response?.data || { message: 'An error occurred' };
   }
 };
 
 export const verifyOTP = async (data: OTPVerifyRequest): Promise<AuthResponse> => {
   try {
-    const response: AxiosResponse<AuthResponse> = await api.post('/auth/verify-email', data);
+    const response: CustomAxiosResponse<AuthResponse> = await api.post('/auth/verify-email', data);
     if (response.data.token && typeof window !== 'undefined') {
       localStorage.setItem('token', response.data.token);
       localStorage.setItem('user', JSON.stringify(response.data.user));
@@ -191,50 +227,50 @@ export const verifyOTP = async (data: OTPVerifyRequest): Promise<AuthResponse> =
     }
     return response.data;
   } catch (error) {
-    throw { message: getErrorMessage(error as AxiosError) };
+    throw { message: getErrorMessage(error as CustomAxiosError) };
   }
 };
 
 export const verifyResetOTP = async (data: OTPVerifyRequest): Promise<{ success: boolean }> => {
   try {
-    const response: AxiosResponse<{ success: boolean }> = await api.post('/auth/verify-reset-otp', data);
+    const response: CustomAxiosResponse<{ success: boolean }> = await api.post('/auth/verify-reset-otp', data);
     return response.data;
   } catch (error) {
-    throw { message: getErrorMessage(error as AxiosError) };
+    throw { message: getErrorMessage(error as CustomAxiosError) };
   }
 };
 
 export const resetPassword = async (data: PasswordResetRequest): Promise<{ success: boolean }> => {
   try {
-    const response: AxiosResponse<{ success: boolean }> = await api.post('/auth/reset-password', data);
+    const response: CustomAxiosResponse<{ success: boolean }> = await api.post('/auth/reset-password', data);
     return response.data;
   } catch (error) {
-    throw { message: getErrorMessage(error as AxiosError) };
+    throw { message: getErrorMessage(error as CustomAxiosError) };
   }
 };
 
 export const resendOTP = async (data: { userId: string }): Promise<{ success: boolean }> => {
   try {
-    const response: AxiosResponse<{ success: boolean }> = await api.post('/auth/resend-otp', data);
+    const response: CustomAxiosResponse<{ success: boolean }> = await api.post('/auth/resend-otp', data);
     return response.data;
   } catch (error) {
-    throw { message: getErrorMessage(error as AxiosError) };
+    throw { message: getErrorMessage(error as CustomAxiosError) };
   }
 };
 
 export const resendResetOTP = async (data: { userId: string }): Promise<{ success: boolean }> => {
   try {
-    const response: AxiosResponse<{ success: boolean }> = await api.post('/auth/resend-reset-otp', data);
+    const response: CustomAxiosResponse<{ success: boolean }> = await api.post('/auth/resend-reset-otp', data);
     return response.data;
   } catch (error) {
-    throw { message: getErrorMessage(error as AxiosError) };
+    throw { message: getErrorMessage(error as CustomAxiosError) };
   }
 };
 
 // Alert related API calls
 export const createAlert = async (formData: FormData): Promise<Alert> => {
   try {
-    const response: AxiosResponse<Alert> = await api.post('/api/alerts/create', formData, {
+    const response: CustomAxiosResponse<Alert> = await api.post('/api/alerts/create', formData, {
       headers: {
         'Content-Type': 'multipart/form-data'
       }
@@ -242,37 +278,37 @@ export const createAlert = async (formData: FormData): Promise<Alert> => {
     
     return response.data;
   } catch (error) {
-    const axiosError = error as AxiosError;
+    const axiosError = error as CustomAxiosError;
     throw axiosError.response?.data || { message: 'An error occurred' };
   }
 };
 
 export const getAlerts = async (filters = {}): Promise<{ alerts: Alert[], totalCount: number }> => {
   try {
-    const response: AxiosResponse<{ alerts: Alert[], totalCount: number }> = await api.get('/api/alerts', { params: filters });
+    const response: CustomAxiosResponse<{ alerts: Alert[], totalCount: number }> = await api.get('/api/alerts', { params: filters });
     return response.data;
   } catch (error) {
-    const axiosError = error as AxiosError;
+    const axiosError = error as CustomAxiosError;
     throw axiosError.response?.data || { message: 'An error occurred' };
   }
 };
 
 export const getAlertById = async (alertId: string): Promise<Alert> => {
   try {
-    const response: AxiosResponse<Alert> = await api.get(`/api/alerts/${alertId}`);
+    const response: CustomAxiosResponse<Alert> = await api.get(`/api/alerts/${alertId}`);
     return response.data;
   } catch (error) {
-    const axiosError = error as AxiosError;
+    const axiosError = error as CustomAxiosError;
     throw axiosError.response?.data || { message: 'An error occurred' };
   }
 };
 
 export const getUserAlerts = async (): Promise<Alert[]> => {
   try {
-    const response: AxiosResponse<Alert[]> = await api.get('/api/alerts/user/my-alerts');
+    const response: CustomAxiosResponse<Alert[]> = await api.get('/api/alerts/user/my-alerts');
     return response.data;
   } catch (error) {
-    const axiosError = error as AxiosError;
+    const axiosError = error as CustomAxiosError;
     throw axiosError.response?.data || { message: 'An error occurred' };
   }
 };
@@ -347,11 +383,11 @@ export const fetchAlerts = async (params: FetchAlertsParams = {}): Promise<{ ale
     
     const endpoint = queryString ? `/api/alerts?${queryString}` : '/api/alerts';
     
-    const response: AxiosResponse<{ alerts: Alert[], totalCount: number }> = await api.get(endpoint);
+    const response: CustomAxiosResponse<{ alerts: Alert[], totalCount: number }> = await api.get(endpoint);
     return response.data;
   } catch (error) {
     console.error('Error fetching alerts:', error);
-    const axiosError = error as AxiosError;
+    const axiosError = error as CustomAxiosError;
     throw axiosError.response?.data || {
       message: 'Failed to fetch alerts. Please try again later.',
       error: (error as Error).message
@@ -361,40 +397,40 @@ export const fetchAlerts = async (params: FetchAlertsParams = {}): Promise<{ ale
 
 export const getNotifications = async (): Promise<Notification[]> => {
   try {
-    const response: AxiosResponse<Notification[]> = await api.get('/api/notifications');
+    const response: CustomAxiosResponse<Notification[]> = await api.get('/api/notifications');
     return response.data;
   } catch (error) {
-    const axiosError = error as AxiosError;
+    const axiosError = error as CustomAxiosError;
     throw axiosError.response?.data || { message: 'Error fetching notifications' };
   }
 };
 
 export const markAsRead = async (notificationId: string): Promise<{ success: boolean }> => {
   try {
-    const response: AxiosResponse<{ success: boolean }> = await api.patch(`/api/notifications/${notificationId}/read`);
+    const response: CustomAxiosResponse<{ success: boolean }> = await api.patch(`/api/notifications/${notificationId}/read`);
     return response.data;
   } catch (error) {
-    const axiosError = error as AxiosError;
+    const axiosError = error as CustomAxiosError;
     throw axiosError.response?.data || { message: 'Error marking notification as read' };
   }
 };
 
 export const deleteNotification = async (notificationId: string): Promise<{ success: boolean }> => {
   try {
-    const response: AxiosResponse<{ success: boolean }> = await api.delete(`/api/notifications/${notificationId}`);
+    const response: CustomAxiosResponse<{ success: boolean }> = await api.delete(`/api/notifications/${notificationId}`);
     return response.data;
   } catch (error) {
-    const axiosError = error as AxiosError;
+    const axiosError = error as CustomAxiosError;
     throw axiosError.response?.data || { message: 'Error deleting notification' };
   }
 };
 
 export const markAllAsRead = async (): Promise<{ success: boolean }> => {
   try {
-    const response: AxiosResponse<{ success: boolean }> = await api.patch('/api/notifications/mark-all-read');
+    const response: CustomAxiosResponse<{ success: boolean }> = await api.patch('/api/notifications/mark-all-read');
     return response.data;
   } catch (error) {
-    const axiosError = error as AxiosError;
+    const axiosError = error as CustomAxiosError;
     throw axiosError.response?.data || { message: 'Error marking all notifications as read' };
   }
 };

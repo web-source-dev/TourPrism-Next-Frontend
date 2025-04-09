@@ -1,12 +1,12 @@
 'use client';
 
 import React, { useState, useEffect, ChangeEvent, FormEvent } from 'react';
-import { Box, Button, Typography, CircularProgress, Link as MuiLink, Alert, Divider, Paper, TextField } from '@mui/material';
+import { Box, Button, Typography, CircularProgress, Link as MuiLink, Alert, Divider, Paper, TextField, InputAdornment } from '@mui/material';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { register, googleLogin, verifyOTP, resendOTP } from '@/services/api';
 import { useAuth } from '@/context/AuthContext';
-
+import Image from 'next/image';
 export default function SignUp() {
   const router = useRouter();
   const { isAuthenticated, setUser } = useAuth();
@@ -21,7 +21,6 @@ export default function SignUp() {
   const [formData, setFormData] = useState({
     email: '',
     password: '',
-    confirmPassword: ''
   });
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
   const [isLoading, setIsLoading] = useState(false);
@@ -130,13 +129,6 @@ export default function SignUp() {
       newErrors.password = 'Password is required';
     } else if (formData.password.length < 6) {
       newErrors.password = 'Password must be at least 6 characters long';
-    }
-    
-    // Confirm password validation
-    if (!formData.confirmPassword) {
-      newErrors.confirmPassword = 'Please confirm your password';
-    } else if (formData.confirmPassword !== formData.password) {
-      newErrors.confirmPassword = 'Passwords do not match';
     }
     
     setErrors(newErrors);
@@ -259,7 +251,7 @@ export default function SignUp() {
       }}>
         <Box
           component="img"
-          src="/images/signup-image.webp"
+          src="/t.png"
           alt="Sign Up"
           sx={{
             width: '100%',
@@ -275,7 +267,7 @@ export default function SignUp() {
         flexDirection: 'column',
         justifyContent: 'center',
         alignItems: 'center',
-        p: { xs: 2, sm: 4 }
+        p: { xs: 0, sm: 0 }
       }}>
         <Paper elevation={0} sx={{ 
           width: '100%', 
@@ -284,23 +276,19 @@ export default function SignUp() {
           borderRadius: 3,
           boxShadow: { xs: 'none', sm: '0px 4px 20px rgba(0, 0, 0, 0.05)' }
         }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1, mb: 8 }}>
           <Link href="/" passHref>
-            <Box 
-              component="img" 
-              src="/logo.png" 
-              alt="Logo" 
-              sx={{ height: 40, mb: 4, cursor: 'pointer', display: 'block', mx: 'auto' }}
+            <Box
+              component="img"
+              src="/t.png"
+              alt="Logo"
+              sx={{ height: 28, cursor: 'pointer', display: 'block' }}
             />
           </Link>
-          
-          <Typography variant="h4" component="h1" align="center" sx={{ mb: 1, fontWeight: 'bold' }}>
-            {otpStep ? 'Verify Email' : 'Create Account'}
+          <Typography variant="h6" sx={{ fontWeight: 600, color: '#000', fontSize: '20px' }}>
+            tourprism
           </Typography>
-          
-          <Typography variant="body1" color="text.secondary" align="center" sx={{ mb: 4 }}>
-            {otpStep ? 'Please enter the 6-digit code sent to your email' : 'Join TourPrism to access real-time safety alerts'}
-          </Typography>
-          
+         </Box>
           {errors.form && (
             <Alert severity="error" sx={{ mb: 3 }}>
               {errors.form}
@@ -308,7 +296,15 @@ export default function SignUp() {
           )}
           
           {otpStep ? (
-            // OTP Form
+       <>
+            <Box sx={{ display: 'flex', flexDirection: 'column',alignItems: 'center', justifyContent: 'center', gap: 1, mb: 3 }}>
+              <Typography variant="body1" sx={{ mb: 1, fontWeight: 'bold', fontSize: '20px' }}>
+                Verify Email
+              </Typography>
+              <Typography variant="body2" sx={{ mb: 1,textAlign: 'center', fontWeight: 500 ,fontSize: '16px'}}>
+                Please enter the 6-digit code sent to your email {formData.email}
+              </Typography>
+            </Box>
             <Box component="form">
               <Box sx={{ display: 'flex', justifyContent: 'center', gap: 1, mb: 3 }}>
                 {otpValues.map((value, index) => (
@@ -377,6 +373,7 @@ export default function SignUp() {
                 {isLoading ? <CircularProgress size={24} sx={{ color: 'white' }} /> : 'Verify Email'}
               </Button>
             </Box>
+       </>
           ) : (
             // Signup Form
             <Box component="form" onSubmit={handleSubmit}>
@@ -393,7 +390,14 @@ export default function SignUp() {
                   error={!!errors.email}
                   helperText={errors.email}
                   InputProps={{
-                    sx: { borderRadius: 2 }
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <i className="ri-mail-line"></i>
+                      </InputAdornment>
+                    ),
+                    sx: { borderRadius: 2,
+                      height: 45
+                    }
                   }}
                 />
               </Box>
@@ -412,26 +416,14 @@ export default function SignUp() {
                   error={!!errors.password}
                   helperText={errors.password}
                   InputProps={{
-                    sx: { borderRadius: 2 }
-                  }}
-                />
-              </Box>
-              
-              <Box sx={{ mb: 4 }}>
-                <Typography variant="body2" sx={{ mb: 1, fontWeight: 500 }}>
-                  Confirm Password
-                </Typography>
-                <TextField
-                  fullWidth
-                  type="password"
-                  name="confirmPassword"
-                  placeholder="Confirm your password"
-                  value={formData.confirmPassword}
-                  onChange={handleChange}
-                  error={!!errors.confirmPassword}
-                  helperText={errors.confirmPassword}
-                  InputProps={{
-                    sx: { borderRadius: 2 }
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <i className="ri-lock-line"></i>
+                      </InputAdornment>
+                    ),
+                    sx: { borderRadius: 2,
+                      height: 45
+                    }
                   }}
                 />
               </Box>
@@ -453,6 +445,17 @@ export default function SignUp() {
               >
                 {isLoading ? <CircularProgress size={24} sx={{ color: 'white' }} /> : 'Create Account'}
               </Button>
+
+              <Box sx={{ mt: 2, textAlign: 'center' }}>
+                <Link href="/login" passHref>
+                  <MuiLink 
+                    underline="hover" 
+                    sx={{ color: '#056CF2' }}
+                  >
+                    Sign In
+                  </MuiLink>
+                </Link>
+              </Box>
               
               <Divider sx={{ my: 3 }}>
                 <Typography variant="body2" color="text.secondary">
@@ -464,12 +467,12 @@ export default function SignUp() {
                 fullWidth
                 variant="outlined"
                 onClick={handleGoogleSignUp}
-                startIcon={<i className="ri-google-fill" style={{ fontSize: 18 }}></i>}
+                startIcon={<Image src="/images/pngwing.png" alt="Google" width={20} height={20} />}
                 sx={{
                   borderColor: '#ddd',
                   color: '#333',
                   py: 1.5,
-                  borderRadius: 2,
+                  borderRadius: 10,
                   textTransform: 'none',
                   '&:hover': {
                     borderColor: '#ccc',
@@ -479,20 +482,6 @@ export default function SignUp() {
               >
                 Continue with Google
               </Button>
-              
-              <Box sx={{ mt: 4, textAlign: 'center' }}>
-                <Typography variant="body2" display="inline">
-                  Already have an account?{' '}
-                </Typography>
-                <Link href="/login" passHref>
-                  <MuiLink 
-                    underline="hover" 
-                    sx={{ color: 'black', fontWeight: 'bold' }}
-                  >
-                    Sign In
-                  </MuiLink>
-                </Link>
-              </Box>
             </Box>
           )}
         </Paper>

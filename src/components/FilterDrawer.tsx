@@ -87,7 +87,7 @@ const FilterDrawer = ({
 
   const getTimeRangeLabel = (value: number) => {
     if (value === 0) return 'All Time';
-    return `${value} ${value === 1 ? 'Day' : 'Days'}`;
+    return `Next ${value} ${value === 1 ? 'Day' : 'Days'}`;
   };
 
   const handleApplyFiltersClick = () => {
@@ -181,7 +181,7 @@ const FilterDrawer = ({
         <Divider sx={{ my: 2, bgcolor: '#eee' }} />
         <Box sx={{ mb: 1 }}>
           <Typography variant="subtitle2" gutterBottom>
-            Time Range
+            Time Horizon
           </Typography>
           <Box sx={{ px: 1 }}>
             <Slider

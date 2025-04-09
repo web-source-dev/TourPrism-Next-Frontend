@@ -3,7 +3,7 @@ export interface User {
   email: string;
   name?: string;
   isVerified: boolean;
-  role?: string;
+  role?: 'user' | 'admin' | 'superadmin';
   createdAt: string;
   updatedAt: string;
 }
@@ -28,6 +28,7 @@ export interface Alert {
   addToEmailSummary?: boolean;
   previousVersionNotes?: string;
   updatedBy?: string;
+  userId?: User | string;
   location: string;
   latitude: number;
   longitude: number;
@@ -92,6 +93,8 @@ export interface AlertFormData {
   city: string;
   country?: string;
   media?: Media[];
+  expectedStart?: Date | string;
+  expectedEnd?: Date | string;
 }
 
 export interface ApiError {
@@ -103,6 +106,7 @@ export interface AuthResponse {
   token: string;
   user: User;
   requireMFA?: boolean;
+  needsVerification?: boolean;
   userId?: string;
   message?: string;
 } 

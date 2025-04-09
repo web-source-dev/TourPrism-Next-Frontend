@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef, ChangeEvent, FormEvent } from 'react';
+import React, { useState, useRef, ChangeEvent, FormEvent } from 'react';
 import { 
   Box, 
   Typography, 
@@ -18,11 +18,37 @@ import AlertSubmissionSuccess from '@/components/AlertSubmissionSuccess';
 import { createAlert } from '@/services/api';
 import { AlertFormData } from '@/types';
 import Script from 'next/script';
+import Image from 'next/image';
+
+// Define more specific types for Google Maps API
+interface GoogleMapsPlace {
+  geometry: {
+    location: {
+      lat: () => number;
+      lng: () => number;
+    };
+  };
+  formatted_address?: string;
+  name?: string;
+  address_components?: Array<{
+    long_name: string;
+    types: string[];
+  }>;
+}
 
 // Declare global google type
 declare global {
   interface Window {
-    google: any;
+    google: {
+      maps: {
+        places: {
+          Autocomplete: new (input: HTMLInputElement, options: Record<string, unknown>) => {
+            addListener: (event: string, callback: () => void) => void;
+            getPlace: () => GoogleMapsPlace;
+          };
+        };
+      };
+    };
   }
 }
 
@@ -46,17 +72,14 @@ export default function PostAlert() {
   const [snackbarSeverity, setSnackbarSeverity] = useState<'success' | 'error'>('success');
   
   const autocompleteInputRef = useRef<HTMLInputElement>(null);
-  const autocompleteRef = useRef<any>(null);
+  const autocompleteRef = useRef<{
+    addListener: (event: string, callback: () => void) => void;
+    getPlace: () => GoogleMapsPlace;
+  } | null>(null);
   const googleMapApiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || '';
   
-  useEffect(() => {
-    if (typeof window !== 'undefined' && window.google && window.google.maps && autocompleteInputRef.current) {
-      initializeAutocomplete();
-    }
-  }, []);
-  
   const initializeAutocomplete = () => {
-    if (!autocompleteInputRef.current) return;
+    if (!autocompleteInputRef.current || !window.google || !window.google.maps) return;
     
     autocompleteRef.current = new window.google.maps.places.Autocomplete(
       autocompleteInputRef.current,
@@ -68,9 +91,9 @@ export default function PostAlert() {
     
     // Add listener for place selection
     autocompleteRef.current.addListener('place_changed', () => {
-      const place = autocompleteRef.current.getPlace();
+      const place = autocompleteRef.current?.getPlace();
       
-      if (!place.geometry) {
+      if (!place || !place.geometry) {
         // User entered the name of a Place that was not suggested
         setErrors({ 
           ...errors, 
@@ -81,7 +104,8 @@ export default function PostAlert() {
       
       // Clear the location error if it exists
       if (errors.location) {
-        const { location, ...newErrors } = errors;
+        const { ...newErrors } = errors;
+        delete newErrors.location;
         setErrors(newErrors);
       }
       
@@ -89,7 +113,7 @@ export default function PostAlert() {
     });
   };
   
-  const updateLocationData = (place: any) => {
+  const updateLocationData = (place: GoogleMapsPlace) => {
     let city = '';
     
     // Extract city from address components
@@ -107,12 +131,13 @@ export default function PostAlert() {
     
     setFormData({
       ...formData,
-      location: place.formatted_address || place.name,
+      location: place.formatted_address || place.name || '',
       latitude: place.geometry.location.lat(),
       longitude: place.geometry.location.lng(),
       city: city,
     });
   };
+
   
   const handleIncidentTypeSelect = (type: string) => {
     setErrors({ 
@@ -455,18 +480,16 @@ export default function PostAlert() {
                             mb: 1
                           }}
                         >
-                          <img
-                            src={media.url || (media.file ? URL.createObjectURL(media.file as File) : '')}
-                            alt={`Upload ${index + 1}`}
-                            style={{
-                              position: 'absolute',
-                              top: 0,
-                              left: 0,
-                              width: '100%',
-                              height: '100%',
-                              objectFit: 'cover'
-                            }}
-                          />
+                          <Box sx={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' }}>
+                            <Image
+                              src={media.url || (media.file ? URL.createObjectURL(media.file as File) : '')}
+                              alt={`Upload ${index + 1}`}
+                              fill
+                              style={{
+                                objectFit: 'cover'
+                              }}
+                            />
+                          </Box>
                           <IconButton
                             onClick={() => handleDeleteMedia(index)}
                             sx={{

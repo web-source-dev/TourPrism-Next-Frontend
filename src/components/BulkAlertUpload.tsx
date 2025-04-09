@@ -60,7 +60,7 @@ const BulkAlertUpload = () => {
 
     try {
       const result = await uploadBulkAlerts(file);
-      setUploadResult(result);
+      setUploadResult(result as UploadResult);
     } catch (err) {
       setError(typeof err === 'string' ? err : 'Failed to upload file');
     } finally {
@@ -72,6 +72,7 @@ const BulkAlertUpload = () => {
     try {
       await downloadTemplate();
     } catch (err) {
+      console.error('Error downloading template:', err);
       setError('Failed to download template');
     }
   };
@@ -91,6 +92,8 @@ const BulkAlertUpload = () => {
     { field: 'longitude', description: 'Longitude coordinate (decimal format)', required: true },
     { field: 'city', description: 'City name', required: true },
     { field: 'country', description: 'Country name', required: false },
+    { field: 'expectedStart', description: 'Expected start date/time of the alert (ISO format: YYYY-MM-DDTHH:MM:SS.sssZ)', required: false },
+    { field: 'expectedEnd', description: 'Expected end date/time of the alert (ISO format: YYYY-MM-DDTHH:MM:SS.sssZ)', required: false },
     { field: 'linkToSource', description: 'URL link to source information', required: false },
     { field: 'status', description: 'Status (pending, approved, rejected, published)', required: false },
     { field: 'addToEmailSummary', description: 'Include in email summaries (true/false)', required: false }

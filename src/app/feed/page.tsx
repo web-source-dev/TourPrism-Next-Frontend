@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
   Box, 
   Typography, 
@@ -10,9 +10,16 @@ import {
   Skeleton,
   Dialog,
   DialogContent,
+  DialogTitle,
   CircularProgress,
   Snackbar,
-  Alert as MuiAlert
+  Alert as MuiAlert,
+  DialogActions,
+  List,
+  ListItem,
+  ListItemText,
+  useTheme,
+  useMediaQuery
 } from '@mui/material';
 import { useRouter } from 'next/navigation';
 import Layout from '@/components/Layout';
@@ -48,113 +55,39 @@ export default function Feed() {
   const [filters, setFilters] = useState<FilterOptions>({
     sortBy: 'newest',
     incidentTypes: [],
-    timeRange: 7,
-    distance: 10
+    timeRange: 0,
+    distance: 50
   });
 
-  useEffect(() => {
-    // Check if we have stored location
-    const storedCity = localStorage.getItem('selectedCity');
-    const storedLat = localStorage.getItem('selectedLat');
-    const storedLng = localStorage.getItem('selectedLng');
-    
-    if (storedCity && storedLat && storedLng) {
-      setCity(storedCity);
-      setCoords({
-        latitude: parseFloat(storedLat),
-        longitude: parseFloat(storedLng)
-      });
-      setLocationConfirmed(true);
-      fetchLocationAlerts(storedCity, {
-        latitude: parseFloat(storedLat),
-        longitude: parseFloat(storedLng)
-      });
-    } else {
-      handleUseMyLocation();
-    }
-  }, []);
+  const theme = useTheme();
+  const fullScreen = useMediaQuery(theme.breakpoints.down('sm'));
 
-  const handleFollowUpdate = async (alertId: string) => {
-    if (!isAuthenticated) {
-      // Show login dialog if not authenticated
-      setLoginDialogOpen(true);
-      return;
-    }
-
-    try {
-      const response = await followAlert(alertId);
-      
-      // Use the functional state update to ensure we're working with the latest state
-      setAlerts(prevAlerts => 
-        prevAlerts.map(alert => 
-          alert._id === alertId ? 
-            { 
-              ...alert, 
-              numberOfFollows: response.numberOfFollows, 
-              isFollowing: response.following 
-            } : 
-            alert
-        )
-      );
-      
-      setSnackbar({
-        open: true,
-        message: response.following ? 'You are now following this alert' : 'You have unfollowed this alert',
-        severity: 'success'
-      });
-    } catch (error) {
-      setSnackbar({
-        open: true,
-        message: 'Failed to follow the alert',
-        severity: 'error'
-      });
-    }
-  };
-
-  const formatTime = (createdAt: string) => {
-    const date = new Date(createdAt);
-    const now = new Date();
-    const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
-    
-    if (diffInSeconds < 60) {
-      return `${diffInSeconds}s ago`;
-    }
-    
-    const diffInMinutes = Math.floor(diffInSeconds / 60);
-    if (diffInMinutes < 60) {
-      return `${diffInMinutes}m ago`;
-    }
-    
-    const diffInHours = Math.floor(diffInMinutes / 60);
-    if (diffInHours < 24) {
-      return `${diffInHours}h ago`;
-    }
-    
-    const diffInDays = Math.floor(diffInHours / 24);
-    if (diffInDays < 30) {
-      return `${diffInDays}d ago`;
-    }
-    
-    const diffInMonths = Math.floor(diffInDays / 30);
-    return `${diffInMonths}m ago`;
-  };
-
-  const fetchLocationAlerts = async (cityName: string = "Edinburgh", coordinates: {latitude: number; longitude: number} | null = null) => {
+  // Define the fetchLocationAlerts function with useCallback to avoid recreation on each render
+  const fetchLocationAlerts = useCallback(async (cityName: string = "Edinburgh", coordinates: {latitude: number; longitude: number} | null = null) => {
     setLoading(true);
     try {
-      const params: any = {
+      const params: Record<string, unknown> = {
         page: 1,
         limit: isAuthenticated ? 10 : 3, // Limit to 3 for non-logged in users
         sortBy: filters.sortBy,
       };
       
       // Add time range filter if not set to "All Time"
+      // This now filters based on the alert's expected start/end date
       if (filters.timeRange > 0) {
-        const endDate = new Date();
-        const startDate = new Date();
-        startDate.setDate(startDate.getDate() - filters.timeRange);
-        params.startDate = startDate.toISOString();
-        params.endDate = endDate.toISOString();
+        // Current date as the reference point
+        const now = new Date();
+        
+        // For filtering, we want to include alerts:
+        // 1. That are expected to be active now or in the future
+        // 2. Up to 'timeRange' days from now
+        const futureDate = new Date();
+        futureDate.setDate(futureDate.getDate() + filters.timeRange);
+        
+        // Use as start date for the filter (now)
+        params.startDate = now.toISOString();
+        // Use as end date for the filter (future)
+        params.endDate = futureDate.toISOString();
       }
       
       // Add incident type filters if selected
@@ -210,6 +143,118 @@ export default function Feed() {
     } finally {
       setLoading(false);
     }
+  }, [isAuthenticated, filters]); // Only include dependencies that affect how alerts are fetched
+
+  // Define the handleUseMyLocation function with useCallback
+  const handleUseMyLocation = useCallback(async () => {
+    setLocationLoading(true);
+    setLocationError(null);
+    
+    try {
+      // First attempt with high accuracy
+      const position = await getHighAccuracyLocation(true);
+      await handleLocationSuccess(position, true);
+    } catch (error) {
+      console.error('Error in handleUseMyLocation:', error);
+      try {
+        // Fall back to low accuracy if high accuracy fails
+        const position = await getHighAccuracyLocation(false);
+        await handleLocationSuccess(position, false);
+      } catch (error) {
+        const geolocationError = error as GeolocationPositionError;
+        handleLocationError(geolocationError);
+      }
+    } finally {
+      setLocationLoading(false);
+    }
+  }, [/* eslint-disable-line react-hooks/exhaustive-deps */]); // Dependency array is empty to avoid circular dependencies with handleLocationSuccess and handleLocationError
+
+  useEffect(() => {
+    // Check if we have stored location
+    const storedCity = localStorage.getItem('selectedCity');
+    const storedLat = localStorage.getItem('selectedLat');
+    const storedLng = localStorage.getItem('selectedLng');
+    
+    if (storedCity && storedLat && storedLng) {
+      setCity(storedCity);
+      setCoords({
+        latitude: parseFloat(storedLat),
+        longitude: parseFloat(storedLng)
+      });
+      setLocationConfirmed(true);
+      fetchLocationAlerts(storedCity, {
+        latitude: parseFloat(storedLat),
+        longitude: parseFloat(storedLng)
+      });
+    } else {
+      handleUseMyLocation();
+    }
+  }, [fetchLocationAlerts, handleUseMyLocation]);
+
+  const handleFollowUpdate = async (alertId: string) => {
+    if (!isAuthenticated) {
+      // Show login dialog if not authenticated
+      setLoginDialogOpen(true);
+      return;
+    }
+
+    try {
+      const response = await followAlert(alertId);
+      
+      // Use the functional state update to ensure we're working with the latest state
+      setAlerts(prevAlerts => 
+        prevAlerts.map(alert => 
+          alert._id === alertId ? 
+            { 
+              ...alert, 
+              numberOfFollows: response.numberOfFollows, 
+              isFollowing: response.following 
+            } : 
+            alert
+        )
+      );
+      
+      setSnackbar({
+        open: true,
+        message: response.following ? 'You are now following this alert' : 'You have unfollowed this alert',
+        severity: 'success'
+      });
+    } catch (error) {
+      console.error('Error following alert:', error);
+      setSnackbar({
+        open: true,
+        message: 'Failed to follow the alert',
+        severity: 'error'
+      });
+    }
+  };
+
+  const formatTime = (createdAt: string) => {
+    const date = new Date(createdAt);
+    const now = new Date();
+    const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
+    
+    if (diffInSeconds < 60) {
+      return `${diffInSeconds}s ago`;
+    }
+    
+    const diffInMinutes = Math.floor(diffInSeconds / 60);
+    if (diffInMinutes < 60) {
+      return `${diffInMinutes}m ago`;
+    }
+    
+    const diffInHours = Math.floor(diffInMinutes / 60);
+    if (diffInHours < 24) {
+      return `${diffInHours}h ago`;
+    }
+    
+    const diffInDays = Math.floor(diffInHours / 24);
+    if (diffInDays < 30) {
+      return `${diffInDays}d ago`;
+    }
+    
+    const diffInMonths = Math.floor(diffInDays / 30);
+    return `${diffInMonths}m ago`;
   };
 
   const getHighAccuracyLocation = (highAccuracy = true) => {
@@ -231,46 +276,6 @@ export default function Feed() {
         options
       );
     });
-  };
-
-  const handleUseMyLocation = async () => {
-    setLocationLoading(true);
-    setLocationError(null);
-    
-    try {
-      // First attempt with high accuracy
-      const position = await getHighAccuracyLocation(true);
-      await handleLocationSuccess(position, true);
-    } catch (highAccuracyError) {
-      try {
-        // Fall back to low accuracy if high accuracy fails
-        const position = await getHighAccuracyLocation(false);
-        await handleLocationSuccess(position, false);
-      } catch (error) {
-        const geolocationError = error as GeolocationPositionError;
-        handleLocationError(geolocationError);
-      }
-    } finally {
-      setLocationLoading(false);
-    }
-  };
-
-  const getCityFromCoordinates = async (latitude: number, longitude: number) => {
-    try {
-      const response = await fetch(
-        `https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json`
-      );
-      const data = await response.json();
-      
-      if (data.address) {
-        // Try to get the city, town, or village name
-        return data.address.city || data.address.town || data.address.village || 'Unknown location';
-      }
-      return 'Unknown location';
-    } catch (error) {
-      console.error('Error getting location name:', error);
-      return 'Unknown location';
-    }
   };
 
   const handleLocationSuccess = async (position: GeolocationPosition, highAccuracy = true) => {
@@ -385,19 +390,28 @@ export default function Feed() {
     setLoading(true);
     
     try {
-      const params: any = {
+      const params: Record<string, unknown> = {
         page: nextPage,
         limit: 10,
         sortBy: filters.sortBy,
       };
       
       // Add time range filter if not set to "All Time"
+      // This now filters based on the alert's expected start/end date
       if (filters.timeRange > 0) {
-        const endDate = new Date();
-        const startDate = new Date();
-        startDate.setDate(startDate.getDate() - filters.timeRange);
-        params.startDate = startDate.toISOString();
-        params.endDate = endDate.toISOString();
+        // Current date as the reference point
+        const now = new Date();
+        
+        // For filtering, we want to include alerts:
+        // 1. That are expected to be active now or in the future
+        // 2. Up to 'timeRange' days from now
+        const futureDate = new Date();
+        futureDate.setDate(futureDate.getDate() + filters.timeRange);
+        
+        // Use as start date for the filter (now)
+        params.startDate = now.toISOString();
+        // Use as end date for the filter (future)
+        params.endDate = futureDate.toISOString();
       }
       
       // Add incident type filters if selected
@@ -463,11 +477,28 @@ export default function Feed() {
     setFilters({
       sortBy: 'newest',
       incidentTypes: [],
-      timeRange: 7,
-      distance: 10
+      timeRange: 0,
+      distance: 50
     });
   };
 
+  const getCityFromCoordinates = async (latitude: number, longitude: number) => {
+    try {
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json`
+      );
+      const data = await response.json();
+      
+      if (data.address) {
+        // Try to get the city, town, or village name
+        return data.address.city || data.address.town || data.address.village || 'Unknown location';
+      }
+      return 'Unknown location';
+    } catch (error) {
+      console.error('Error getting location name:', error);
+      return 'Unknown location';
+    }
+  };
 
   if (!locationConfirmed) {
     return (
@@ -566,64 +597,106 @@ export default function Feed() {
                 backgroundColor: 'transparent',
               }}
             >
-              <i className="ri-refresh-line"></i>
+              <i className="ri-map-pin-5-line"> </i>
             </button>
           </Box>
         </Box>
         
-        {/* Low Accuracy Warning */}
-        {lowAccuracyWarning && (
-          <Paper 
-            sx={{ 
-              p: 2, 
-              mb: 3, 
-              bgcolor: '#fff3e0', 
-              border: '1px solid #ffcc80', 
-              borderRadius: 2 
-            }}
-          >
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-              <i className="ri-alert-line" style={{ color: '#ff9800', fontSize: '20px' }}></i>
-              <Typography variant="subtitle1" sx={{ fontWeight: 'bold', color: '#e65100' }}>
-                Low Location Accuracy
-              </Typography>
-            </Box>
-            <Typography variant="body2" sx={{ mb: 1 }}>
-              Your current location accuracy is {locationAccuracy ? `approximately ${Math.round(locationAccuracy)} meters` : 'low'}. This may affect the relevance of alerts shown to you.
+        {/* Low Accuracy Warning Dialog */}
+        <Dialog
+          open={lowAccuracyWarning}
+          onClose={() => setLowAccuracyWarning(false)}
+          fullScreen={fullScreen}
+          PaperProps={{
+            sx: {
+              borderRadius: 2,
+              maxWidth: '500px',
+              width: '100%'
+            }
+          }}
+        >
+          <DialogTitle sx={{ 
+            display: 'flex', 
+            alignItems: 'center', 
+            gap: 1,
+            py: 2
+          }}>
+            <i className="ri-radar-line" style={{ color: '#000', fontSize: '24px' }}></i>
+            <Typography variant="h6" sx={{ fontWeight: 600, color: '#000' }}>
+              Improve Location Accuracy
             </Typography>
-            <Box sx={{ display: 'flex', gap: 1, mt: 2 }}>
-              <Button 
-                size="small" 
-                onClick={() => setLowAccuracyWarning(false)} 
-                sx={{ 
-                  color: 'white', 
-                  bgcolor: '#ff9800',
-                  '&:hover': { bgcolor: '#f57c00' }
-                }}
-              >
-                Continue Anyway
-              </Button>
-              <Button 
-                size="small" 
-                variant="outlined" 
-                onClick={() => {
-                  setLowAccuracyWarning(false);
-                  handleUseMyLocation();
-                }} 
-                sx={{ 
-                  color: '#ff9800', 
-                  borderColor: '#ff9800',
-                  '&:hover': { 
-                    bgcolor: 'rgba(255, 152, 0, 0.04)', 
-                    borderColor: '#f57c00' 
-                  }
-                }}
-              >
-                Try Again
-              </Button>
-            </Box>
-          </Paper>
-        )}
+          </DialogTitle>
+          
+          <DialogContent sx={{ px: 3, pt: 3, pb: 1 }}>
+            <Typography variant="body1" sx={{ my: 3 }}>
+              We detected that your location accuracy is {locationAccuracy ? `approximately ${Math.round(locationAccuracy)} meters` : 'lower than optimal'}.
+            </Typography>
+            
+            <Typography variant="subtitle1" sx={{ fontWeight: 600}}>
+              How to improve location accuracy:
+            </Typography>
+            
+            <List sx={{ mb: 2 }}>
+              <ListItem sx={{ px: 0}}>
+                <ListItemText 
+                  primary="Move to an open area away from buildings" 
+                  secondary="Tall structures can interfere with GPS signals"
+                />
+              </ListItem>
+              
+              <ListItem sx={{ px: 0}}>
+                <ListItemText 
+                  primary="Enable high-accuracy mode in settings" 
+                  secondary="In your device settings, ensure location is set to high-accuracy mode"
+                />
+              </ListItem>
+              
+              <ListItem sx={{ px: 0}}>
+                <ListItemText 
+                  primary="Connect to Wi-Fi if possible" 
+                  secondary="Wi-Fi connections can help improve location accuracy"
+                />
+              </ListItem>
+              
+              <ListItem sx={{ px: 0}}>
+  <ListItemText
+    primary="Try restarting your location services"
+    secondary="Turn location off and on again in your device settings"
+  />
+</ListItem>
+            </List>
+          </DialogContent>
+          
+          <DialogActions sx={{ px: 3, pb: 3, pt: 1, flexDirection: {xs: 'row', sm: 'row'}, gap: 1 }}>
+            <Button 
+              fullWidth={fullScreen}
+              variant="outlined" 
+              onClick={() => {
+                setLowAccuracyWarning(false);
+                handleUseMyLocation();
+              }}
+              sx={{ 
+                borderColor: '#000',
+                color: '#000',
+                order: {xs: 2, sm: 1}
+              }}
+            >
+              Try Again
+            </Button>
+            <Button 
+              fullWidth={fullScreen}
+              variant="contained" 
+              onClick={() => setLowAccuracyWarning(false)} 
+              sx={{ 
+                bgcolor: '#000',
+                color: 'white',
+                order: {xs: 1, sm: 2}
+              }}
+            >
+              Continue Anyway
+            </Button>
+          </DialogActions>
+        </Dialog>
 
         {/* Alerts List */}
         {loading && alerts.length === 0 ? (
@@ -687,7 +760,7 @@ export default function Feed() {
                 </Typography>
                 
                 {/* Risk Level Box - conditionally shown */}
-                {(alert.risk || isAuthenticated) && (
+                {(alert.risk && isAuthenticated) && (
                   <Box 
                     sx={{ 
                       p: 1.5, 
@@ -795,6 +868,13 @@ export default function Feed() {
         onClose={handleCloseLoginDialog}
         maxWidth="xs"
         fullWidth
+        PaperProps={{
+          sx: {
+            borderRadius: 3,
+            maxWidth: '380px',
+            width: '100%'
+          }
+        }}
       >
         <DialogContent sx={{ p: 3, textAlign: 'center' }}>
           <Box sx={{ mb: 2 }}>
@@ -806,11 +886,11 @@ export default function Feed() {
               style={{ margin: '0 auto' }}
             />
           </Box>
-          <Typography variant="h6" sx={{ mb: 1, fontWeight: 600 }}>
-            Login to track alerts!
+          <Typography variant="h6" sx={{ mb: 1, fontWeight: 500, fontSize: '20px' }}>
+            Login in to view updates of the alerts!
           </Typography>
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-            Please sign in to follow alerts and receive personalized notifications.
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 3, fontSize: '14px' }}>
+            Please sign in to track disruptions and receive personalized notifications.
           </Typography>
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
             <Button
@@ -822,7 +902,7 @@ export default function Feed() {
                 color: 'white',
                 '&:hover': { bgcolor: '#333' },
                 py: 1.2,
-                borderRadius: 1
+                borderRadius: 2
               }}
             >
               Login Now
@@ -836,7 +916,7 @@ export default function Feed() {
                 color: 'text.primary',
                 '&:hover': { bgcolor: 'rgba(0,0,0,0.04)' },
                 py: 1.2,
-                borderRadius: 1
+                borderRadius: 2
               }}
             >
               Cancel

@@ -22,6 +22,7 @@ import NotificationDrawer from './NotificationDrawer';
 import { getNotifications } from '../services/api';
 import { NotificationsNone } from '@mui/icons-material';
 import { Notification } from '../types';
+import Image from 'next/image';
 
 interface LayoutProps {
   children: ReactNode;
@@ -37,6 +38,7 @@ const Layout = ({ children, isFooter = true, onFilterOpen }: LayoutProps) => {
   const router = useRouter();
   const pathname = usePathname();
   const [isClient, setIsClient] = useState(false);
+  const isFeedPage = pathname === '/feed';
 
   // Use useEffect to mark when component is mounted on client
   useEffect(() => {
@@ -129,12 +131,37 @@ const Layout = ({ children, isFooter = true, onFilterOpen }: LayoutProps) => {
     </Box>
   );
 
+  // Navigation links to show on desktop
+  const navLinks = [
+    { text: 'About', path: '/about' },
+    { text: 'Feature', path: '/feature' },
+    { text: 'Resources', path: '/resources' },
+    { text: 'Pricing', path: '/pricing' }
+  ];
+
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', p: 0, m: 0 }}>
-      <AppBar position="static" sx={{ bgcolor: 'white', boxShadow: 1 }}>
-        <Toolbar sx={{ display: 'flex', justifyContent: 'space-between' }}>
-          <Box sx={{display: 'flex', gap: 1}}>
-            {/* Mobile menu icon */}
+      <Box sx={{ 
+        px: { xs: 3, sm: 3, md: 3 }, 
+        py: 1.5, 
+        mx: { xs: 1, sm: 1.5, md: 3.5 },
+        my: 1.5,
+        height: { sm: '30px', md: '80px' },
+        bgcolor: '#EBEBEC', 
+        borderRadius: 50,
+        boxShadow: 'none'
+      }}>
+        <Toolbar 
+          disableGutters
+          sx={{ 
+            display: 'flex', 
+            justifyContent: 'space-between',
+            minHeight: { xs: '48px', sm: '56px' }
+          }}
+        >
+          {/* Left side of header */}
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            {/* Mobile menu icon - only on mobile */}
             <IconButton
               color="inherit"
               aria-label="open drawer"
@@ -145,13 +172,13 @@ const Layout = ({ children, isFooter = true, onFilterOpen }: LayoutProps) => {
               <i className="ri-menu-2-line" style={{ fontSize: '24px' }}></i>
             </IconButton>
 
+            {/* Logo */}
             <Typography
               component={Link}
               href="/"
               sx={{
                 display: 'flex',
                 alignItems: 'center',
-                gap: 1,
                 fontWeight: 'bold',
                 fontSize: '24px',
                 color: 'black',
@@ -161,27 +188,94 @@ const Layout = ({ children, isFooter = true, onFilterOpen }: LayoutProps) => {
               <span style={{ color: '#0066FF' }}>t</span>
             </Typography>
             
+            {/* Feed text - only on feed page */}
+            {isFeedPage && (
+              <Typography
+                sx={{
+                  display: { xs: 'flex', sm: 'none' },
+                  alignItems: 'center',
+                  ml: 2,
+                  fontWeight: 'medium',
+                  fontSize: '18px',
+                  color: 'black'
+                }}
+              >
+                Feed
+              </Typography>
+            )}
           </Box>
+
+          {/* Desktop navigation - center of header */}
+          <Box sx={{ 
+            display: { xs: 'none', sm: 'flex' }, 
+            position: 'absolute',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            gap: 3
+          }}>
+            {navLinks.map((link) => (
+              <Link
+                key={link.text}
+                href={link.path}
+                style={{
+                  color: 'black',
+                  textDecoration: 'none',
+                  fontSize: '16px',
+                  fontWeight: 500
+                }}
+              >
+                {link.text}
+              </Link>
+            ))}
+          </Box>
+
+          {/* Right side of header */}
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+            {/* Login button for non-logged in users */}
             {!isAuthenticated && (
-              <Button variant="contained" sx={{ bgcolor: 'rgb(220, 220, 220)',borderRadius: 10, color: '#444',boxShadow:'none'}} onClick={() => router.push('/login')}>
+              <Button 
+                variant="contained" 
+                sx={{ 
+                  bgcolor: 'rgb(220, 220, 220)',
+                  borderRadius: 10, 
+                  color: '#444',
+                  boxShadow: 'none',
+                  px: 3,
+                  '&:hover': {
+                    bgcolor: 'rgb(210, 210, 210)',
+                  }
+                }} 
+                onClick={() => router.push('/login')}
+              >
                 Login
               </Button>
             )}
+
+            {/* Notification and filter icons for logged in users */}
             {isAuthenticated && (
               <>
                 <IconButton
                   onClick={() => setNotificationDrawerOpen(true)}
-                  sx={{ color: 'black' }}
+                  sx={{ 
+                    color: 'black',
+                    '&:hover': {
+                      bgcolor: 'rgba(0, 0, 0, 0.04)'
+                    }
+                  }}
                 >
                   <Badge badgeContent={isClient ? unreadCount : 0} color="error">
                     <NotificationsNone />
                   </Badge>
                 </IconButton>
-                {pathname === '/feed' && (
+                {isFeedPage && (
                   <IconButton
                     onClick={handleFilterOpenForFeedPage}
-                    sx={{ color: 'black' }}
+                    sx={{ 
+                      color: 'black',
+                      '&:hover': {
+                        bgcolor: 'rgba(0, 0, 0, 0.04)'
+                      }
+                    }}
                   >
                     <i className="ri-filter-3-line"></i>
                   </IconButton>
@@ -189,35 +283,8 @@ const Layout = ({ children, isFooter = true, onFilterOpen }: LayoutProps) => {
               </>
             )}
           </Box>
-          {/* Desktop navigation */}
-          <Box sx={{ display: { xs: 'none', sm: 'flex' }, gap: 2 }}>
-            {!isAuthenticated && (
-              <>
-                <Link
-                  href="/login"
-                  style={{
-                    color: 'black',
-                    textDecoration: 'none',
-                    fontSize: '16px'
-                  }}
-                >
-                  Login
-                </Link>
-                <Link
-                  href="/signup"
-                  style={{
-                    color: 'black',
-                    textDecoration: 'none',
-                    fontSize: '16px'
-                  }}
-                >
-                  Sign Up
-                </Link>
-              </>
-            )}
-          </Box>
         </Toolbar>
-      </AppBar>
+      </Box>
 
       {/* Mobile drawer */}
       <Drawer
@@ -244,57 +311,51 @@ const Layout = ({ children, isFooter = true, onFilterOpen }: LayoutProps) => {
         <Box
           component="footer"
           sx={{
-            py: 3,
-            px: 0,
+            py: 5,
+            px: 1,
             mt: 'auto',
-            bgcolor: 'white',
-            borderTop: '1px solid #e0e0e0'
+            textAlign: 'center',
+            borderTop: '1px solid rgb(218, 218, 218)'
           }}
         >
           <Container maxWidth="lg">
-            <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, justifyContent: 'space-between', alignItems: { xs: 'flex-start', md: 'flex-start' }, gap: 3 }}>
-              {/* Navigation Links */}
-              <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, gap: { xs: 2, md: 6 }, alignItems: { xs: 'flex-start', md: 'flex-start' } }}>
-                <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: { xs: 'flex-start', md: 'flex-start' }, gap: 1 }}>
-                  <Link href="/about" style={{ fontSize:'14px', color: '#000', textDecoration: 'none' }}>About</Link>
-                  <Link href="/post-alert" style={{ fontSize:'14px', color: '#000', textDecoration: 'none' }}>Post Alert</Link>
-                  <Link href="/ambassadors" style={{ fontSize:'14px', color: '#000', textDecoration: 'none' }}>Ambassadors</Link>
-                  <Link href="/pricing" style={{ fontSize:'14px', color: '#000', textDecoration: 'none' }}>Pricing</Link>
-                  <Link href="/privacy-policy" style={{ fontSize:'14px', color: '#000', textDecoration: 'none' }}>Privacy Policy</Link>
-                  <Link href="/terms" style={{ fontSize:'14px', color: '#000', textDecoration: 'none' }}>Terms of Use</Link>
-                </Box>
-              </Box>
+            {/* Footer Links Row */}
+            <Box sx={{ 
+              display: 'flex', 
+              justifyContent: 'center',
+              gap: 2,
+              mb: 2
+            }}>
+              <Link href="/about" style={{ color: '#000', textDecoration: 'none', fontSize: '14px' }}>
+                About us
+              </Link>
+              <Link href="/privacy-policy" style={{ color: '#000', textDecoration: 'none', fontSize: '14px' }}>
+                Privacy Policy
+              </Link>
+              <Link href="/terms" style={{ color: '#000', textDecoration: 'none', fontSize: '14px' }}>
+                Terms of Use
+              </Link>
             </Box>
-            {/* Logo and Social Links */}
-            <Box sx={{ display: 'flex', mt: 3, flexDirection: 'column', alignItems: { xs: 'flex-start', md: 'flex-start' }, gap: 2 }}>
-              <Typography
-                component={Link}
-                href="/"
-                sx={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 1,
-                  fontSize: '18px',
-                  color: 'black',
-                  textDecoration: 'none'
-                }}
-              >
-                <span style={{ color: '#0066FF', fontWeight: 'bold', fontSize:'24px' }}>t</span> tourprism
-              </Typography>
-              <Box sx={{ display: 'flex', gap: 2, alignItems:'center' }}>
-                <Link href="mailto:info@tourprism.com" style={{ color: 'black', textDecoration:'none' }}>
-                  <i className="ri-mail-fill" style={{ fontSize: '24px', color:'#666' }}></i>
-                </Link>
-                <Link href="https://linkedin.com" target="_blank" style={{ color: 'black', textDecoration:'none' }}>
-                  <i className="ri-linkedin-box-fill" style={{ fontSize: '27px', color:'#666' }}></i>
-                </Link>
-                <Link href="https://twitter.com" target="_blank" style={{ color: 'white', textDecoration:'none', backgroundColor:'#666', borderRadius:'5px', height:'22px' }}>
-                  <i className="ri-twitter-x-fill" style={{ fontSize: '20px' }}></i>
-                </Link>
-              </Box>
-              <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                © 2025. Tourprism Limited. <br /> Made in Scotland.
-              </Typography>
+            
+            {/* Copyright */}
+            <Typography variant="body2" sx={{ mb: 1, fontSize: '12px' }}>
+              © 2025. Tourprism Limited. Made in Scotland.
+            </Typography>
+            
+            {/* Social Icons */}
+            <Box sx={{ 
+              display: 'flex', 
+              justifyContent: 'center',
+            }}>
+              <IconButton sx={{ bgcolor: 'transparent', color: 'black', width: 36, height: 36 }}>
+                <Image src="/images/mail.svg" alt="mail" width={36} height={36} />
+              </IconButton>
+              <IconButton sx={{ bgcolor: 'transparent', color: 'black', width: 36, height: 36 }}>
+                <Image src="/images/linkedin.svg" alt="linkedin" width={36} height={36} />
+              </IconButton>
+              <IconButton sx={{ bgcolor: 'transparent', color: 'black', width: 36, height: 36 }}>
+                <Image src="/images/twitter.svg" alt="twitter" width={36} height={36} />
+              </IconButton>
             </Box>
           </Container>
         </Box>

@@ -1,13 +1,13 @@
 import { api } from './api';
 
 // Define AxiosError type locally since import is having issues
-type AxiosError<T = any> = Error & {
+type AxiosError<T = unknown> = Error & {
   response?: {
     data: T;
     status: number;
     statusText: string;
-    headers: any;
-    config: any;
+    headers: Record<string, string>;
+    config: Record<string, unknown>;
   };
 };
 
@@ -38,7 +38,7 @@ export const downloadTemplate = async () => {
     // Make sure we're in browser environment
     if (typeof window !== 'undefined') {
       // Create a download link and trigger it
-      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const url = window.URL.createObjectURL(new Blob([response.data as BlobPart]));
       const link = document.createElement('a');
       link.href = url;
       link.setAttribute('download', 'alert-template.csv');
