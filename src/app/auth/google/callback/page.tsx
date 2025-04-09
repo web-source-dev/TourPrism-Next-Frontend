@@ -1,13 +1,14 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Box, CircularProgress, Typography, Alert, Button, Paper, Fade } from '@mui/material';
 import Link from 'next/link';
 import { useAuth } from '@/context/AuthContext';
 import { handleGoogleCallback } from '@/services/api';
 
-export default function GoogleCallback() {
+// Create a client component that uses useSearchParams
+function GoogleCallbackClient() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { setUser } = useAuth();
@@ -201,5 +202,34 @@ export default function GoogleCallback() {
         </Typography>
       </Box>
     </Fade>
+  );
+}
+
+// Main page component with Suspense boundary
+export default function GoogleCallback() {
+  return (
+    <Suspense fallback={
+      <Box sx={{ 
+        display: 'flex', 
+        flexDirection: 'column',
+        justifyContent: 'center', 
+        alignItems: 'center', 
+        height: '100vh',
+        bgcolor: '#f9f9f9'
+      }}>
+        <Box
+          component="img"
+          src="/t.png"
+          alt="Logo"
+          sx={{ height: 40, mb: 3 }}
+        />
+        <CircularProgress sx={{ color: 'black' }} />
+        <Typography variant="h6" sx={{ mt: 2, fontWeight: 500 }}>
+          Loading...
+        </Typography>
+      </Box>
+    }>
+      <GoogleCallbackClient />
+    </Suspense>
   );
 } 
