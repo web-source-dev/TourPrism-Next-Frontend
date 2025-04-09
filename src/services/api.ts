@@ -534,4 +534,43 @@ export const getDashboardStats = async (): Promise<DashboardStats> => {
   }
 };
 
+// User profile functions
+export const getUserProfile = async (): Promise<User> => {
+  try {
+    const response = await api.get<{ user: User }>('/auth/user/profile');
+    
+    // Update the user in localStorage
+    if (typeof window !== 'undefined') {
+      const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+      const updatedUser = { ...currentUser, ...response.data.user };
+      localStorage.setItem('user', JSON.stringify(updatedUser));
+    }
+    
+    return response.data.user;
+  } catch (error) {
+    throw getErrorMessage(error as CustomAxiosError);
+  }
+};
+
+export const updateUserProfile = async (userData: {
+  firstName?: string;
+  lastName?: string;
+  emailPrefrences?: boolean;
+}): Promise<User> => {
+  try {
+    const response = await api.put<{ user: User }>('/auth/user/profile', userData);
+    
+    // Update the user in localStorage
+    if (typeof window !== 'undefined') {
+      const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+      const updatedUser = { ...currentUser, ...response.data.user };
+      localStorage.setItem('user', JSON.stringify(updatedUser));
+    }
+    
+    return response.data.user;
+  } catch (error) {
+    throw getErrorMessage(error as CustomAxiosError);
+  }
+};
+
 export { api }; 

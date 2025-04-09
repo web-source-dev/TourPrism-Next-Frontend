@@ -20,6 +20,7 @@ const adminPaths = [
 ];
 
 // /bulk path is intentionally NOT added to public paths as it should be protected
+// /profile path also requires authentication
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;

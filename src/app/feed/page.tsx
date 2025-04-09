@@ -873,7 +873,7 @@ export default function Feed() {
 
             {/* Load more button - only for logged in users */}
             {hasMore && isAuthenticated && (
-              <Box sx={{ textAlign: 'center', mb: 4 }}>
+              <Box sx={{ textAlign: 'center', mt: 4 }}>
                 <Button
                   variant="outlined"
                   onClick={handleLoadMore}
@@ -882,8 +882,8 @@ export default function Feed() {
                   sx={{
                     borderColor: 'black',
                     color: 'black',
-                    borderRadius: 2,
-                    px: 4,
+                    borderRadius: 50,
+                    px: 10,
                     py: 1
                   }}
                 >

@@ -6,6 +6,9 @@ export interface User {
   role?: string;
   createdAt: string;
   updatedAt: string;
+  firstName?: string;
+  lastName?: string;
+  emailPrefrences?: boolean;
 }
 
 export interface Alert {
