@@ -24,6 +24,8 @@ export default function SignUp() {
   });
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
   const [isLoading, setIsLoading] = useState(false);
+  // Add password visibility state
+  const [showPassword, setShowPassword] = useState(false);
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -237,6 +239,11 @@ export default function SignUp() {
     googleLogin();
   };
 
+  // Add password visibility toggle handler
+  const togglePasswordVisibility = () => {
+    setShowPassword((show) => !show);
+  };
+
   return (
     <Box sx={{ 
       display: 'flex',
@@ -411,7 +418,7 @@ export default function SignUp() {
                 </Typography>
                 <TextField
                   fullWidth
-                  type="password"
+                  type={showPassword ? "text" : "password"}
                   name="password"
                   placeholder="Create a strong password"
                   value={formData.password}
@@ -422,6 +429,17 @@ export default function SignUp() {
                     startAdornment: (
                       <InputAdornment position="start">
                         <i className="ri-lock-line"></i>
+                      </InputAdornment>
+                    ),
+                    endAdornment: (
+                      <InputAdornment position="end">
+                        <Button
+                          onClick={togglePasswordVisibility}
+                          tabIndex={-1}
+                          sx={{ minWidth: 'auto', p: 0.5 }}
+                        >
+                          <i className={showPassword ? "ri-eye-off-line" : "ri-eye-line"}></i>
+                        </Button>
                       </InputAdornment>
                     ),
                     sx: { borderRadius: 2,

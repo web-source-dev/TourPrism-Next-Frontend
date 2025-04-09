@@ -28,6 +28,8 @@ function LoginContent() {
   });
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
   const [isLoading, setIsLoading] = useState(false);
+  // Add password visibility state
+  const [showPassword, setShowPassword] = useState(false);
 
   // Add new state to track verification reason
   const [verificationReason, setVerificationReason] = useState<'email' | 'mfa'>('email');
@@ -245,6 +247,11 @@ function LoginContent() {
     googleLogin();
   };
 
+  // Add password visibility toggle handler
+  const togglePasswordVisibility = () => {
+    setShowPassword((show) => !show);
+  };
+
   return (
     <Box sx={{ 
       display: 'flex',
@@ -433,7 +440,7 @@ function LoginContent() {
                 </Box>
                 <TextField
                   fullWidth
-                  type="password"
+                  type={showPassword ? "text" : "password"}
                   name="password"
                   placeholder="Enter your password"
                   value={formData.password}
@@ -444,6 +451,17 @@ function LoginContent() {
                     startAdornment: (
                       <InputAdornment position="start">
                         <i className="ri-lock-line"></i>
+                      </InputAdornment>
+                    ),
+                    endAdornment: (
+                      <InputAdornment position="end">
+                        <Button
+                          onClick={togglePasswordVisibility}
+                          tabIndex={-1}
+                          sx={{ minWidth: 'auto', p: 0.5 }}
+                        >
+                          <i className={showPassword ? "ri-eye-off-line" : "ri-eye-line"}></i>
+                        </Button>
                       </InputAdornment>
                     ),
                     sx: { borderRadius: 2,

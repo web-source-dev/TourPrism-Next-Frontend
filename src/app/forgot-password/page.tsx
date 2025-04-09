@@ -29,6 +29,9 @@ export default function ForgotPassword() {
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
   const [isLoading, setIsLoading] = useState(false);
   const [success, setSuccess] = useState(false);
+  // Add password visibility states
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   useEffect(() => {
     let interval: NodeJS.Timeout;
@@ -268,6 +271,15 @@ export default function ForgotPassword() {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  // Add password visibility toggle handlers
+  const toggleNewPasswordVisibility = () => {
+    setShowNewPassword((show) => !show);
+  };
+
+  const toggleConfirmPasswordVisibility = () => {
+    setShowConfirmPassword((show) => !show);
   };
 
   return (
@@ -520,7 +532,7 @@ export default function ForgotPassword() {
                     </Typography>
                     <TextField
                       fullWidth
-                      type="password"
+                      type={showNewPassword ? "text" : "password"}
                       name="newPassword"
                       placeholder="Enter your new password"
                       value={formData.newPassword}
@@ -531,6 +543,17 @@ export default function ForgotPassword() {
                         startAdornment: (
                           <InputAdornment position="start">
                             <i className="ri-lock-line"></i>
+                          </InputAdornment>
+                        ),
+                        endAdornment: (
+                          <InputAdornment position="end">
+                            <Button
+                              onClick={toggleNewPasswordVisibility}
+                              tabIndex={-1}
+                              sx={{ minWidth: 'auto', p: 0.5 }}
+                            >
+                              <i className={showNewPassword ? "ri-eye-off-line" : "ri-eye-line"}></i>
+                            </Button>
                           </InputAdornment>
                         ),
                         sx: {
@@ -547,7 +570,7 @@ export default function ForgotPassword() {
                     </Typography>
                     <TextField
                       fullWidth
-                      type="password"
+                      type={showConfirmPassword ? "text" : "password"}
                       name="confirmPassword"
                       placeholder="Confirm your new password"
                       value={formData.confirmPassword}
@@ -558,6 +581,17 @@ export default function ForgotPassword() {
                         startAdornment: (
                           <InputAdornment position="start">
                             <i className="ri-lock-line"></i>
+                          </InputAdornment>
+                        ),
+                        endAdornment: (
+                          <InputAdornment position="end">
+                            <Button
+                              onClick={toggleConfirmPasswordVisibility}
+                              tabIndex={-1}
+                              sx={{ minWidth: 'auto', p: 0.5 }}
+                            >
+                              <i className={showConfirmPassword ? "ri-eye-off-line" : "ri-eye-line"}></i>
+                            </Button>
                           </InputAdornment>
                         ),
                         sx: {
