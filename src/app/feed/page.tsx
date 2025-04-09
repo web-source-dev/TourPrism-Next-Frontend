@@ -170,6 +170,24 @@ export default function Feed() {
     }
   }, [/* eslint-disable-line react-hooks/exhaustive-deps */]); // Dependency array is empty to avoid circular dependencies with handleLocationSuccess and handleLocationError
 
+  // Move handleSelectEdinburgh up and wrap it in useCallback
+  const handleSelectEdinburgh = useCallback(() => {
+    const edinburghCoords = { latitude: 55.9533, longitude: -3.1883 };
+    
+    // Save to localStorage for persistence across page refreshes
+    localStorage.setItem('selectedCity', 'Edinburgh');
+    localStorage.setItem('selectedLat', edinburghCoords.latitude.toString());
+    localStorage.setItem('selectedLng', edinburghCoords.longitude.toString());
+
+    // Update state
+    setCity('Edinburgh');
+    setCoords(edinburghCoords);
+    setLocationConfirmed(true);
+    
+    // Fetch alerts for Edinburgh
+    fetchLocationAlerts('Edinburgh', edinburghCoords);
+  }, [fetchLocationAlerts]); // Add fetchLocationAlerts as dependency
+
   useEffect(() => {
     // Check if we have stored location
     const storedCity = localStorage.getItem('selectedCity');
@@ -188,7 +206,7 @@ export default function Feed() {
       // Use Edinburgh as default location instead of requesting user location
       handleSelectEdinburgh();
     }
-  }, []); // No dependencies needed for initial setup
+  }, [handleSelectEdinburgh]); // Add handleSelectEdinburgh as dependency
 
   // Add a separate effect to fetch alerts after authentication state is ready
   useEffect(() => {
@@ -337,23 +355,6 @@ export default function Feed() {
       default:
         setLocationError("An unknown error occurred while getting your location. Please try again or select a city manually.");
     }
-  };
-
-  const handleSelectEdinburgh = () => {
-    const edinburghCoords = { latitude: 55.9533, longitude: -3.1883 };
-    
-    // Save to localStorage for persistence across page refreshes
-    localStorage.setItem('selectedCity', 'Edinburgh');
-    localStorage.setItem('selectedLat', edinburghCoords.latitude.toString());
-    localStorage.setItem('selectedLng', edinburghCoords.longitude.toString());
-
-    // Update state
-    setCity('Edinburgh');
-    setCoords(edinburghCoords);
-    setLocationConfirmed(true);
-    
-    // Fetch alerts for Edinburgh
-    fetchLocationAlerts('Edinburgh', edinburghCoords);
   };
 
   const handleContinueWithLocation = () => {
