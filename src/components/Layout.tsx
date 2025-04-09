@@ -70,17 +70,15 @@ const Layout = ({ children, isFooter = true, onFilterOpen }: LayoutProps) => {
 
   const menuItems = isAuthenticated ? [
     { text: 'Feed', icon: 'ri-home-line', path: '/feed' },
-    { text: 'Post Alert', icon: 'ri-notification-line', path: '/post-alert' },
-    { text: 'My Alerts', icon: 'ri-notification-line', path: '/my-alerts' },
+    { text: 'Action Hub', icon: 'ri-notification-line', path: '/post-alert' },
     { text: 'Insights', icon: 'ri-line-chart-line', path: '/insights' },
-    { text: 'Rewards', icon: 'ri-gift-line', path: '/rewards' },
     { text: 'Subscription', icon: 'ri-vip-crown-line', path: '/subscription' },
     { text: 'Settings', icon: 'ri-settings-line', path: '/settings' },
     { text: 'Logout', icon: 'ri-logout-box-line', path: '/' }
   ] : [
     { text: 'About', icon: 'ri-information-line', path: '/about' },
-    { text: 'Post Alert', icon: 'ri-notification-line', path: '/post-alert' },
-    { text: 'Ambassadors', icon: 'ri-team-line', path: '/ambassadors' },
+    { text: 'Feature', icon: 'ri-notification-line', path: '/feature' },
+    { text: 'Resources', icon: 'ri-team-line', path: '/resources' },
     { text: 'Pricing', icon: 'ri-price-tag-3-line', path: '/pricing' },
     { text: 'Login', icon: 'ri-login-box-line', path: '/login' }
   ];

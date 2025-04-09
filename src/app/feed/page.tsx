@@ -1,12 +1,12 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { 
-  Box, 
-  Typography, 
-  Button, 
-  Paper, 
-  Divider, 
+import {
+  Box,
+  Typography,
+  Button,
+  Paper,
+  Divider,
   Skeleton,
   Dialog,
   DialogContent,
@@ -43,7 +43,7 @@ export default function Feed() {
   const [locationError, setLocationError] = useState<string | null>(null);
   const [locationLoading, setLocationLoading] = useState(false);
   const [city, setCity] = useState<string | null>(null);
-  const [coords, setCoords] = useState<{latitude: number; longitude: number} | null>(null);
+  const [coords, setCoords] = useState<{ latitude: number; longitude: number } | null>(null);
   const [loginDialogOpen, setLoginDialogOpen] = useState(false);
   const [lowAccuracyWarning, setLowAccuracyWarning] = useState(false);
   const [locationAccuracy, setLocationAccuracy] = useState<number | null>(null);
@@ -119,11 +119,12 @@ export default function Feed() {
         console.warn(`Filtered out ${response.alerts.length - uniqueAlerts.length} duplicate alert(s) in initial load`);
       }
       
-      // Don't redirect if not authenticated
+      // For non-authenticated users, show only 3 alerts
       if (!isAuthenticated) {
         // Ensure we only show 3 alerts max for non-authenticated users
         setAlerts(uniqueAlerts.slice(0, 3));
       } else {
+        // For authenticated users, show all alerts
         setAlerts(uniqueAlerts);
       }
       
@@ -149,7 +150,7 @@ export default function Feed() {
   const handleUseMyLocation = useCallback(async () => {
     setLocationLoading(true);
     setLocationError(null);
-    
+
     try {
       // First attempt with high accuracy
       const position = await getHighAccuracyLocation(true);
@@ -174,7 +175,7 @@ export default function Feed() {
     const storedCity = localStorage.getItem('selectedCity');
     const storedLat = localStorage.getItem('selectedLat');
     const storedLng = localStorage.getItem('selectedLng');
-    
+
     if (storedCity && storedLat && storedLng) {
       setCity(storedCity);
       setCoords({
@@ -182,14 +183,21 @@ export default function Feed() {
         longitude: parseFloat(storedLng)
       });
       setLocationConfirmed(true);
-      fetchLocationAlerts(storedCity, {
-        latitude: parseFloat(storedLat),
-        longitude: parseFloat(storedLng)
-      });
+      
+      // Initial location is set, but we'll delay fetching alerts
+      // to ensure authentication state is properly loaded
     } else {
       handleUseMyLocation();
     }
-  }, [fetchLocationAlerts, handleUseMyLocation]);
+  }, [handleUseMyLocation]); // Remove fetchLocationAlerts from dependencies
+
+  // Add a separate effect to fetch alerts after authentication state is ready
+  useEffect(() => {
+    if (locationConfirmed && city && coords) {
+      // This effect will run again whenever isAuthenticated changes
+      fetchLocationAlerts(city, coords);
+    }
+  }, [city, coords, locationConfirmed, isAuthenticated, fetchLocationAlerts]);
 
   const handleFollowUpdate = async (alertId: string) => {
     if (!isAuthenticated) {
@@ -200,20 +208,20 @@ export default function Feed() {
 
     try {
       const response = await followAlert(alertId);
-      
+
       // Use the functional state update to ensure we're working with the latest state
-      setAlerts(prevAlerts => 
-        prevAlerts.map(alert => 
-          alert._id === alertId ? 
-            { 
-              ...alert, 
-              numberOfFollows: response.numberOfFollows, 
-              isFollowing: response.following 
-            } : 
+      setAlerts(prevAlerts =>
+        prevAlerts.map(alert =>
+          alert._id === alertId ?
+            {
+              ...alert,
+              numberOfFollows: response.numberOfFollows,
+              isFollowing: response.following
+            } :
             alert
         )
       );
-      
+
       setSnackbar({
         open: true,
         message: response.following ? 'You are now following this alert' : 'You have unfollowed this alert',
@@ -233,26 +241,26 @@ export default function Feed() {
     const date = new Date(createdAt);
     const now = new Date();
     const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
-    
+
     if (diffInSeconds < 60) {
       return `${diffInSeconds}s ago`;
     }
-    
+
     const diffInMinutes = Math.floor(diffInSeconds / 60);
     if (diffInMinutes < 60) {
       return `${diffInMinutes}m ago`;
     }
-    
+
     const diffInHours = Math.floor(diffInMinutes / 60);
     if (diffInHours < 24) {
       return `${diffInHours}h ago`;
     }
-    
+
     const diffInDays = Math.floor(diffInHours / 24);
     if (diffInDays < 30) {
       return `${diffInDays}d ago`;
     }
-    
+
     const diffInMonths = Math.floor(diffInDays / 30);
     return `${diffInMonths}m ago`;
   };
@@ -281,32 +289,32 @@ export default function Feed() {
   const handleLocationSuccess = async (position: GeolocationPosition, highAccuracy = true) => {
     const { latitude, longitude } = position.coords;
     const accuracy = position.coords.accuracy;
-    
+
     // Store the location accuracy for potential warnings
     setLocationAccuracy(accuracy);
-    
+
     // Show low accuracy warning if accuracy is worse than 100 meters
     const hasLowAccuracy = accuracy > 100;
     if (!highAccuracy || hasLowAccuracy) {
       setLowAccuracyWarning(true);
     }
-    
+
     try {
       const cityName = await getCityFromCoordinates(latitude, longitude);
-      
+
       // Store location in localStorage
       localStorage.setItem('selectedCity', cityName);
       localStorage.setItem('selectedLat', latitude.toString());
       localStorage.setItem('selectedLng', longitude.toString());
       localStorage.setItem('locationAccuracy', accuracy.toString());
-      
+
       setCity(cityName);
       setCoords({ latitude, longitude });
       setLocationConfirmed(true);
-      
+
       // Fetch alerts for this location
       fetchLocationAlerts(cityName, { latitude, longitude });
-      
+
     } catch (error) {
       setLocationError('Failed to get your city name. Please try again or select a city manually.');
       console.error('Error in reverse geocoding:', error);
@@ -315,7 +323,7 @@ export default function Feed() {
 
   const handleLocationError = (error: GeolocationPositionError) => {
     console.error('Geolocation error:', error);
-    
+
     switch (error.code) {
       case error.PERMISSION_DENIED:
         setLocationError("You denied access to your location. Please enable location services or select a city manually.");
@@ -336,7 +344,7 @@ export default function Feed() {
     localStorage.setItem('selectedCity', 'Edinburgh');
     localStorage.setItem('selectedLat', edinburghCoords.latitude.toString());
     localStorage.setItem('selectedLng', edinburghCoords.longitude.toString());
-    
+
     setCity('Edinburgh');
     setCoords(edinburghCoords);
     setLocationConfirmed(true);
@@ -351,6 +359,12 @@ export default function Feed() {
   };
 
   const handleResetLocation = () => {
+    if (!isAuthenticated) {
+      // Show login dialog for non-authenticated users
+      setLoginDialogOpen(true);
+      return;
+    }
+    
     setLocationConfirmed(false);
     setCity(null);
     setCoords(null);
@@ -385,40 +399,40 @@ export default function Feed() {
 
   const loadMoreAlerts = async () => {
     if (!hasMore || loading || !isAuthenticated) return;
-    
+
     const nextPage = page + 1;
     setLoading(true);
-    
+
     try {
       const params: Record<string, unknown> = {
         page: nextPage,
         limit: 10,
         sortBy: filters.sortBy,
       };
-      
+
       // Add time range filter if not set to "All Time"
       // This now filters based on the alert's expected start/end date
       if (filters.timeRange > 0) {
         // Current date as the reference point
         const now = new Date();
-        
+
         // For filtering, we want to include alerts:
         // 1. That are expected to be active now or in the future
         // 2. Up to 'timeRange' days from now
         const futureDate = new Date();
         futureDate.setDate(futureDate.getDate() + filters.timeRange);
-        
+
         // Use as start date for the filter (now)
         params.startDate = now.toISOString();
         // Use as end date for the filter (future)
         params.endDate = futureDate.toISOString();
       }
-      
+
       // Add incident type filters if selected
       if (filters.incidentTypes && filters.incidentTypes.length > 0) {
         params.incidentTypes = filters.incidentTypes;
       }
-      
+
       // Add location parameters
       if (coords) {
         params.latitude = coords.latitude;
@@ -429,20 +443,20 @@ export default function Feed() {
       } else if (city) {
         params.city = city;
       }
-      
+
       const response = await fetchAlerts(params);
-      
+
       // Create a map of current alerts by ID for fast lookup
       const alertMap = new Map(alerts.map(alert => [alert._id, alert]));
-      
+
       // Only add alerts that don't already exist in our current list
       const newUniqueAlerts = response.alerts.filter(alert => !alertMap.has(alert._id));
-      
+
       // If we received duplicates, log a warning
       if (newUniqueAlerts.length < response.alerts.length) {
         console.warn(`Filtered out ${response.alerts.length - newUniqueAlerts.length} duplicate alert(s)`);
       }
-      
+
       // Update state with combined unique alerts
       setAlerts(prevAlerts => [...prevAlerts, ...newUniqueAlerts]);
       setHasMore(alerts.length + newUniqueAlerts.length < response.totalCount);
@@ -488,7 +502,7 @@ export default function Feed() {
         `https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json`
       );
       const data = await response.json();
-      
+
       if (data.address) {
         // Try to get the city, town, or village name
         return data.address.city || data.address.town || data.address.village || 'Unknown location';
@@ -507,17 +521,17 @@ export default function Feed() {
           <Typography variant="h5" gutterBottom sx={{ fontWeight: 'bold', mb: 2 }}>
             Choose Your Location
           </Typography>
-          
+
           <Typography variant="body1" sx={{ mb: 3, textAlign: 'center' }}>
-            For a personalized experience, please share your location or select a city
+            For a personalized experience, please share your location or select Edinburgh
           </Typography>
-          
+
           {locationError && (
             <MuiAlert severity="error" sx={{ mb: 3, width: '100%', maxWidth: 500 }}>
               {locationError}
             </MuiAlert>
           )}
-          
+
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, width: '100%', maxWidth: 500 }}>
             <Button
               variant="contained"
@@ -534,7 +548,7 @@ export default function Feed() {
             >
               {locationLoading ? 'Getting location...' : 'Use my current location'}
             </Button>
-            
+
             <Button
               variant="outlined"
               onClick={handleSelectEdinburgh}
@@ -546,9 +560,9 @@ export default function Feed() {
                 borderRadius: 3
               }}
             >
-              Edinburgh (Demo City)
+              Continue with Edinburgh
             </Button>
-            
+
             {city && coords && (
               <Button
                 variant="contained"
@@ -572,7 +586,7 @@ export default function Feed() {
   }
 
   return (
-    <Layout onFilterOpen={() => setIsFilterDrawerOpen(true)}>
+    <Layout onFilterOpen={() => isAuthenticated ? setIsFilterDrawerOpen(true) : setLoginDialogOpen(true)}>
       <Box sx={{ p: 2, maxWidth: 800, mx: 'auto' }}>
         <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <Box>
@@ -583,7 +597,7 @@ export default function Feed() {
               {totalCount} alerts
             </Typography>
           </Box>
-          
+
           <Box sx={{ display: 'flex', gap: 1 }}>
             <button
               onClick={handleResetLocation}
@@ -601,7 +615,7 @@ export default function Feed() {
             </button>
           </Box>
         </Box>
-        
+
         {/* Low Accuracy Warning Dialog */}
         <Dialog
           open={lowAccuracyWarning}
@@ -615,9 +629,9 @@ export default function Feed() {
             }
           }}
         >
-          <DialogTitle sx={{ 
-            display: 'flex', 
-            alignItems: 'center', 
+          <DialogTitle sx={{
+            display: 'flex',
+            alignItems: 'center',
             gap: 1,
             py: 2
           }}>
@@ -626,71 +640,71 @@ export default function Feed() {
               Improve Location Accuracy
             </Typography>
           </DialogTitle>
-          
+
           <DialogContent sx={{ px: 3, pt: 3, pb: 1 }}>
             <Typography variant="body1" sx={{ my: 3 }}>
               We detected that your location accuracy is {locationAccuracy ? `approximately ${Math.round(locationAccuracy)} meters` : 'lower than optimal'}.
             </Typography>
-            
-            <Typography variant="subtitle1" sx={{ fontWeight: 600}}>
+
+            <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
               How to improve location accuracy:
             </Typography>
-            
+
             <List sx={{ mb: 2 }}>
-              <ListItem sx={{ px: 0}}>
-                <ListItemText 
-                  primary="Move to an open area away from buildings" 
+              <ListItem sx={{ px: 0 }}>
+                <ListItemText
+                  primary="Move to an open area away from buildings"
                   secondary="Tall structures can interfere with GPS signals"
                 />
               </ListItem>
-              
-              <ListItem sx={{ px: 0}}>
-                <ListItemText 
-                  primary="Enable high-accuracy mode in settings" 
+
+              <ListItem sx={{ px: 0 }}>
+                <ListItemText
+                  primary="Enable high-accuracy mode in settings"
                   secondary="In your device settings, ensure location is set to high-accuracy mode"
                 />
               </ListItem>
-              
-              <ListItem sx={{ px: 0}}>
-                <ListItemText 
-                  primary="Connect to Wi-Fi if possible" 
+
+              <ListItem sx={{ px: 0 }}>
+                <ListItemText
+                  primary="Connect to Wi-Fi if possible"
                   secondary="Wi-Fi connections can help improve location accuracy"
                 />
               </ListItem>
-              
-              <ListItem sx={{ px: 0}}>
-  <ListItemText
-    primary="Try restarting your location services"
-    secondary="Turn location off and on again in your device settings"
-  />
-</ListItem>
+
+              <ListItem sx={{ px: 0 }}>
+                <ListItemText
+                  primary="Try restarting your location services"
+                  secondary="Turn location off and on again in your device settings"
+                />
+              </ListItem>
             </List>
           </DialogContent>
-          
-          <DialogActions sx={{ px: 3, pb: 3, pt: 1, flexDirection: {xs: 'row', sm: 'row'}, gap: 1 }}>
-            <Button 
+
+          <DialogActions sx={{ px: 3, pb: 3, pt: 1, flexDirection: { xs: 'row', sm: 'row' }, gap: 1 }}>
+            <Button
               fullWidth={fullScreen}
-              variant="outlined" 
+              variant="outlined"
               onClick={() => {
                 setLowAccuracyWarning(false);
                 handleUseMyLocation();
               }}
-              sx={{ 
+              sx={{
                 borderColor: '#000',
                 color: '#000',
-                order: {xs: 2, sm: 1}
+                order: { xs: 2, sm: 1 }
               }}
             >
               Try Again
             </Button>
-            <Button 
+            <Button
               fullWidth={fullScreen}
-              variant="contained" 
-              onClick={() => setLowAccuracyWarning(false)} 
-              sx={{ 
+              variant="contained"
+              onClick={() => setLowAccuracyWarning(false)}
+              sx={{
                 bgcolor: '#000',
                 color: 'white',
-                order: {xs: 1, sm: 2}
+                order: { xs: 1, sm: 2 }
               }}
             >
               Continue Anyway
@@ -736,7 +750,7 @@ export default function Feed() {
                 <Typography variant="subtitle1" sx={{ fontWeight: 500 }}>
                   {alert.title || "Road Closures in 48h : Fringe Festival Protest"}
                 </Typography>
-                
+
                 {/* Alert Metadata */}
                 <Box sx={{ display: 'flex', gap: 1, color: 'text.secondary', fontSize: '0.85rem', mb: 0.5 }}>
                   <Box component="span" sx={{ display: 'flex', alignItems: 'center' }}>
@@ -752,42 +766,51 @@ export default function Feed() {
                     {alert.createdAt ? formatTime(alert.createdAt) : "26h"}
                   </Box>
                 </Box>
-                
+
                 {/* Alert Content - Combined description and recommended action */}
                 <Typography variant="body2" sx={{ mb: 1 }}>
                   {alert.description || "Roads closures expected, resulting in delayed check-ins."}
                   {alert.recommendedAction && ` ${alert.recommendedAction}`}
                 </Typography>
-                
+
                 {/* Risk Level Box - conditionally shown */}
                 {(alert.risk && isAuthenticated) && (
-                  <Box 
-                    sx={{ 
-                      p: 1.5, 
-                      mb: 2, 
-                      bgcolor: '#e5f7f0', 
+                  <Box
+                    sx={{
+                      p: 1.5,
+                      mb: 2,
+                      bgcolor:
+                        alert.risk === 'Low' ? '#e6f4ea' :
+                          alert.risk === 'Medium' ? '#fff4e5' :
+                            alert.risk === 'High' ? '#fdecea' :
+                              'transparent',
                       borderRadius: 1,
-                      color: '#00855b',
+                      color:
+                        alert.risk === 'Low' ? '#00855b' :
+                          alert.risk === 'Medium' ? '#c17e00' :
+                            alert.risk === 'High' ? '#d32f2f' :
+                              'inherit',
                       fontWeight: 500,
                       fontSize: '0.85rem'
                     }}
                   >
-                    Risk level escalated – Prepare for further disruption.
+                    {alert.risk}
                   </Box>
                 )}
-                
+
+
                 {/* Update Time and Follow Text */}
                 <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
                   <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.85rem' }}>
                     Updated {formatTime(alert.updatedAt || alert.createdAt)}
                   </Typography>
-                  
+
                   {/* Use text with bell icon instead of button */}
-                  <Box 
+                  <Box
                     onClick={() => handleFollowUpdate(alert._id)}
-                    sx={{ 
-                      display: 'flex', 
-                      alignItems: 'center', 
+                    sx={{
+                      display: 'flex',
+                      alignItems: 'center',
                       gap: 0.5,
                       cursor: 'pointer',
                       color: alert.isFollowing ? 'primary.main' : 'text.secondary',
@@ -795,8 +818,8 @@ export default function Feed() {
                       '&:hover': { color: 'primary.main' }
                     }}
                   >
-                    <i className={alert.isFollowing ? "ri-notification-3-fill" : "ri-notification-3-line"} 
-                       style={{ fontSize: '1.1rem' }} />
+                    <i className={alert.isFollowing ? "ri-notification-3-fill" : "ri-notification-3-line"}
+                      style={{ fontSize: '1.1rem' }} />
                     <Typography variant="body2">
                       {alert.isFollowing ? 'Following' : 'Follow Updates'}
                     </Typography>
@@ -805,13 +828,13 @@ export default function Feed() {
                 <Divider sx={{ my: 1 }} />
               </Paper>
             ))}
-            
+
             {/* Login to view more alert - for non-logged in users */}
             {!isAuthenticated && alerts.length > 0 && (
-              <Box 
-                sx={{ 
-                  textAlign: 'center', 
-                  p: 1, 
+              <Box
+                sx={{
+                  textAlign: 'center',
+                  p: 1,
                   bgcolor: 'rgb(238, 238, 238)',
                   borderRadius: 5,
                   cursor: 'pointer',
@@ -826,11 +849,11 @@ export default function Feed() {
                 </Typography>
               </Box>
             )}
-            
+
             {/* Load more button - only for logged in users */}
             {hasMore && isAuthenticated && (
               <Box sx={{ textAlign: 'center', mb: 4 }}>
-                <Button 
+                <Button
                   variant="outlined"
                   onClick={handleLoadMore}
                   disabled={loading}
@@ -850,7 +873,7 @@ export default function Feed() {
           </>
         )}
       </Box>
-      
+
       {/* Filter Drawer */}
       <FilterDrawer
         open={isFilterDrawerOpen}
@@ -861,7 +884,7 @@ export default function Feed() {
         onApplyFilters={handleApplyFilters}
         onClearFilters={handleClearFilters}
       />
-      
+
       {/* Login Dialog */}
       <Dialog
         open={loginDialogOpen}
@@ -878,11 +901,11 @@ export default function Feed() {
       >
         <DialogContent sx={{ p: 3, textAlign: 'center' }}>
           <Box sx={{ mb: 2 }}>
-            <Image 
-              src="/images/login-alert.png" 
-              alt="Login required" 
-              width={120} 
-              height={120} 
+            <Image
+              src="/images/login-alert.png"
+              alt="Login required"
+              width={120}
+              height={120}
               style={{ margin: '0 auto' }}
             />
           </Box>
@@ -924,16 +947,16 @@ export default function Feed() {
           </Box>
         </DialogContent>
       </Dialog>
-      
+
       {/* Snackbar for notifications */}
-      <Snackbar 
-        open={snackbar.open} 
-        autoHideDuration={4000} 
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={4000}
         onClose={handleCloseSnackbar}
         anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
       >
-        <MuiAlert 
-          onClose={handleCloseSnackbar} 
+        <MuiAlert
+          onClose={handleCloseSnackbar}
           severity={snackbar.severity}
           sx={{ width: '100%' }}
         >
