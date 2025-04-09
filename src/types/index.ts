@@ -3,7 +3,7 @@ export interface User {
   email: string;
   name?: string;
   isVerified: boolean;
-  role?: 'user' | 'admin' | 'superadmin';
+  role?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -28,7 +28,6 @@ export interface Alert {
   addToEmailSummary?: boolean;
   previousVersionNotes?: string;
   updatedBy?: string;
-  userId?: User | string;
   location: string;
   latitude: number;
   longitude: number;
@@ -39,6 +38,8 @@ export interface Alert {
   createdBy: User | string;
   createdAt: string;
   updatedAt: string;
+  expectedStart?: string;
+  expectedEnd?: string;
 }
 
 export interface Media {

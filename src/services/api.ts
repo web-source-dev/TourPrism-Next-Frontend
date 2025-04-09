@@ -435,4 +435,99 @@ export const markAllAsRead = async (): Promise<{ success: boolean }> => {
   }
 };
 
+// Admin API Functions
+export const getAllUsers = async (params = {}): Promise<{ users: User[], totalCount: number }> => {
+  try {
+    const response = await api.get<{ users: User[], totalCount: number }>('/api/admin/users', { params });
+    return response.data;
+  } catch (error) {
+    throw getErrorMessage(error as CustomAxiosError);
+  }
+};
+
+export const updateUserRole = async (userId: string, role: string): Promise<{ success: boolean }> => {
+  try {
+    const response = await api.put<{ success: boolean }>(`/api/admin/users/${userId}/role`, { role });
+    return response.data;
+  } catch (error) {
+    throw getErrorMessage(error as CustomAxiosError);
+  }
+};
+
+export const getAllAlertsAdmin = async (params = {}): Promise<{ alerts: Alert[], totalCount: number }> => {
+  try {
+    const response = await api.get<{ alerts: Alert[], totalCount: number }>('/api/admin/alerts', { params });
+    return response.data;
+  } catch (error) {
+    throw getErrorMessage(error as CustomAxiosError);
+  }
+};
+
+export const updateAlertStatus = async (alertId: string, status: string): Promise<{ success: boolean }> => {
+  try {
+    const response = await api.put<{ success: boolean }>(`/api/admin/alerts/${alertId}/status`, { status });
+    return response.data;
+  } catch (error) {
+    throw getErrorMessage(error as CustomAxiosError);
+  }
+};
+
+export const deleteAlert = async (alertId: string): Promise<{ success: boolean }> => {
+  try {
+    const response = await api.delete<{ success: boolean }>(`/api/admin/alerts/${alertId}`);
+    return response.data;
+  } catch (error) {
+    throw getErrorMessage(error as CustomAxiosError);
+  }
+};
+
+export const updateAlert = async (alertId: string, alertData: Partial<Alert>): Promise<{ success: boolean; alert: Alert }> => {
+  try {
+    const response = await api.put<{ success: boolean; alert: Alert }>(`/api/admin/alerts/${alertId}`, alertData);
+    return response.data;
+  } catch (error) {
+    throw getErrorMessage(error as CustomAxiosError);
+  }
+};
+
+export const createNewAlert = async (alertData: Partial<Alert>): Promise<{ success: boolean; alert: Alert }> => {
+  try {
+    const response = await api.post<{ success: boolean; alert: Alert }>('/api/admin/alerts', alertData);
+    return response.data;
+  } catch (error) {
+    throw getErrorMessage(error as CustomAxiosError);
+  }
+};
+
+// Define DashboardStats interface for the dashboard stats return type
+interface DashboardStats {
+  totalUsers: number;
+  totalAlerts: number;
+  alertsByStatus: {
+    pending: number;
+    approved: number;
+    rejected: number;
+    published: number;
+  };
+  recentAlerts: {
+    _id: string;
+    title: string;
+    description: string;
+    status: string;
+    createdAt: string;
+    city: string;
+  }[];
+  totalSubscribers: number;
+  activeUsers: number;
+}
+
+export const getDashboardStats = async (): Promise<DashboardStats> => {
+  try {
+    const response = await api.get<DashboardStats>('/api/admin/dashboard');
+    return response.data;
+  } catch (error) {
+    throw getErrorMessage(error as CustomAxiosError);
+  }
+};
+
 export { api }; 

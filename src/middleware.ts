@@ -13,17 +13,15 @@ const publicPaths = [
   // Add other public paths here
 ];
 
-// Admin paths that require admin privileges
+// Admin paths that require admin role
 const adminPaths = [
   '/admin',
-  '/admin/users',
-  '/admin/alerts',
-  '/admin/dashboard',
+  '/bulk',
 ];
 
 // /bulk path is intentionally NOT added to public paths as it should be protected
 
-export function middleware(request: NextRequest) {
+export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   
   // If it's a public path or an API route, don't check authentication
@@ -41,8 +39,24 @@ export function middleware(request: NextRequest) {
     return NextResponse.redirect(url);
   }
   
-  // For admin routes, we'll let the client-side AuthContext handle the role check
-  // The server-side admin routes are protected by their own middleware
+  // For admin routes, check if the user has admin role
+  if (adminPaths.some(path => pathname.startsWith(path))) {
+    try {
+      // This is a simple check - in production you would verify the JWT signature
+      // and decode it properly with the secret key
+      const user = JSON.parse(atob(token.split('.')[1]));
+      
+      if (user.role !== 'admin' && user.role !== 'superadmin') {
+        // Redirect to homepage if not admin
+        return NextResponse.redirect(new URL('/', request.url));
+      }
+    } catch (error) {
+      console.error('Error checking admin role:', error);
+      // If token is invalid, redirect to login
+      const url = new URL('/login', request.url);
+      return NextResponse.redirect(url);
+    }
+  }
   
   return NextResponse.next();
 }

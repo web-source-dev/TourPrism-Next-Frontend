@@ -1,556 +1,575 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
-import {
-  Box,
-  Container,
-  Typography,
-  Paper,
-  Divider,
-  List,
-  ListItem,
-  ListItemText,
-  ListItemAvatar,
-  Avatar,
-  CircularProgress,
-  Chip,
-  TextField,
+import React, { useEffect, useState, useCallback } from 'react';
+import { 
+  Box, 
+  Typography, 
+  Paper, 
+  Table, 
+  TableBody, 
+  TableCell, 
+  TableContainer, 
+  TableHead, 
+  TableRow,
+  TablePagination,
   Button,
   IconButton,
-  Menu,
+  TextField,
   MenuItem,
+  Chip,
   Dialog,
-  DialogTitle,
+  DialogActions,
   DialogContent,
   DialogContentText,
-  DialogActions,
+  DialogTitle,
+  CircularProgress,
   FormControl,
   InputLabel,
   Select,
-  Tab,
-  Tabs,
-  Pagination,
-  Tooltip,
+  SelectChangeEvent,
+  Stack,
   Snackbar,
-  Alert
+  Alert,
+  Card,
+  CardContent,
+  useMediaQuery,
+  useTheme
 } from '@mui/material';
-import { useRouter } from 'next/navigation';
-import { useAuth } from '@/context/AuthContext';
 import AdminLayout from '@/components/AdminLayout';
-import { getPendingAlerts, updateAlertStatus, deleteAlert, getAlertsByStatus } from '@/services/adminApi';
-import { PendingAlertsResponse } from '@/services/adminApi';
-import { fetchAlerts } from '@/services/api';
+import { getAllAlertsAdmin, updateAlertStatus, deleteAlert } from '@/services/api';
 import { Alert as AlertType } from '@/types';
-
-interface TabPanelProps {
-  children?: React.ReactNode;
-  index: number;
-  value: number;
-}
-
-function TabPanel(props: TabPanelProps) {
-  const { children, value, index, ...other } = props;
-
-  return (
-    <div
-      role="tabpanel"
-      hidden={value !== index}
-      id={`alert-tabpanel-${index}`}
-      aria-labelledby={`alert-tab-${index}`}
-      {...other}
-    >
-      {value === index && (
-        <Box sx={{ py: 3 }}>
-          {children}
-        </Box>
-      )}
-    </div>
-  );
-}
+import { useRouter } from 'next/navigation';
 
 export default function AlertsManagement() {
-  const { isAuthenticated, isAdmin, isLoading } = useAuth();
-  const [tabValue, setTabValue] = useState(0);
+  const [alerts, setAlerts] = useState<AlertType[]>([]);
+  const [totalCount, setTotalCount] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [pendingAlerts, setPendingAlerts] = useState<AlertType[]>([]);
-  const [allAlerts, setAllAlerts] = useState<AlertType[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [searchQuery, setSearchQuery] = useState('');
   const [selectedAlert, setSelectedAlert] = useState<AlertType | null>(null);
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [dialogOpen, setDialogOpen] = useState(false);
   const [statusDialogOpen, setStatusDialogOpen] = useState(false);
   const [newStatus, setNewStatus] = useState('');
-  const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [actionMenuAnchor, setActionMenuAnchor] = useState<null | HTMLElement>(null);
-  const [successMessage, setSuccessMessage] = useState<string | null>(null);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' as 'success' | 'error' });
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const router = useRouter();
-  
-  // For action menu (more options)
-  const handleActionMenuOpen = (event: React.MouseEvent<HTMLButtonElement>, alert: AlertType) => {
-    setActionMenuAnchor(event.currentTarget);
-    setSelectedAlert(alert);
-  };
 
-  const handleActionMenuClose = () => {
-    setActionMenuAnchor(null);
-  };
-
-  // Tab change handler
-  const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
-    setTabValue(newValue);
-    setPage(1); // Reset to first page when changing tabs
-  };
-
-  // Pagination handler
-  const handlePageChange = (event: React.ChangeEvent<unknown>, value: number) => {
-    setPage(value);
-  };
-
-  // Handle alert status change dialog
-  const handleStatusDialogOpen = (status: string) => {
-    setNewStatus(status);
-    setStatusDialogOpen(true);
-    handleActionMenuClose();
-  };
-
-  const handleStatusDialogClose = () => {
-    setStatusDialogOpen(false);
-  };
-
-  const handleStatusChange = async () => {
-    if (!selectedAlert) return;
-    
+  const fetchAlerts = useCallback(async () => {
+    setLoading(true);
+    setError(null);
     try {
-      const updatedAlert = await updateAlertStatus(selectedAlert._id, newStatus as 'approved' | 'rejected' | 'pending');
-      // Update local state instead of refetching all data
-      const updateAlertInList = (alerts: AlertType[]): AlertType[] => {
-        return alerts.map(alert => 
-          alert._id === selectedAlert._id ? { ...alert, status: newStatus } : alert
-        );
+      const params: Record<string, string | number> = {
+        page: page + 1,
+        limit: rowsPerPage
       };
       
-      // Update the lists based on current tab
-      if (tabValue === 0) {
-        setPendingAlerts(prev => prev.filter(alert => alert._id !== selectedAlert._id));
-      } else {
-        setAllAlerts(prev => updateAlertInList(prev));
+      if (statusFilter !== 'all') {
+        params.status = statusFilter;
       }
       
-      // Show success feedback
-      setSuccessMessage(`Alert status changed to ${newStatus} successfully`);
-      setStatusDialogOpen(false);
+      if (searchQuery) {
+        params.search = searchQuery;
+      }
+      
+      const { alerts, totalCount } = await getAllAlertsAdmin(params);
+      setAlerts(alerts);
+      setTotalCount(totalCount);
     } catch (error) {
-      console.error('Error updating alert status:', error);
-      setErrorMessage('Failed to update alert status');
+      console.error('Error fetching alerts:', error);
+      setError('Failed to load alerts. Please try again.');
+      setSnackbar({
+        open: true,
+        message: 'Failed to load alerts',
+        severity: 'error'
+      });
+    } finally {
+      setLoading(false);
     }
+  }, [page, rowsPerPage, statusFilter, searchQuery]);
+
+  useEffect(() => {
+    fetchAlerts();
+  }, [fetchAlerts]);
+
+  const handleChangePage = (_event: unknown, newPage: number) => {
+    setPage(newPage);
   };
 
-  // Handle alert deletion dialog
-  const handleDeleteDialogOpen = () => {
-    setDeleteDialogOpen(true);
-    handleActionMenuClose();
+  const handleChangeRowsPerPage = (event: React.ChangeEvent<HTMLInputElement>) => {
+    setRowsPerPage(parseInt(event.target.value, 10));
+    setPage(0);
   };
 
-  const handleDeleteDialogClose = () => {
-    setDeleteDialogOpen(false);
+  const handleStatusFilterChange = (event: SelectChangeEvent) => {
+    setStatusFilter(event.target.value);
+    setPage(0);
   };
 
-  const handleDeleteAlert = async () => {
+  const handleSearchChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchQuery(event.target.value);
+    setPage(0);
+  };
+
+  const handleDeleteClick = (alert: AlertType) => {
+    setSelectedAlert(alert);
+    setDialogOpen(true);
+  };
+
+  const handleStatusChangeClick = (alert: AlertType) => {
+    setSelectedAlert(alert);
+    setNewStatus(alert.status || 'pending');
+    setStatusDialogOpen(true);
+  };
+
+  const handleConfirmDelete = async () => {
     if (!selectedAlert) return;
     
     try {
       await deleteAlert(selectedAlert._id);
-      
-      // Update local state instead of refetching all data
-      if (tabValue === 0) {
-        setPendingAlerts(prev => prev.filter(alert => alert._id !== selectedAlert._id));
-      } else {
-        setAllAlerts(prev => prev.filter(alert => alert._id !== selectedAlert._id));
-      }
-      
-      // Show success feedback
-      setSuccessMessage('Alert deleted successfully');
-      setDeleteDialogOpen(false);
+      setAlerts(alerts.filter(alert => alert._id !== selectedAlert._id));
+      setSnackbar({
+        open: true,
+        message: 'Alert deleted successfully',
+        severity: 'success'
+      });
     } catch (error) {
       console.error('Error deleting alert:', error);
-      setErrorMessage('Failed to delete alert');
-    }
-  };
-
-  // Handle alert edit
-  const handleEditAlert = () => {
-    if (!selectedAlert) return;
-    // Store selected alert in local storage for the edit page
-    localStorage.setItem('editAlert', JSON.stringify(selectedAlert));
-    router.push(`/admin/alerts/edit?id=${selectedAlert._id}`);
-    handleActionMenuClose();
-  };
-
-  // Fetch alerts based on tab value and page
-  const fetchData = async () => {
-    setLoading(true);
-    try {
-      if (tabValue === 0) {
-        // Fetch pending alerts
-        const response = await getPendingAlerts(page, 10);
-        setPendingAlerts(response.alerts);
-        setTotalPages(response.totalPages);
-      } else {
-        // Fetch alerts by status using admin API
-        const statuses = ['approved', 'rejected', 'all'];
-        const status = tabValue === 3 ? undefined : statuses[tabValue - 1]; // approved, rejected, or all
-        
-        // Use new API endpoint for filtered alerts
-        const response = await getAlertsByStatus(status as 'approved' | 'rejected' | undefined, page, 10, searchQuery);
-        setAllAlerts(response.alerts);
-        setTotalPages(response.totalPages || Math.ceil(response.totalAlerts / 10));
-      }
-    } catch (error) {
-      console.error('Error fetching alerts:', error);
+      setSnackbar({
+        open: true,
+        message: 'Failed to delete alert',
+        severity: 'error'
+      });
     } finally {
-      setLoading(false);
+      setDialogOpen(false);
+      setSelectedAlert(null);
     }
   };
 
-  useEffect(() => {
-    if (!isLoading && !isAdmin) {
-      router.push('/');
+  const handleConfirmStatusChange = async () => {
+    if (!selectedAlert || !newStatus) return;
+    
+    try {
+      await updateAlertStatus(selectedAlert._id, newStatus);
+      setAlerts(alerts.map(alert => 
+        alert._id === selectedAlert._id 
+          ? { ...alert, status: newStatus } 
+          : alert
+      ));
+      setSnackbar({
+        open: true,
+        message: `Alert status updated to ${newStatus}`,
+        severity: 'success'
+      });
+    } catch (error) {
+      console.error('Error updating alert status:', error);
+      setSnackbar({
+        open: true,
+        message: 'Failed to update alert status',
+        severity: 'error'
+      });
+    } finally {
+      setStatusDialogOpen(false);
+      setSelectedAlert(null);
     }
-  }, [isAdmin, isLoading, router]);
-
-  useEffect(() => {
-    if (isAuthenticated && isAdmin) {
-      fetchData();
-    }
-  }, [isAuthenticated, isAdmin, tabValue, page]);
-
-  // Handle search
-  const handleSearch = () => {
-    setPage(1); // Reset to first page when searching
-    fetchData();
   };
 
-  // Get current alerts based on active tab
-  const currentAlerts = tabValue === 0 ? pendingAlerts : allAlerts;
+  const handleCloseSnackbar = () => {
+    setSnackbar({ ...snackbar, open: false });
+  };
 
-  if (isLoading || loading) {
-    return (
-      <AdminLayout>
-        <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '50vh' }}>
-          <CircularProgress />
-        </Box>
-      </AdminLayout>
-    );
-  }
+  const handleRetry = () => {
+    fetchAlerts();
+  };
 
-  // Function to get status color
-  const getStatusColor = (status?: string) => {
+  const getStatusColor = (status: string) => {
     switch (status) {
       case 'approved':
-        return 'success';
+        return { bg: '#e8f5e9', color: '#2e7d32' };
       case 'rejected':
-        return 'error';
-      case 'pending':
-        return 'warning';
+        return { bg: '#ffebee', color: '#c62828' };
+      case 'published':
+        return { bg: '#e3f2fd', color: '#1565c0' };
       default:
-        return 'default';
+        return { bg: '#fff8e1', color: '#f57f17' };
     }
   };
+
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  };
+
+  // Mobile card view for alerts
+  const renderAlertCards = () => {
+    if (alerts.length === 0) {
+      return (
+        <Typography variant="body1" sx={{ textAlign: 'center', p: 3, color: 'text.secondary' }}>
+          No alerts found
+        </Typography>
+      );
+    }
+
+    return (
+      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+        {alerts.map(alert => (
+          <Card 
+            key={alert._id} 
+            elevation={0} 
+            sx={{ 
+              border: '1px solid #e0e0e0', 
+              borderRadius: 2,
+              transition: 'transform 0.2s, box-shadow 0.2s',
+              '&:hover': {
+                transform: 'translateY(-2px)',
+                boxShadow: '0 4px 8px rgba(0,0,0,0.08)'
+              }
+            }}
+          >
+            <CardContent sx={{ p: 2 }}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1 }}>
+                <Typography variant="subtitle1" sx={{ fontWeight: 'bold' }}>
+                  {alert.title || alert.description.substring(0, 30)}
+                </Typography>
+                <Chip
+                  label={alert.status?.charAt(0).toUpperCase() + (alert.status?.slice(1) || '')}
+                  size="small"
+                  sx={{
+                    bgcolor: getStatusColor(alert.status || 'pending').bg,
+                    color: getStatusColor(alert.status || 'pending').color,
+                    fontWeight: 'medium'
+                  }}
+                />
+              </Box>
+              
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, mb: 2 }}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <Typography variant="body2" color="text.secondary">City:</Typography>
+                  <Typography variant="body2">{alert.city}</Typography>
+                </Box>
+                
+                <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <Typography variant="body2" color="text.secondary">Created:</Typography>
+                  <Typography variant="body2">{formatDate(alert.createdAt)}</Typography>
+                </Box>
+              </Box>
+              
+              <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1 }}>
+                <Button
+                  size="small"
+                  variant="outlined"
+                  onClick={() => handleStatusChangeClick(alert)}
+                  sx={{ 
+                    borderColor: '#ccc', 
+                    color: '#555',
+                    '&:hover': { borderColor: '#999', backgroundColor: '#f5f5f5' }
+                  }}
+                >
+                  Update Status
+                </Button>
+                <Button
+                  size="small"
+                  variant="outlined"
+                  onClick={() => router.push(`/admin/alerts/edit/${alert._id}`)}
+                  sx={{ 
+                    borderColor: '#1976d2', 
+                    color: '#1976d2',
+                    '&:hover': { backgroundColor: '#e3f2fd' }
+                  }}
+                >
+                  <i className="ri-edit-line" style={{ marginRight: '4px' }} />
+                  Edit
+                </Button>
+                <IconButton
+                  size="small"
+                  color="error"
+                  onClick={() => handleDeleteClick(alert)}
+                >
+                  <i className="ri-delete-bin-line" />
+                </IconButton>
+              </Box>
+            </CardContent>
+          </Card>
+        ))}
+      </Box>
+    );
+  };
+
+  // Desktop table view for alerts
+  const renderAlertTable = () => {
+    return (
+      <TableContainer>
+        <Table sx={{ minWidth: 650 }}>
+          <TableHead>
+            <TableRow>
+              <TableCell sx={{ fontWeight: 'bold' }}>Title</TableCell>
+              <TableCell sx={{ fontWeight: 'bold' }}>City</TableCell>
+              <TableCell sx={{ fontWeight: 'bold' }}>Created On</TableCell>
+              <TableCell sx={{ fontWeight: 'bold' }}>Status</TableCell>
+              <TableCell sx={{ fontWeight: 'bold' }}>Actions</TableCell>
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {alerts.length > 0 ? (
+              alerts.map((alert) => (
+                <TableRow key={alert._id} hover>
+                  <TableCell sx={{ maxWidth: 250 }}>
+                    <Typography noWrap title={alert.title || alert.description.substring(0, 30)}>
+                      {alert.title || alert.description.substring(0, 30)}
+                    </Typography>
+                  </TableCell>
+                  <TableCell>{alert.city}</TableCell>
+                  <TableCell>{formatDate(alert.createdAt)}</TableCell>
+                  <TableCell>
+                    <Chip
+                      label={alert.status?.charAt(0).toUpperCase() + (alert.status?.slice(1) || '')}
+                      size="small"
+                      sx={{
+                        bgcolor: getStatusColor(alert.status || 'pending').bg,
+                        color: getStatusColor(alert.status || 'pending').color,
+                        fontWeight: 'medium'
+                      }}
+                    />
+                  </TableCell>
+                  <TableCell>
+                    <Stack direction="row" spacing={1}>
+                      <Button
+                        size="small"
+                        variant="outlined"
+                        onClick={() => handleStatusChangeClick(alert)}
+                        sx={{ 
+                          borderColor: '#ccc', 
+                          color: '#555',
+                          '&:hover': { borderColor: '#999', backgroundColor: '#f5f5f5' }
+                        }}
+                      >
+                        Update Status
+                      </Button>
+                      <Button
+                        size="small"
+                        variant="outlined"
+                        onClick={() => router.push(`/admin/alerts/edit/${alert._id}`)}
+                        sx={{ 
+                          borderColor: '#1976d2', 
+                          color: '#1976d2',
+                          '&:hover': { backgroundColor: '#e3f2fd' }
+                        }}
+                      >
+                        <i className="ri-edit-line" style={{ marginRight: '4px' }} />
+                        Edit
+                      </Button>
+                      <IconButton
+                        size="small"
+                        color="error"
+                        onClick={() => handleDeleteClick(alert)}
+                      >
+                        <i className="ri-delete-bin-line" />
+                      </IconButton>
+                    </Stack>
+                  </TableCell>
+                </TableRow>
+              ))
+            ) : (
+              <TableRow>
+                <TableCell colSpan={5} align="center" sx={{ py: 3 }}>
+                  <Typography variant="body1" color="text.secondary">
+                    No alerts found
+                  </Typography>
+                </TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
+      </TableContainer>
+    );
+  };
+
+  // Error display component
+  const renderError = () => (
+    <Box sx={{ textAlign: 'center', p: 4 }}>
+      <Typography variant="h6" color="error" sx={{ mb: 2 }}>
+        {error}
+      </Typography>
+      <Button 
+        variant="contained" 
+        onClick={handleRetry}
+        startIcon={<i className="ri-refresh-line" />}
+      >
+        Try Again
+      </Button>
+    </Box>
+  );
 
   return (
     <AdminLayout>
-      <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-          <Typography variant="h4" component="h1">
-            Alerts Management
-          </Typography>
-        </Box>
+      <Box sx={{ mb: 4 }}>
+        <Typography variant="h4" sx={{ mb: 1, fontWeight: 'bold' }}>
+          Alerts Management
+        </Typography>
+        <Typography variant="body1" color="text.secondary">
+          View, filter and manage all alerts
+        </Typography>
+      </Box>
 
-        {/* Success Snackbar */}
-        <Snackbar
-          open={!!successMessage}
-          autoHideDuration={4000}
-          onClose={() => setSuccessMessage(null)}
-          anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
+      <Paper sx={{ p: 3, mb: 3, borderRadius: 2 }} elevation={0}>
+        <Stack 
+          direction={{ xs: 'column', sm: 'row' }} 
+          spacing={2} 
+          sx={{ mb: 3 }}
+          alignItems={{ sm: 'center' }}
         >
-          <Alert onClose={() => setSuccessMessage(null)} severity="success">
-            {successMessage}
-          </Alert>
-        </Snackbar>
-        
-        {/* Error Snackbar */}
-        <Snackbar
-          open={!!errorMessage}
-          autoHideDuration={4000}
-          onClose={() => setErrorMessage(null)}
-          anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
-        >
-          <Alert onClose={() => setErrorMessage(null)} severity="error">
-            {errorMessage}
-          </Alert>
-        </Snackbar>
-
-        {/* Search bar */}
-        <Box sx={{ mb: 3, display: 'flex', gap: 2 }}>
           <TextField
             label="Search alerts"
             variant="outlined"
             size="small"
             fullWidth
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            onKeyPress={(e) => {
-              if (e.key === 'Enter') handleSearch();
-            }}
+            onChange={handleSearchChange}
+            sx={{ flex: 2, maxWidth: { sm: 300 } }}
           />
-          <Button 
-            variant="contained" 
-            onClick={handleSearch}
+          <FormControl size="small" sx={{ width: { xs: '100%', sm: 200 } }}>
+            <InputLabel id="status-filter-label">Filter by Status</InputLabel>
+            <Select
+              labelId="status-filter-label"
+              id="status-filter"
+              value={statusFilter}
+              label="Filter by Status"
+              onChange={handleStatusFilterChange}
+            >
+              <MenuItem value="all">All Statuses</MenuItem>
+              <MenuItem value="pending">Pending</MenuItem>
+              <MenuItem value="approved">Approved</MenuItem>
+              <MenuItem value="rejected">Rejected</MenuItem>
+              <MenuItem value="published">Published</MenuItem>
+            </Select>
+          </FormControl>
+          <Button
+            variant="contained"
+            color="primary"
+            startIcon={<i className="ri-add-line" />}
+            onClick={() => router.push('/admin/alerts/create')}
             sx={{ 
-              bgcolor: 'black', 
-              '&:hover': { bgcolor: '#333' },
-              whiteSpace: 'nowrap'
+              ml: { sm: 'auto' },
+              whiteSpace: 'nowrap',
+              minWidth: { xs: '100%', sm: 'auto' }
             }}
           >
-            Search
+            Create New Alert
           </Button>
-        </Box>
+        </Stack>
 
-        {/* Tabs */}
-        <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
-          <Tabs value={tabValue} onChange={handleTabChange} aria-label="alert tabs">
-            <Tab label="Pending Approval" />
-            <Tab label="Approved" />
-            <Tab label="Rejected" />
-            <Tab label="All Alerts" />
-          </Tabs>
-        </Box>
-
-        {/* Tab Panels */}
-        <TabPanel value={tabValue} index={0}>
-          <AlertsList 
-            alerts={pendingAlerts} 
-            onActionClick={handleActionMenuOpen}
-            getStatusColor={getStatusColor}
-          />
-        </TabPanel>
-        <TabPanel value={tabValue} index={1}>
-          <AlertsList 
-            alerts={allAlerts} 
-            onActionClick={handleActionMenuOpen}
-            getStatusColor={getStatusColor}
-          />
-        </TabPanel>
-        <TabPanel value={tabValue} index={2}>
-          <AlertsList 
-            alerts={allAlerts} 
-            onActionClick={handleActionMenuOpen}
-            getStatusColor={getStatusColor}
-          />
-        </TabPanel>
-        <TabPanel value={tabValue} index={3}>
-          <AlertsList 
-            alerts={allAlerts} 
-            onActionClick={handleActionMenuOpen}
-            getStatusColor={getStatusColor}
-          />
-        </TabPanel>
-
-        {/* Pagination */}
-        <Box sx={{ display: 'flex', justifyContent: 'center', mt: 3 }}>
-          <Pagination 
-            count={totalPages} 
-            page={page} 
-            onChange={handlePageChange} 
-            color="primary" 
-          />
-        </Box>
-
-        {/* Action Menu */}
-        <Menu
-          anchorEl={actionMenuAnchor}
-          open={Boolean(actionMenuAnchor)}
-          onClose={handleActionMenuClose}
-        >
-          <MenuItem onClick={handleEditAlert}>
-            <Box sx={{ display: 'flex', alignItems: 'center' }}>
-              <i className="ri-edit-line" style={{ marginRight: 8 }} />
-              <Tooltip title="Edit all alert details including location, coordinates, and properties" placement="right">
-                <span>Edit Alert Details</span>
-              </Tooltip>
-            </Box>
-          </MenuItem>
-          <MenuItem onClick={() => handleStatusDialogOpen('approved')}>
-            <Box sx={{ display: 'flex', alignItems: 'center' }}>
-              <i className="ri-check-line" style={{ marginRight: 8, color: 'green' }} />
-              Approve
-            </Box>
-          </MenuItem>
-          <MenuItem onClick={() => handleStatusDialogOpen('rejected')}>
-            <Box sx={{ display: 'flex', alignItems: 'center' }}>
-              <i className="ri-close-line" style={{ marginRight: 8, color: 'red' }} />
-              Reject
-            </Box>
-          </MenuItem>
-          <MenuItem onClick={() => handleStatusDialogOpen('pending')}>
-            <Box sx={{ display: 'flex', alignItems: 'center' }}>
-              <i className="ri-time-line" style={{ marginRight: 8, color: 'orange' }} />
-              Set to Pending
-            </Box>
-          </MenuItem>
-          <Divider />
-          <MenuItem onClick={handleDeleteDialogOpen} sx={{ color: 'error.main' }}>
-            <Box sx={{ display: 'flex', alignItems: 'center' }}>
-              <i className="ri-delete-bin-line" style={{ marginRight: 8 }} />
-              Delete
-            </Box>
-          </MenuItem>
-        </Menu>
-
-        {/* Status Change Dialog */}
-        <Dialog open={statusDialogOpen} onClose={handleStatusDialogClose}>
-          <DialogTitle>Change Alert Status</DialogTitle>
-          <DialogContent>
-            <DialogContentText>
-              Are you sure you want to change the status of this alert to {newStatus}?
-            </DialogContentText>
-          </DialogContent>
-          <DialogActions>
-            <Button onClick={handleStatusDialogClose}>Cancel</Button>
-            <Button onClick={handleStatusChange} autoFocus>
-              Change Status
-            </Button>
-          </DialogActions>
-        </Dialog>
-
-        {/* Delete Dialog */}
-        <Dialog open={deleteDialogOpen} onClose={handleDeleteDialogClose}>
-          <DialogTitle>Delete Alert</DialogTitle>
-          <DialogContent>
-            <DialogContentText>
-              Are you sure you want to delete this alert? This action cannot be undone.
-            </DialogContentText>
-          </DialogContent>
-          <DialogActions>
-            <Button onClick={handleDeleteDialogClose}>Cancel</Button>
-            <Button onClick={handleDeleteAlert} color="error" autoFocus>
-              Delete
-            </Button>
-          </DialogActions>
-        </Dialog>
-      </Container>
-    </AdminLayout>
-  );
-}
-
-// Alerts List Component
-interface AlertsListProps {
-  alerts: AlertType[];
-  onActionClick: (event: React.MouseEvent<HTMLButtonElement>, alert: AlertType) => void;
-  getStatusColor: (status?: string) => "success" | "error" | "warning" | "default";
-}
-
-function AlertsList({ alerts, onActionClick, getStatusColor }: AlertsListProps) {
-  // Helper function to get user display name
-  const getUserDisplayInfo = (alert: AlertType) => {
-    // Check for createdBy object
-    if (typeof alert.createdBy === 'object' && alert.createdBy) {
-      return {
-        name: alert.createdBy.name || 'U',
-        email: alert.createdBy.email || 'No Email'
-      };
-    }
-    
-    // Fallback to userId if available
-    if (typeof alert.userId === 'object' && alert.userId) {
-      return {
-        name: alert.userId.name || 'U',
-        email: alert.userId.email || 'No Email'
-      };
-    }
-    
-    // Default when no user info is available
-    return {
-      name: 'U',
-      email: 'Unknown User'
-    };
-  };
-
-  return (
-    <Paper
-      sx={{
-        width: '100%',
-        borderRadius: 2,
-        overflow: 'hidden',
-      }}
-    >
-      {alerts.length === 0 ? (
-        <Box sx={{ p: 3, textAlign: 'center' }}>
-          <Typography variant="body1" color="text.secondary">
-            No alerts found
-          </Typography>
-        </Box>
-      ) : (
-        <List sx={{ width: '100%', bgcolor: 'background.paper' }}>
-          {alerts.map((alert) => {
-            const userInfo = getUserDisplayInfo(alert);
+        {loading ? (
+          <Box sx={{ display: 'flex', justifyContent: 'center', p: 5 }}>
+            <CircularProgress />
+          </Box>
+        ) : error ? (
+          renderError()
+        ) : (
+          <>
+            {/* Switch between mobile card view and desktop table view */}
+            {isMobile ? renderAlertCards() : renderAlertTable()}
             
-            return (
-              <React.Fragment key={alert._id}>
-                <ListItem
-                  alignItems="flex-start"
-                  secondaryAction={
-                    <Box sx={{ display: 'flex', gap: 1 }}>
-                      <Chip 
-                        label={alert.status?.toUpperCase() || 'PENDING'} 
-                        size="small"
-                        color={getStatusColor(alert.status)}
-                        sx={{ mr: 1 }}
-                      />
-                      <Tooltip title="Actions">
-                        <IconButton 
-                          edge="end" 
-                          aria-label="actions"
-                          onClick={(e) => onActionClick(e, alert)}
-                        >
-                          <i className="ri-more-2-fill" />
-                        </IconButton>
-                      </Tooltip>
-                    </Box>
-                  }
-                >
-                  <ListItemAvatar>
-                    <Avatar sx={{ bgcolor: 'primary.main' }}>
-                      {userInfo.name.charAt(0).toUpperCase()}
-                    </Avatar>
-                  </ListItemAvatar>
-                  <ListItemText
-                    primary={alert.title || 'Untitled Alert'}
-                    secondary={
-                      <React.Fragment>
-                        <Typography
-                          sx={{ display: 'inline' }}
-                          component="span"
-                          variant="body2"
-                          color="text.primary"
-                        >
-                          {userInfo.email}
-                        </Typography>
-                        {` — ${alert.description?.substring(0, 100) || 'No description'}...`}
-                        <Typography variant="caption" display="block" sx={{ mt: 1 }}>
-                          Location: {alert.city || 'Unknown'}, {alert.country || 'Unknown'} | Created: {new Date(alert.createdAt).toLocaleString()}
-                        </Typography>
-                      </React.Fragment>
-                    }
-                  />
-                </ListItem>
-                <Divider variant="inset" component="li" />
-              </React.Fragment>
-            );
-          })}
-        </List>
-      )}
-    </Paper>
+            <TablePagination
+              rowsPerPageOptions={[5, 10, 25, 50]}
+              component="div"
+              count={totalCount}
+              rowsPerPage={rowsPerPage}
+              page={page}
+              onPageChange={handleChangePage}
+              onRowsPerPageChange={handleChangeRowsPerPage}
+            />
+          </>
+        )}
+      </Paper>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog
+        open={dialogOpen}
+        onClose={() => setDialogOpen(false)}
+      >
+        <DialogTitle>Confirm Deletion</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            Are you sure you want to delete this alert? This action cannot be undone.
+          </DialogContentText>
+          {selectedAlert && (
+            <Box sx={{ mt: 2, p: 2, bgcolor: '#f5f5f5', borderRadius: 1 }}>
+              <Typography variant="subtitle2">
+                {selectedAlert.title || selectedAlert.description.substring(0, 30)}
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                {selectedAlert.city}
+              </Typography>
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDialogOpen(false)}>Cancel</Button>
+          <Button onClick={handleConfirmDelete} color="error">Delete</Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Status Update Dialog */}
+      <Dialog
+        open={statusDialogOpen}
+        onClose={() => setStatusDialogOpen(false)}
+      >
+        <DialogTitle>Update Alert Status</DialogTitle>
+        <DialogContent>
+          <DialogContentText sx={{ mb: 3 }}>
+            Choose a new status for this alert.
+          </DialogContentText>
+          {selectedAlert && (
+            <Box sx={{ mb: 3, p: 2, bgcolor: '#f5f5f5', borderRadius: 1 }}>
+              <Typography variant="subtitle2">
+                {selectedAlert.title || selectedAlert.description.substring(0, 30)}
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                {selectedAlert.city}
+              </Typography>
+            </Box>
+          )}
+          <FormControl fullWidth>
+            <InputLabel id="new-status-label">Status</InputLabel>
+            <Select
+              labelId="new-status-label"
+              id="new-status"
+              value={newStatus}
+              label="Status"
+              onChange={(e) => setNewStatus(e.target.value as string)}
+            >
+              <MenuItem value="pending">Pending</MenuItem>
+              <MenuItem value="approved">Approved</MenuItem>
+              <MenuItem value="rejected">Rejected</MenuItem>
+              <MenuItem value="published">Published</MenuItem>
+            </Select>
+          </FormControl>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setStatusDialogOpen(false)}>Cancel</Button>
+          <Button onClick={handleConfirmStatusChange} variant="contained">Update</Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Snackbar for notifications */}
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={6000}
+        onClose={handleCloseSnackbar}
+        anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+      >
+        <Alert 
+          onClose={handleCloseSnackbar} 
+          severity={snackbar.severity}
+          variant="filled"
+          sx={{ width: '100%' }}
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
+    </AdminLayout>
   );
 } 

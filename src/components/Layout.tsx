@@ -2,8 +2,7 @@
 
 import React, { useEffect, useState, ReactNode } from 'react';
 import { 
-  Box, 
-  AppBar, 
+  Box,
   Toolbar, 
   Typography, 
   Container, 

@@ -16,9 +16,15 @@ export const uploadBulkAlerts = async (file: File) => {
     const formData = new FormData();
     formData.append('file', file);
 
+    // Get token from localStorage or cookies
+    const token = typeof window !== 'undefined' ? 
+      localStorage.getItem('token') || document.cookie.replace(/(?:(?:^|.*;\s*)token\s*=\s*([^;]*).*$)|^.*$/, "$1") : 
+      null;
+
     const response = await api.post('/api/bulk-alerts/upload', formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
+        'Authorization': token ? `Bearer ${token}` : '',
       },
     });
 
