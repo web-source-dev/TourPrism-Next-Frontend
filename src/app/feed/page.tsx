@@ -772,7 +772,7 @@ export default function Feed() {
                 {/* Update Time and Follow Text */}
                 <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
                   <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.85rem' }}>
-                    Updated {formatTime(alert.updatedAt || alert.createdAt)}
+                    Updated {alert.updated ? formatTime(alert.updated) : formatTime(alert.updatedAt)}
                   </Typography>
 
                   {/* Use text with bell icon instead of button */}

@@ -419,11 +419,6 @@ export default function EditAlertPage() {
               sx={{ width: '100%' }}
             />
           </Box>
-
-          {/* Media */}
-          <Typography variant="h6" sx={{ fontWeight: 'bold', mb: 2, mt: 2 }}>
-            Media
-          </Typography>
           <Divider sx={{ mb: 3 }} />
 
           {/* Actions */}

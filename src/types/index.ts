@@ -41,6 +41,7 @@ export interface Alert {
   createdBy: User | string;
   createdAt: string;
   updatedAt: string;
+  updated?: string;
   expectedStart?: string;
   expectedEnd?: string;
 }
@@ -58,6 +59,8 @@ export interface Notification {
   isRead: boolean;
   userId: string;
   alertId?: string;
+  risk?: string;
+  type?: string;
   createdAt: string;
   updatedAt: string;
 }

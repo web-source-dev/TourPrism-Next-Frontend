@@ -15,6 +15,41 @@ interface NotificationDrawerProps {
   notifications: Notification[];
   onNotificationUpdate: () => void;
 }
+// Add a function to get risk dot color (more vibrant than background colors)
+const getRiskDotColor = (risk: string | undefined) => {
+  if (!risk) return '#E0E0E0'; // Default gray
+  
+  switch(risk.toLowerCase()) {
+    case 'low':
+      return '#4CAF50'; // Green
+    case 'medium':
+      return '#FF9800'; // Orange
+    case 'high':
+      return '#F44336'; // Red
+    case 'critical':
+      return '#B71C1C'; // Dark Red
+    default:
+      return '#9E9E9E'; // Gray
+  }
+};
+
+// Get percentage width for risk indicator
+const getRiskIndicatorWidth = (risk: string | undefined) => {
+  if (!risk) return 25; // Default
+  
+  switch(risk.toLowerCase()) {
+    case 'low':
+      return 25; // 25%
+    case 'medium':
+      return 50; // 50%
+    case 'high':
+      return 75; // 75%
+    case 'critical':
+      return 100; // 100%
+    default:
+      return 25; // Default
+  }
+};
 
 const NotificationDrawer = ({ open, onClose, notifications, onNotificationUpdate }: NotificationDrawerProps) => {
   const [showUnreadOnly, setShowUnreadOnly] = useState(false);
@@ -98,7 +133,7 @@ const NotificationDrawer = ({ open, onClose, notifications, onNotificationUpdate
         sx: {
           width: { xs: '100%', sm: 380 },
           zIndex: 1000, // Ensure the drawer is on top of other elements
-          bgcolor: 'background.default'
+          bgcolor: '#fff'
         }
       }}
     >
@@ -144,9 +179,53 @@ const NotificationDrawer = ({ open, onClose, notifications, onNotificationUpdate
               }}
             >
               <Box sx={{ width: '100%', p: 0 }}>
-                  <Typography variant="subtitle2">
-                    {notification.title}
-                  </Typography>
+                {notification.risk && (
+                  <Box
+                    sx={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      mb: 0.5
+                    }}
+                  >
+                    <Box
+                      sx={{
+                        position: 'relative',
+                        width: '100%',
+                        height: '3px',
+                        bgcolor: '#fff',
+                        borderRadius: '4px',
+                        mb: 0.5
+                      }}
+                    >
+                      <Box
+                        sx={{
+                          position: 'absolute',
+                          left: 0,
+                          top: 0,
+                          height: '100%',
+                          width: `${getRiskIndicatorWidth(notification.risk)}%`,
+                          bgcolor: getRiskDotColor(notification.risk),
+                          borderRadius: '4px'
+                        }}
+                      />
+                    </Box>
+                    <Typography 
+                      variant="caption" 
+                      sx={{ 
+                        fontSize: '0.65rem',
+                        color: getRiskDotColor(notification.risk),
+                        fontWeight: 'medium',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.5px'
+                      }}
+                    >
+                      {notification.risk} Risk
+                    </Typography>
+                  </Box>
+                )}
+                <Typography variant="subtitle2">
+                  {notification.title}
+                </Typography>
                 <Typography variant="body2" color="text.secondary">
                   {notification.message}
                 </Typography>
@@ -208,7 +287,10 @@ const NotificationDrawer = ({ open, onClose, notifications, onNotificationUpdate
           sx: {
             borderTopLeftRadius: 16,
             borderTopRightRadius: 16,
-            pb: 2
+            pb: 2,
+            width: { xs: '100%', sm: 380 },
+            ml: { xs: 0, sm: 'auto' },
+            mr: { xs: 0, sm: 0 }
           }
         }}
       >
