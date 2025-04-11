@@ -10,7 +10,13 @@ const publicPaths = [
   '/about',
   '/pricing',
   '/ambassadors',
-  '/session-expired'
+  '/session-expired',
+  '/not-found',
+  '/feature',
+  '/resources',
+  '/action-hub',
+  '/insights',
+  '/subscription'
   // Add other public paths here
 ];
 
@@ -18,6 +24,7 @@ const publicPaths = [
 const adminPaths = [
   '/admin',
   '/bulk',
+
 ];
 
 // /bulk path is intentionally NOT added to public paths as it should be protected

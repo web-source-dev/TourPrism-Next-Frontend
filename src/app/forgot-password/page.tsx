@@ -327,30 +327,9 @@ export default function ForgotPassword() {
         // Main content (wrap existing content with Fade for smooth transition)
         <Fade in={!isPageLoading} timeout={500}>
           <Box sx={{ display: 'flex', width: '100%' }}>
-            <Box sx={{
-              display: { xs: 'none', md: 'flex' },
-              width: '50%',
-              bgcolor: '#ffffff',
-              alignItems: 'center',
-              justifyContent: 'center',
-              position: 'relative',
-              overflow: 'hidden'
-            }}>
-              <Box
-                component="img"
-                src="/t.png"
-                alt="Forgot Password"
-                sx={{
-                  width: '60%',
-                  height: '60%',
-                  objectFit: 'cover',
-                  mixBlendMode:'multiply'
-                }}
-              />
-            </Box>
 
             <Box sx={{
-              width: { xs: '100%', md: '50%' },
+              width: { xs: '100%', md: '100%' },
               display: 'flex',
               flexDirection: 'column',
               justifyContent: 'center',
@@ -433,9 +412,6 @@ export default function ForgotPassword() {
                     {currentStep === 'email' && (
                       <Box component="form" onSubmit={handleSubmitEmail}>
                         <Box sx={{ mb: 4 }}>
-                          <Typography variant="body2" sx={{ mb: 1, fontWeight: 500 }}>
-                            Email Address
-                          </Typography>
                           <TextField
                             fullWidth
                             name="email"

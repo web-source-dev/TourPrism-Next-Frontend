@@ -68,39 +68,27 @@ export default function Feed() {
     try {
       const params: Record<string, unknown> = {
         page: 1,
-        limit: isAuthenticated ? 10 : 3, // Limit to 3 for non-logged in users
+        limit: isAuthenticated ? 10 : 3,
         sortBy: filters.sortBy,
       };
-      
-      // Add time range filter if not set to "All Time"
-      // This now filters based on the alert's expected start/end date
       if (filters.timeRange > 0) {
-        // Current date as the reference point
         const now = new Date();
-        
-        // For filtering, we want to include alerts:
-        // 1. That are expected to be active now or in the future
-        // 2. Up to 'timeRange' days from now
         const futureDate = new Date();
         futureDate.setDate(futureDate.getDate() + filters.timeRange);
         
-        // Use as start date for the filter (now)
         params.startDate = now.toISOString();
-        // Use as end date for the filter (future)
         params.endDate = futureDate.toISOString();
       }
       
-      // Add incident type filters if selected
       if (filters.incidentTypes && filters.incidentTypes.length > 0) {
         params.incidentTypes = filters.incidentTypes;
       }
       
-      // Add location parameters
       if (coordinates) {
         params.latitude = coordinates.latitude;
         params.longitude = coordinates.longitude;
         if (filters.distance && filters.distance > 0) {
-          params.distance = filters.distance; // in km
+          params.distance = filters.distance;
         }
       } else if (cityName) {
         params.city = cityName;
@@ -109,22 +97,17 @@ export default function Feed() {
       console.log('Fetching alerts with params:', params);
       const response = await fetchAlerts(params);
       
-      // Ensure each alert has a unique ID
       const uniqueAlerts = Array.from(
         new Map(response.alerts.map(alert => [alert._id, alert])).values()
       );
       
-      // If we filtered out any duplicates, log a warning
       if (uniqueAlerts.length < response.alerts.length) {
         console.warn(`Filtered out ${response.alerts.length - uniqueAlerts.length} duplicate alert(s) in initial load`);
       }
       
-      // For non-authenticated users, show only 3 alerts
       if (!isAuthenticated) {
-        // Ensure we only show 3 alerts max for non-authenticated users
         setAlerts(uniqueAlerts.slice(0, 3));
       } else {
-        // For authenticated users, show all alerts
         setAlerts(uniqueAlerts);
       }
       
@@ -144,15 +127,13 @@ export default function Feed() {
     } finally {
       setLoading(false);
     }
-  }, [isAuthenticated, filters]); // Only include dependencies that affect how alerts are fetched
+  }, [isAuthenticated, filters]);
 
-  // Define the handleUseMyLocation function with useCallback
   const handleUseMyLocation = useCallback(async () => {
     setLocationLoading(true);
     setLocationError(null);
 
     try {
-      // First attempt with high accuracy
       const position = await getHighAccuracyLocation(true);
       await handleLocationSuccess(position, true);
     } catch (error) {
@@ -168,25 +149,22 @@ export default function Feed() {
     } finally {
       setLocationLoading(false);
     }
-  }, [/* eslint-disable-line react-hooks/exhaustive-deps */]); // Dependency array is empty to avoid circular dependencies with handleLocationSuccess and handleLocationError
+  }, []); 
 
-  // Move handleSelectEdinburgh up and wrap it in useCallback
+ 
   const handleSelectEdinburgh = useCallback(() => {
     const edinburghCoords = { latitude: 55.9533, longitude: -3.1883 };
     
-    // Save to localStorage for persistence across page refreshes
     localStorage.setItem('selectedCity', 'Edinburgh');
     localStorage.setItem('selectedLat', edinburghCoords.latitude.toString());
     localStorage.setItem('selectedLng', edinburghCoords.longitude.toString());
 
-    // Update state
     setCity('Edinburgh');
     setCoords(edinburghCoords);
     setLocationConfirmed(true);
     
-    // Fetch alerts for Edinburgh
     fetchLocationAlerts('Edinburgh', edinburghCoords);
-  }, [fetchLocationAlerts]); // Add fetchLocationAlerts as dependency
+  }, [fetchLocationAlerts])
 
   useEffect(() => {
     // Check if we have stored location
@@ -203,30 +181,24 @@ export default function Feed() {
       });
       setLocationConfirmed(true);
     } else {
-      // Use Edinburgh as default location instead of requesting user location
       handleSelectEdinburgh();
     }
-  }, [handleSelectEdinburgh]); // Add handleSelectEdinburgh as dependency
+  }, [handleSelectEdinburgh]);
 
-  // Add a separate effect to fetch alerts after authentication state is ready
   useEffect(() => {
     if (locationConfirmed && city && coords) {
-      // This effect will run again whenever isAuthenticated changes
       fetchLocationAlerts(city, coords);
     }
   }, [city, coords, locationConfirmed, isAuthenticated, fetchLocationAlerts]);
 
   const handleFollowUpdate = async (alertId: string) => {
     if (!isAuthenticated) {
-      // Show login dialog if not authenticated
       setLoginDialogOpen(true);
       return;
     }
 
     try {
       const response = await followAlert(alertId);
-
-      // Use the functional state update to ensure we're working with the latest state
       setAlerts(prevAlerts =>
         prevAlerts.map(alert =>
           alert._id === alertId ?
@@ -318,19 +290,15 @@ export default function Feed() {
 
     try {
       const cityName = await getCityFromCoordinates(latitude, longitude);
-
-      // Store location in localStorage for persistence across page refreshes
       localStorage.setItem('selectedCity', cityName);
       localStorage.setItem('selectedLat', latitude.toString());
       localStorage.setItem('selectedLng', longitude.toString());
       localStorage.setItem('locationAccuracy', accuracy.toString());
 
-      // Update state
       setCity(cityName);
       setCoords({ latitude, longitude });
       setLocationConfirmed(true);
 
-      // Fetch alerts for this location
       fetchLocationAlerts(cityName, { latitude, longitude });
 
     } catch (error) {
@@ -358,15 +326,11 @@ export default function Feed() {
   };
 
   const handleContinueWithLocation = () => {
-    // Ensure we have valid location data
     if (!city || !coords) {
-      // If no valid location data, default to Edinburgh
       handleSelectEdinburgh();
       return;
     }
     
-    // If we already have location data in state but it's not in localStorage (after reset),
-    // save it to localStorage again
     localStorage.setItem('selectedCity', city);
     localStorage.setItem('selectedLat', coords.latitude.toString());
     localStorage.setItem('selectedLng', coords.longitude.toString());
@@ -378,16 +342,11 @@ export default function Feed() {
 
   const handleResetLocation = () => {
     if (!isAuthenticated) {
-      // Show login dialog for non-authenticated users
       setLoginDialogOpen(true);
       return;
     }
-    
-    // Instead of clearing storage immediately, show location selection UI
     setLocationConfirmed(false);
     
-    // Keep the current location data in state for reference
-    // This allows the user to see their current location while selecting a new one
   };
 
   const handleLogin = () => {
@@ -426,55 +385,34 @@ export default function Feed() {
         limit: 10,
         sortBy: filters.sortBy,
       };
-
-      // Add time range filter if not set to "All Time"
-      // This now filters based on the alert's expected start/end date
       if (filters.timeRange > 0) {
-        // Current date as the reference point
         const now = new Date();
-
-        // For filtering, we want to include alerts:
-        // 1. That are expected to be active now or in the future
-        // 2. Up to 'timeRange' days from now
         const futureDate = new Date();
         futureDate.setDate(futureDate.getDate() + filters.timeRange);
 
-        // Use as start date for the filter (now)
         params.startDate = now.toISOString();
-        // Use as end date for the filter (future)
         params.endDate = futureDate.toISOString();
       }
-
-      // Add incident type filters if selected
       if (filters.incidentTypes && filters.incidentTypes.length > 0) {
         params.incidentTypes = filters.incidentTypes;
       }
-
-      // Add location parameters
       if (coords) {
         params.latitude = coords.latitude;
         params.longitude = coords.longitude;
         if (filters.distance && filters.distance > 0) {
-          params.distance = filters.distance; // in km
+          params.distance = filters.distance;
         }
       } else if (city) {
         params.city = city;
       }
 
       const response = await fetchAlerts(params);
-
-      // Create a map of current alerts by ID for fast lookup
       const alertMap = new Map(alerts.map(alert => [alert._id, alert]));
-
-      // Only add alerts that don't already exist in our current list
       const newUniqueAlerts = response.alerts.filter(alert => !alertMap.has(alert._id));
-
-      // If we received duplicates, log a warning
       if (newUniqueAlerts.length < response.alerts.length) {
         console.warn(`Filtered out ${response.alerts.length - newUniqueAlerts.length} duplicate alert(s)`);
       }
 
-      // Update state with combined unique alerts
       setAlerts(prevAlerts => [...prevAlerts, ...newUniqueAlerts]);
       setHasMore(alerts.length + newUniqueAlerts.length < response.totalCount);
       setPage(nextPage);
@@ -496,7 +434,6 @@ export default function Feed() {
 
   const handleApplyFilters = () => {
     setIsFilterDrawerOpen(false);
-    // Refetch alerts with new filters
     if (city && coords) {
       fetchLocationAlerts(city, coords);
     } else if (city) {
@@ -521,7 +458,6 @@ export default function Feed() {
       const data = await response.json();
 
       if (data.address) {
-        // Try to get the city, town, or village name
         return data.address.city || data.address.town || data.address.village || 'Unknown location';
       }
       return 'Unknown location';
@@ -626,6 +562,7 @@ export default function Feed() {
                 color: 'black',
                 height: '40px',
                 width: '40px',
+                cursor: 'pointer',
                 padding: '5px',
                 borderRadius: '8px',
                 backgroundColor: 'transparent',
@@ -765,7 +702,7 @@ export default function Feed() {
         ) : (
           <>
             {alerts.map((alert: AlertType, index: number) => (
-              <Paper key={`alert-${alert._id}-${index}`} sx={{ py: 0.5, borderRadius: 2, boxShadow: 'none' }}>
+              <Paper key={`alert-${alert._id}-${index}`} sx={{ py: 0.5,bgcolor:'#f5f5f5', borderRadius: 2, boxShadow: 'none' }}>
                 {/* Alert Header */}
                 <Typography variant="subtitle1" sx={{ fontWeight: 500 }}>
                   {alert.title || ""}
@@ -773,27 +710,38 @@ export default function Feed() {
 
                 {/* Alert Metadata */}
                 <Box sx={{ display: 'flex', gap: 1, color: 'text.secondary', fontSize: '0.85rem', mb: 0.5 }}>
-                  <Box component="span" sx={{ display: 'flex', alignItems: 'center' }}>
-                    <i className="ri-bus-2-line" style={{ fontSize: '1rem', marginRight: '4px' }}></i>
+                  <Box component="span" sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+<path d="M6.83301 11.6667C6.83301 11.3905 7.05687 11.1667 7.33301 11.1667H8.66634C8.94248 11.1667 9.16634 11.3905 9.16634 11.6667C9.16634 11.9428 8.94248 12.1667 8.66634 12.1667H7.33301C7.05687 12.1667 6.83301 11.9428 6.83301 11.6667Z" fill="#757575"/>
+<path fill-rule="evenodd" clip-rule="evenodd" d="M2.91761 2.67407C3.75577 1.92294 5.42033 0.833336 7.99972 0.833336C10.5791 0.833336 12.2437 1.92294 13.0818 2.67407L13.0961 2.68683C13.3284 2.89495 13.5142 3.06136 13.6737 3.41847C13.8336 3.77651 13.8334 4.08864 13.8331 4.47216L13.8331 9.36992C13.8331 10.2816 13.8331 11.0165 13.7554 11.5945C13.6747 12.1946 13.5021 12.6998 13.1008 13.1011C12.7539 13.448 12.3294 13.624 11.833 13.7174V14.6667C11.833 14.9428 11.6091 15.1667 11.333 15.1667C11.0569 15.1667 10.833 14.9428 10.833 14.6667V13.8162C10.4068 13.8334 9.92052 13.8333 9.36964 13.8333H6.62981C6.07888 13.8333 5.59252 13.8334 5.16634 13.8162V14.6667C5.16634 14.9428 4.94248 15.1667 4.66634 15.1667C4.3902 15.1667 4.16634 14.9428 4.16634 14.6667V13.7174C3.67002 13.624 3.24548 13.448 2.89862 13.1011C2.49734 12.6998 2.32475 12.1946 2.24407 11.5945C2.16636 11.0165 2.16637 10.2816 2.16639 9.36992L2.16636 4.47216C2.16608 4.08864 2.16585 3.77651 2.32577 3.41847C2.48526 3.06136 2.67103 2.89495 2.90337 2.68683L2.91761 2.67407ZM7.99972 1.83334C5.72617 1.83334 4.28951 2.78743 3.58499 3.41879C3.55125 3.44902 3.52146 3.47582 3.49497 3.5L12.5045 3.5C12.478 3.47582 12.4482 3.44902 12.4145 3.41879C11.7099 2.78743 10.2733 1.83334 7.99972 1.83334ZM3.16639 4.5L3.16639 8.94459L3.1926 8.95078C3.4498 9.0113 3.82554 9.09259 4.29396 9.17405C5.23183 9.33716 6.53565 9.49999 7.99995 9.49999C9.46425 9.49999 10.7681 9.33716 11.7059 9.17405C12.1744 9.09259 12.5501 9.0113 12.8073 8.95078L12.8331 8.9447L12.833 4.5L3.16639 4.5ZM12.832 9.97095C12.5786 10.0273 12.2563 10.0933 11.8773 10.1593C10.8985 10.3295 9.53565 10.5 7.99995 10.5C6.46425 10.5 5.10141 10.3295 4.12261 10.1593C3.74334 10.0933 3.42091 10.0272 3.16746 9.97084C3.16991 10.448 3.17795 10.8385 3.20421 11.1667H3.99967C4.27582 11.1667 4.49967 11.3905 4.49967 11.6667C4.49967 11.9428 4.27582 12.1667 3.99967 12.1667H3.43544C3.48464 12.256 3.54126 12.3295 3.60573 12.394C3.79024 12.5785 4.04928 12.6988 4.53847 12.7646C5.04204 12.8323 5.70944 12.8333 6.66639 12.8333H9.33306C10.29 12.8333 10.9574 12.8323 11.461 12.7646C11.9502 12.6988 12.2092 12.5785 12.3937 12.394C12.4582 12.3295 12.5148 12.256 12.564 12.1667H11.9997C11.7235 12.1667 11.4997 11.9428 11.4997 11.6667C11.4997 11.3905 11.7235 11.1667 11.9997 11.1667H12.7952C12.8215 10.8386 12.8295 10.4481 12.832 9.97095Z" fill="#757575"/>
+<path d="M1.33301 5.5C1.60915 5.5 1.83301 5.72386 1.83301 6L1.83301 6.66667C1.83301 6.94281 1.60915 7.16667 1.33301 7.16667C1.05687 7.16667 0.833008 6.94281 0.833008 6.66667L0.833008 6C0.833008 5.72386 1.05687 5.5 1.33301 5.5Z" fill="#757575"/>
+<path d="M15.1663 6C15.1663 5.72386 14.9425 5.5 14.6663 5.5C14.3902 5.5 14.1663 5.72386 14.1663 6V6.66667C14.1663 6.94281 14.3902 7.16667 14.6663 7.16667C14.9425 7.16667 15.1663 6.94281 15.1663 6.66667V6Z" fill="#757575"/>
+</svg>
+
                     {alert.alertCategory || ""}
                   </Box>
-                  <Box component="span" sx={{ display: 'flex', alignItems: 'center' }}>
-                    <i className="ri-map-pin-line" style={{ fontSize: '1rem', marginRight: '4px' }}></i>
+                  <Box component="span" sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+<path fill-rule="evenodd" clip-rule="evenodd" d="M11.167 4.66667C11.167 6.24543 10.0117 7.55436 8.50033 7.79408L8.50033 12C8.50033 12.2761 8.27647 12.5 8.00033 12.5C7.72418 12.5 7.50033 12.2761 7.50033 12L7.50033 7.79408C5.989 7.55436 4.83366 6.24543 4.83366 4.66667C4.83366 2.91777 6.25142 1.5 8.00033 1.5C9.74923 1.5 11.167 2.91777 11.167 4.66667ZM8.00033 2.5C6.80371 2.5 5.83366 3.47005 5.83366 4.66667C5.83366 5.86328 6.80371 6.83333 8.00033 6.83333C9.19694 6.83333 10.167 5.86328 10.167 4.66667C10.167 3.47005 9.19694 2.5 8.00033 2.5Z" fill="#757575"/>
+<path d="M5.16699 12.6667C5.16699 12.3905 4.94313 12.1667 4.66699 12.1667C4.39085 12.1667 4.16699 12.3905 4.16699 12.6667C4.16699 13.0325 4.35443 13.3305 4.58539 13.5489C4.81529 13.7664 5.12114 13.9391 5.45761 14.0737C6.13332 14.344 7.03253 14.5 8.00033 14.5C8.96813 14.5 9.86733 14.344 10.543 14.0737C10.8795 13.9391 11.1854 13.7664 11.4153 13.5489C11.6462 13.3305 11.8337 13.0325 11.8337 12.6667C11.8337 12.3905 11.6098 12.1667 11.3337 12.1667C11.0575 12.1667 10.8337 12.3905 10.8337 12.6667C10.8337 12.6697 10.8338 12.7225 10.7282 12.8224C10.6207 12.924 10.4384 13.0385 10.1717 13.1452C9.64094 13.3575 8.87347 13.5 8.00033 13.5C7.12718 13.5 6.35971 13.3575 5.829 13.1452C5.56225 13.0385 5.37994 12.924 5.2725 12.8224C5.16686 12.7225 5.16699 12.6697 5.16699 12.6667Z" fill="#757575"/>
+</svg>
+
                     {alert.city || "EdinBurgh"}
                   </Box>
-                  <Box component="span" sx={{ display: 'flex', alignItems: 'center' }}>
-                    <i className="ri-time-line" style={{ fontSize: '1rem', marginRight: '4px' }}></i>
+                  <Box component="span" sx={{ display: 'flex', alignItems: 'center',gap: 0.5 }}>
+                    
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+<path d="M8.49967 5.33334C8.49967 5.05719 8.27582 4.83334 7.99967 4.83334C7.72353 4.83334 7.49967 5.05719 7.49967 5.33334V8C7.49967 8.13261 7.55235 8.25979 7.64612 8.35356L8.97945 9.68689C9.17472 9.88215 9.4913 9.88215 9.68656 9.68689C9.88182 9.49163 9.88182 9.17505 9.68656 8.97978L8.49967 7.7929V5.33334Z" fill="#757575"/>
+<path fill-rule="evenodd" clip-rule="evenodd" d="M7.99967 0.833336C4.04163 0.833336 0.833008 4.04196 0.833008 8C0.833008 11.958 4.04163 15.1667 7.99967 15.1667C11.9577 15.1667 15.1663 11.958 15.1663 8C15.1663 4.04196 11.9577 0.833336 7.99967 0.833336ZM1.83301 8C1.83301 4.59425 4.59392 1.83334 7.99967 1.83334C11.4054 1.83334 14.1663 4.59425 14.1663 8C14.1663 11.4058 11.4054 14.1667 7.99967 14.1667C4.59392 14.1667 1.83301 11.4058 1.83301 8Z" fill="#757575"/>
+</svg>
+
                     {alert.createdAt ? formatTime(alert.createdAt) : ""}
                   </Box>
                 </Box>
-
-                {/* Alert Content - Combined description and recommended action */}
                 <Typography variant="body2" sx={{ mb: 1 }}>
                   {alert.description || ""}
                   {alert.recommendedAction && ` ${alert.recommendedAction}`}
                 </Typography>
-
-                {/* Risk Level Box - conditionally shown */}
                 {(alert.risk && isAuthenticated) && (
                   <Box
                     sx={{
@@ -840,8 +788,16 @@ export default function Feed() {
                       '&:hover': { color: 'primary.main' }
                     }}
                   >
-                    <i className={alert.isFollowing ? "ri-notification-3-fill" : "ri-notification-3-line"}
-                      style={{ fontSize: '1.1rem' }} />
+                    {alert.isFollowing ? (
+                      <svg width="14" height="16" viewBox="0 0 14 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <path fill-rule="evenodd" clip-rule="evenodd" d="M6.99968 0.833374C4.02913 0.833374 1.61827 3.22772 1.61825 6.18468C1.61818 6.87247 1.57193 7.39159 1.25481 7.85817C1.21072 7.9221 1.15222 8.00217 1.0883 8.08966C0.977267 8.24164 0.849859 8.41603 0.753231 8.56704C0.582689 8.83357 0.416071 9.15498 0.358792 9.5295C0.171916 10.7514 1.03338 11.5425 1.89131 11.897C2.44899 12.1274 3.04588 12.3153 3.6675 12.4606C3.6634 12.5298 3.6701 12.6008 3.68887 12.6714C4.07359 14.1191 5.42024 15.1669 6.99984 15.1669C8.57944 15.1669 9.92609 14.1191 10.3108 12.6714C10.3296 12.6008 10.3363 12.5298 10.3322 12.4606C10.9537 12.3152 11.5505 12.1273 12.108 11.897C12.966 11.5425 13.8274 10.7514 13.6406 9.5295C13.5833 9.15499 13.4167 8.83357 13.2461 8.56704C13.1495 8.41604 13.0221 8.2417 12.9111 8.08972C12.8472 8.00224 12.7887 7.92215 12.7446 7.85822C12.4274 7.39162 12.3812 6.87256 12.3811 6.18473C12.3811 3.22774 9.97023 0.833374 6.99968 0.833374ZM8.87123 12.7193C7.63997 12.8714 6.35974 12.8714 5.12847 12.7193C5.4664 13.3728 6.17059 13.8335 6.99984 13.8335C7.82911 13.8335 8.53331 13.3727 8.87123 12.7193Z" fill="black"/>
+                      </svg>                      
+                    ) : (
+                      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+<path fill-rule="evenodd" clip-rule="evenodd" d="M8.00012 0.833328C4.95497 0.833328 2.48355 3.29418 2.48353 6.33329C2.48347 7.04018 2.43605 7.57372 2.11097 8.05325C2.06577 8.11897 2.00579 8.20127 1.94026 8.2912C1.82644 8.4474 1.69585 8.62661 1.59679 8.78182C1.42197 9.05575 1.25116 9.38609 1.19245 9.77101C1.00088 11.0268 1.88398 11.8399 2.76346 12.2042C3.4182 12.4755 4.12567 12.6894 4.86357 12.8459C5.24629 14.1929 6.51269 15.1666 7.99947 15.1666C9.48615 15.1666 10.7525 14.1931 11.1353 12.8462C11.8737 12.6896 12.5816 12.4756 13.2368 12.2042C14.1162 11.8399 14.9994 11.0268 14.8078 9.77101C14.7491 9.3861 14.5783 9.05576 14.4034 8.78182C14.3044 8.62662 14.1738 8.44741 14.06 8.29121C13.9945 8.20131 13.9345 8.11901 13.8893 8.05331C13.5642 7.57375 13.5168 7.04027 13.5167 6.33333C13.5167 3.2942 11.0453 0.833328 8.00012 0.833328ZM3.48353 6.33333C3.48353 3.84961 5.50411 1.83333 8.00012 1.83333C10.4961 1.83333 12.5167 3.84965 12.5167 6.33337C12.5168 7.05499 12.5524 7.86444 13.0627 8.61613L13.0643 8.61847C13.1482 8.74056 13.2219 8.84064 13.2913 8.93497C13.3838 9.06063 13.4688 9.17611 13.5605 9.3198C13.7026 9.54255 13.7908 9.73558 13.8192 9.92181C13.9112 10.5247 13.5266 11.0017 12.8541 11.2804C10.0014 12.4621 5.99882 12.4621 3.14618 11.2804C2.47358 11.0017 2.08904 10.5247 2.18101 9.92181C2.20942 9.73558 2.29759 9.54255 2.43975 9.3198C2.53145 9.17611 2.61643 9.06065 2.70891 8.935C2.77824 8.8408 2.85215 8.74036 2.93592 8.61848L2.93752 8.61613C3.44788 7.86444 3.48347 7.05495 3.48353 6.33333ZM9.9754 13.0422C8.67637 13.2082 7.32244 13.2081 6.02345 13.0421C6.40445 13.7079 7.14181 14.1666 7.99947 14.1666C8.85706 14.1666 9.59436 13.708 9.9754 13.0422Z" fill="#616161"/>
+</svg>
+
+                    )}
                     <Typography variant="body2">
                       {alert.isFollowing ? 'Following' : 'Follow Updates'}
                     </Typography>

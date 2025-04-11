@@ -297,29 +297,9 @@ function LoginContent() {
         // Main content (wrap existing content with Fade for smooth transition)
         <Fade in={!isPageLoading} timeout={500}>
           <Box sx={{ display: 'flex', width: '100%' }}>
-            <Box sx={{ 
-              display: { xs: 'none', md: 'flex' },
-              width: '50%',
-              bgcolor: '#ffffff',
-              alignItems: 'center',
-              justifyContent: 'center',
-              position: 'relative',
-              overflow: 'hidden'
-            }}>
-              <Box
-                component="img"
-                src="/t.png"
-                alt="Login"
-                sx={{
-                  width: '60%',
-                  height: '60%',
-                  objectFit: 'cover',
-                }}
-              />
-            </Box>
             
             <Box sx={{ 
-              width: { xs: '100%', md: '50%' },
+              width: { xs: '100%', md: '100%' },
               display: 'flex',
               flexDirection: 'column',
               justifyContent: 'center',

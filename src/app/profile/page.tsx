@@ -18,7 +18,8 @@ import {
   CircularProgress,
   Alert,
   Snackbar,
-  Stack
+  Stack,
+  IconButton
 } from '@mui/material';
 import PersonIcon from '@mui/icons-material/Person';
 import SaveIcon from '@mui/icons-material/Save';
@@ -138,8 +139,15 @@ export default function ProfilePage() {
   }
 
   return (
-    <Layout>
+    <Layout isFooter={false}>
     <Box sx={{ maxWidth: '1000px', margin: '0 auto', padding: '0 1rem' }}>
+      <IconButton sx={{bgcolor: 'rgb(43,43,43)', borderRadius: 2,mb: 2,
+        "&:hover": {
+          bgcolor: 'rgb(43,43,43)'
+        }
+      }} onClick={() => router.back()}>
+        <i style={{ color: 'rgb(255, 255, 255)' }} className="ri-arrow-left-s-line">Back</i>
+      </IconButton>
       <Paper elevation={3} sx={{ borderRadius: '12px', overflow: 'hidden' }}>
         <Box 
           sx={{ 

@@ -7,7 +7,7 @@ import Cookies from 'js-cookie';
 
 // Public routes that don't require authentication
 // Keep this in sync with the list in ProtectedRoute.tsx
-const publicRoutes = ['/', '/login', '/signup', '/forgot-password', '/feed', '/about', '/pricing', '/ambassadors'];
+const publicRoutes = ['/', '/login', '/signup', '/forgot-password','/action-hub','/insights','/subscription', '/feed','/feature','/resources', '/about', '/pricing', '/ambassadors', '/not-found'];
 // Auth process routes should never redirect, even during auth loading
 const authProcessRoutes = ['/auth/google/callback'];
 
