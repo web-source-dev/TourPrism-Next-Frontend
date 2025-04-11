@@ -3,16 +3,21 @@
 import React, { useEffect, useState } from 'react';
 import { Box, Typography, Container, Button, Divider, useTheme, useMediaQuery } from '@mui/material';
 import { useRouter } from 'next/navigation';
-import { ArrowRightAlt, DirectionsBus, Healing, SecurityOutlined } from '@mui/icons-material';
+import { ArrowRightAlt } from '@mui/icons-material';
+import { useAuth } from '@/context/AuthContext';
 import Layout from '@/components/Layout';
 import Image from 'next/image';
 
 import { motion } from 'framer-motion';
 export default function Home() {
   const router = useRouter();
-  
+  const { isAuthenticated } = useAuth();
   const handleCreateAccount = () => {
-    router.push('/signup');
+    if (isAuthenticated) {
+      router.push('/feed');
+    } else {
+      router.push('/signup');
+    }
   };
   
   // Benefits data
@@ -271,7 +276,7 @@ export default function Home() {
               }
             }}
           >
-            Create Free Account
+            {isAuthenticated ? 'Go to Feed' : 'Create Free Account'}
           </Button>
         </Box>
 
@@ -485,7 +490,7 @@ export default function Home() {
               }
             }}
           >
-            Create Free Account
+            {isAuthenticated ? 'Go to Feed' : 'Create Free Account'}
           </Button>
         </Box>
 
@@ -635,7 +640,7 @@ export default function Home() {
             },
           }}
         >
-          Create Free Account
+          {isAuthenticated ? 'Go to Feed' : 'Create Free Account'}
         </Button>
       </Box>
     </Box>

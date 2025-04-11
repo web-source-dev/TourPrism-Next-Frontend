@@ -20,7 +20,6 @@ import { useAuth } from '../context/AuthContext';
 import NotificationDrawer from './NotificationDrawer';
 import Banner from './Banner';
 import { getNotifications } from '../services/api';
-import { NotificationsNone } from '@mui/icons-material';
 import { Notification } from '../types';
 import Image from 'next/image';
 
