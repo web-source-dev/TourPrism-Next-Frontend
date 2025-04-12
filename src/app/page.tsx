@@ -167,11 +167,11 @@ export default function Home() {
     }
   ];
   const partnersData = [
-    { title: 'Innovation Partner', logo: "/images/Techscaler.png", alt: "Techscaler", name: 'Techscaler' },
-    { title: 'Innovation Partner', logo: "/images/Barclays.png", alt: "Barclays Eagle Lab", name: 'Barclays Eagle Lab' },
-    { title: 'Industry Partner', logo: "/images/visitScotland.png", alt: "VisitScotland", name: 'VisitScotland' },
-    { title: 'Industry Partner', logo: "/images/TravelTech.png", alt: "Travel Tech for Scotland", name: 'Travel Tech for Scotland' },
-    { title: 'Funding Partner', logo: "/images/Scottish.png", alt: "Scottish EDGE", name: 'Scottish EDGE' },
+    { title: 'Innovation Partner', logo: "/partner/techscaler.svg", alt: "Techscaler", name: 'Techscaler' },
+    { title: 'Innovation Partner', logo: "/partner/Barclays.svg", alt: "Barclays Eagle Lab", name: 'Barclays Eagle Lab' },
+    { title: 'Industry Partner', logo: "/partner/visitScotland.png", alt: "VisitScotland", name: 'VisitScotland' },
+    { title: 'Industry Partner', logo: "/partner/TravelTech.png", alt: "Travel Tech for Scotland", name: 'Travel Tech for Scotland' },
+    { title: 'Funding Partner', logo: "/partner/Scottish.png", alt: "Scottish EDGE", name: 'Scottish EDGE' },
   ];
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm')); // mobile = 2 per row
@@ -321,10 +321,10 @@ export default function Home() {
           <Typography variant="body2">Techscaler</Typography>
         </Box>
 
-        <Divider sx={{ mb: 6 }} />
+       {isMobile && <Divider sx={{ mb: 6 }} />}
 
         {/* How You Benefit Section */}
-        <Box sx={{ textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center',justifyContent: 'center', mb: 4, px: 1, height: {xs: 'auto', md: '80vh'}}}>
+        <Box sx={{ textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center',justifyContent: 'center', mb: 4, px: 1,py:{xs:5,md:0}, height: {xs: 'auto', md: '80vh'}}}>
           <Typography variant="h2" sx={{
             fontSize: { xs: '20px', md: '32px' },
             fontWeight: '500',
@@ -407,7 +407,7 @@ export default function Home() {
         <Divider sx={{ mb: 6 }} />
 
         {/* What We Predict Section */}
-        <Box sx={{ textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center',justifyContent: 'center', mb: 4, px: 1, height: {xs: 'auto', md: '100vh'}}}>
+        <Box sx={{ textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center',justifyContent: 'center', mb: 4, px: 1,py:{xs:5,md:0}, height: {xs: 'auto', md: '100vh'}}}>
           <Typography variant="h2" sx={{
             fontSize: { xs: '20px', md: '32px' },
             fontWeight: '500',
@@ -497,7 +497,7 @@ export default function Home() {
         <Divider sx={{ mb: 6 }} />
 
         {/* How It Works Section */}
-        <Box sx={{ textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center',justifyContent: 'center', mb: 4, px: 1, height: {xs: 'auto', md: '70vh'}}}>
+        <Box sx={{ textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center',justifyContent: 'center', mb: 4,py:{xs:5,md:0} ,px: 1, height: {xs: 'auto', md: '90vh'}}}>
           <Typography variant="h2" sx={{
             fontSize: { xs: '24px', md: '32px' },
             fontWeight: '500',
@@ -583,7 +583,7 @@ export default function Home() {
 
         <Divider sx={{ mb: 6 }} />
 
-        <Box sx={{ textAlign :'center',my: 4 }}>
+        <Box sx={{ textAlign :'center',my: {xs:10,md:15} }}>
       <Typography
         variant="h2"
         sx={{
@@ -646,7 +646,7 @@ export default function Home() {
     </Box>
     <Divider sx={{ mb: 6 }} />
 
-    <Box sx={{ textAlign: 'center', py: 6 }}>
+    <Box sx={{ textAlign: 'center', py: {xs:5,md:15} }}>
   <Typography variant="h5" fontWeight="600" mb={1}>
     Our Partners
   </Typography>

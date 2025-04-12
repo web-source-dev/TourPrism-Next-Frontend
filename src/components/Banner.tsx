@@ -1,15 +1,9 @@
 'use client';
 
 import React from 'react';
-import { Box, Button, Typography } from '@mui/material';
-import { useRouter } from 'next/navigation';
+import { Box, Typography,Link } from '@mui/material';
 
 const Banner = () => {
-  const router = useRouter();
-
-  const handleProfileClick = () => {
-    router.push('/profile');
-  };
 
   return (
     <Box
@@ -17,32 +11,18 @@ const Banner = () => {
         display: 'flex',
         justifyContent: 'center',
         alignItems: 'center',
-        backgroundColor: '#F0F7FF',
-        padding: '10px',
-        borderRadius: '5px',
-        margin: '0 auto 0 auto',
-        maxWidth: { xs: '95%', sm: '90%', md: '85%' },
-        boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-        gap: 2
+        backgroundColor: '#fff',
+        padding: 2,
+        borderRadius: '16px',
+        maxWidth: { xs: '95%', sm: '100%', md: '95%' },
+        margin: {xs:'0 auto 0 auto',md:'0 auto 0 auto'},
+        gap: {xs:1,md:2}
       }}
     >
-      <Typography variant="body1" sx={{ color: '#0066FF' }}>
+      <Typography variant="body1" sx={{ color: '#000',fontSize:{xs:'11px',md:'16px'} }}>
         Complete your profile to get personalized Alerts
       </Typography>
-      <Button
-        variant="contained"
-        size="small"
-        onClick={handleProfileClick}
-        sx={{
-          backgroundColor: '#0066FF',
-          borderRadius: '20px',
-          '&:hover': {
-            backgroundColor: '#0055DD',
-          }
-        }}
-      >
-        Update Profile
-      </Button>
+      <Link href="/profile" sx={{ textDecoration: 'underline',color:'#0064FF',fontSize:{xs:'11px',md:'16px'} }}>Update Profile</Link>
     </Box>
   );
 };

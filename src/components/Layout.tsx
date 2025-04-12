@@ -142,7 +142,7 @@ const Layout = ({ children, isFooter = true, onFilterOpen }: LayoutProps) => {
   ];
 
   return (
-    <Box sx={{ display: 'flex',bgcolor:'#f5f5f5',  flexDirection: 'column', minHeight: '100vh', p: 0, m: 0 }}>
+    <Box sx={{ display: 'flex',bgcolor:'#f5f5f5', px: {xs:0,md:'80px'}, flexDirection: 'column', minHeight: '100vh', p: 0, m: 0 }}>
       <Box sx={{ 
         px: { xs: 3, sm: 1, md: 1 }, 
         py: 0, 
@@ -187,8 +187,8 @@ const Layout = ({ children, isFooter = true, onFilterOpen }: LayoutProps) => {
                 textDecoration: 'none'
               }}
             >
-              <img src="/tourprism.png" alt="tourprism" style={{ width: '20px', height: '32px' }} />
-              <Typography sx={{ fontSize:'18px',ml: 0,fontWeight: '550', color: 'black',display: { xs: 'none', md: 'block' } }}>tourprism</Typography>
+              <Image src="/tourprism.png" alt="tourprism" width={20} height={32} />
+              <Typography sx={{ fontSize:'18px',ml: 0.5,fontWeight: '550', color: 'black',display: { xs: 'none', md: 'block' } }}>tourprism</Typography>
             </Typography>
             )}
             
