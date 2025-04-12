@@ -168,8 +168,8 @@ export default function Home() {
   ];
   const partnersData = [
     { title: 'Innovation Partner', logo: "/partner/techscaler.svg", alt: "Techscaler", name: 'Techscaler' },
-    { title: 'Innovation Partner', logo: "/partner/Barclays.svg", alt: "Barclays Eagle Lab", name: 'Barclays Eagle Lab' },
-    { title: 'Industry Partner', logo: "/partner/visitScotland.png", alt: "VisitScotland", name: 'VisitScotland' },
+    { title: 'Innovation Partner', logo: "https://static.wixstatic.com/shapes/bb6757_74c72453fbd24a79828fbad50cb44d69.svg", alt: "Barclays Eagle Lab", name: 'Barclays Eagle Lab' },
+    { title: 'Industry Partner', logo: "https://static.wixstatic.com/media/bb6757_106ee5dc60374af18b7a271601f61501~mv2.png", alt: "VisitScotland", name: 'VisitScotland' },
     { title: 'Industry Partner', logo: "/partner/TravelTech.png", alt: "Travel Tech for Scotland", name: 'Travel Tech for Scotland' },
     { title: 'Funding Partner', logo: "/partner/Scottish.png", alt: "Scottish EDGE", name: 'Scottish EDGE' },
   ];
