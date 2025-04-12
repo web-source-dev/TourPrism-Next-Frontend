@@ -19,7 +19,7 @@ const Banner = () => {
         gap: {xs:1,md:2}
       }}
     >
-      <Typography variant="body1" sx={{ color: '#000',fontSize:{xs:'11px',md:'16px'} }}>
+      <Typography variant="body1" sx={{ color: '#000',fontSize:{xs:'10.5px',md:'16px'} }}>
         Complete your profile to get personalized Alerts
       </Typography>
       <Link href="/profile" sx={{ textDecoration: 'underline',color:'#0064FF',fontSize:{xs:'11px',md:'16px'} }}>Update Profile</Link>
