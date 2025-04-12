@@ -18,7 +18,7 @@ export async function GET() {
     
     // Create entries for your dynamic pages
     const fields: ISitemapField[] = posts.map((post: Post) => ({
-      loc: `${process.env.SITE_URL || 'https://alerts.tourprism.com'}/feed/${post.id}`,
+      loc: `${process.env.NEXT_PUBLIC_SITE_URL || 'https://alerts.tourprism.com'}/feed/${post.id}`,
       lastmod: new Date(post.updatedAt || post.createdAt).toISOString(),
       // Optional: add changefreq and priority fields if needed
       changefreq: 'daily' as const,

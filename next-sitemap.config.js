@@ -1,6 +1,6 @@
 /** @type {import('next-sitemap').IConfig} */
 module.exports = {
-  siteUrl: process.env.SITE_URL || 'https://alerts.tourprism.com',
+  siteUrl: process.env.NEXT_PUBLIC_SITE_URL || 'https://alerts.tourprism.com',
   generateRobotsTxt: true,
   exclude: [
     '/admin/*',
@@ -10,7 +10,7 @@ module.exports = {
   ],
   robotsTxtOptions: {
     additionalSitemaps: [
-      `${process.env.SITE_URL || 'https://alerts.tourprism.com'}/server-sitemap.xml`,
+      `${process.env.NEXT_PUBLIC_SITE_URL || 'https://alerts.tourprism.com'}/server-sitemap.xml`,
     ],
   },
 } 
