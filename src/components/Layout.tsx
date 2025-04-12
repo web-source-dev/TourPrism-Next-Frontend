@@ -140,6 +140,13 @@ const Layout = ({ children, isFooter = true, onFilterOpen }: LayoutProps) => {
     { text: 'Resources', path: '/resources' },
     { text: 'Pricing', path: '/pricing' }
   ];
+  const loginUserNavLinks = [
+    { text: 'Feed', path: '/feed' },
+    { text: 'Action Hub', path: '/action-hub' },
+    { text: 'Insights', path: '/insights' },
+    { text: 'Subscription', path: '/subscription' },
+    { text: 'Settings', path: '/settings' }
+  ];
 
   return (
     <Box sx={{ display: 'flex',bgcolor:'#f5f5f5', px: {xs:0,md:'80px'}, flexDirection: 'column', minHeight: '100vh', p: 0, m: 0 }}>
@@ -238,16 +245,17 @@ const Layout = ({ children, isFooter = true, onFilterOpen }: LayoutProps) => {
             transform: 'translateX(-50%)',
             gap: 3
           }}>
-            {navLinks.map((link) => (
+            {isAuthenticated ? loginUserNavLinks.map((link) => (
               <Link
                 key={link.text}
                 href={link.path}
-                style={{
-                  color: 'black',
-                  textDecoration: 'none',
-                  fontSize: '16px',
-                  fontWeight: 500
-                }}
+              >
+                {link.text}
+              </Link>
+            )) : navLinks.map((link) => (
+              <Link
+                key={link.text}
+                href={link.path}
               >
                 {link.text}
               </Link>

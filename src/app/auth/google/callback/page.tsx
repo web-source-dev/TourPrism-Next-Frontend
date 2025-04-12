@@ -112,7 +112,7 @@ function GoogleCallbackClient() {
             <Box sx={{ mb: 3 }}>
               <Box
                 component="img"
-                src="/t.png"
+                src="/tourprism.png"
                 alt="Logo"
                 sx={{ height: 40, mb: 2 }}
               />
@@ -164,7 +164,7 @@ function GoogleCallbackClient() {
       }}>
         <Box
           component="img"
-          src="/t.png"
+          src="/tourprism.png"
           alt="Logo"
           sx={{ height: 40, mb: 3 }}
         />
@@ -222,7 +222,7 @@ export default function GoogleCallback() {
       }}>
         <Box
           component="img"
-          src="/t.png"
+          src="/tourprism.png"
           alt="Logo"
           sx={{ height: 40, mb: 3 }}
         />

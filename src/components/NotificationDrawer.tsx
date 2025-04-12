@@ -139,7 +139,7 @@ const NotificationDrawer = ({ open, onClose, notifications, onNotificationUpdate
                 py: 2,
                 px: 2,
                 bgcolor: notification.isRead ? 'transparent' : 'rgba(25, 118, 210, 0.08)',
-                '&:hover': { bgcolor: 'action.hover' }
+                '&:hover': { bgcolor: notification.isRead ? 'transparent' : 'rgba(25, 118, 210, 0.08)' }
               }}
             >
               <Box sx={{ width: '100%', p: 0 }}>

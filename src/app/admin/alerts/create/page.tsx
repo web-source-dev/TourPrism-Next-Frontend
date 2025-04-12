@@ -259,6 +259,7 @@ export default function CreateAlertPage() {
               >
                 <MenuItem value="Weather">Weather</MenuItem>
                 <MenuItem value="Transport">Transport</MenuItem>
+                <MenuItem value="Health">Health</MenuItem>
                 <MenuItem value="Civil Unrest">Civil Unrest</MenuItem>
                 <MenuItem value="General Safety">General Safety</MenuItem>
                 <MenuItem value="Natural Disaster">Natural Disaster</MenuItem>
