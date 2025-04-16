@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Box,
   Typography,
@@ -25,6 +25,8 @@ import { followAlert } from '@/services/alertActions';
 import { Alert as AlertType, FilterOptions } from '@/types';
 import { useAuth } from '@/context/AuthContext';
 import Image from 'next/image';
+import { io, Socket } from 'socket.io-client';
+import Countdown from 'react-countdown';
 
 // Function to get the appropriate icon based on alert category
 const getCategoryIcon = (category: string) => {
@@ -111,7 +113,7 @@ export default function Feed() {
   const [snackbar, setSnackbar] = useState({
     open: false,
     message: '',
-    severity: 'success' as 'success' | 'error'
+    severity: 'success' as 'success' | 'error' | 'info' | 'warning'
   });
   const [filters, setFilters] = useState<FilterOptions>({
     sortBy: 'newest',
@@ -119,7 +121,101 @@ export default function Feed() {
     timeRange: 0,
     distance: 50
   });
+  
+  // Socket.io reference
+  const socketRef = useRef<Socket | null>(null);
 
+  // Socket.io connection setup
+  useEffect(() => {
+    // Connect to Socket.io server
+    const SOCKET_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+    socketRef.current = io(SOCKET_URL);
+    
+    // Connection event handlers
+    socketRef.current.on('connect', () => {
+      console.log('Connected to Socket.io server');
+    });
+    
+    socketRef.current.on('connect_error', (error) => {
+      console.error('Socket.io connection error:', error);
+    });
+    
+    // Alert events
+    socketRef.current.on('alert:created', (data) => {
+      console.log('New alert created:', data);
+      if (city && coords) {
+        fetchLocationAlerts(city, coords);
+      }
+      setSnackbar({
+        open: true,
+        message: 'A new alert has been added',
+        severity: 'info' as 'info'
+      });
+    });
+    
+    socketRef.current.on('alert:updated', (data) => {
+      console.log('Alert updated:', data);
+      setAlerts(prevAlerts => 
+        prevAlerts.map(alert => 
+          alert._id === data.alertId 
+            ? { ...alert, ...data.alert } 
+            : alert
+        )
+      );
+      setSnackbar({
+        open: true,
+        message: 'An alert has been updated',
+        severity: 'info' as 'info'
+      });
+    });
+    
+    socketRef.current.on('alert:deleted', (data) => {
+      console.log('Alert deleted:', data);
+      setAlerts(prevAlerts => 
+        prevAlerts.filter(alert => alert._id !== data.alertId)
+      );
+      setSnackbar({
+        open: true,
+        message: 'An alert has been removed',
+        severity: 'info' as 'info'
+      });
+    });
+    
+    socketRef.current.on('alert:followed', (data) => {
+      console.log('Alert follow status changed:', data);
+      setAlerts(prevAlerts =>
+        prevAlerts.map(alert =>
+          alert._id === data.alertId ?
+            {
+              ...alert,
+              numberOfFollows: data.numberOfFollows,
+              isFollowing: data.following
+            } :
+            alert
+        )
+      );
+    });
+    
+    socketRef.current.on('alerts:bulk-created', (data) => {
+      console.log('Bulk alerts created:', data);
+      if (city && coords) {
+        fetchLocationAlerts(city, coords);
+      }
+      setSnackbar({
+        open: true,
+        message: `${data.count} new alerts have been added`,
+        severity: 'info'
+      });
+    });
+    
+    // Cleanup on component unmount
+    return () => {
+      if (socketRef.current) {
+        socketRef.current.disconnect();
+        socketRef.current = null;
+      }
+    };
+  }, [city, coords]);
 
   // Define the fetchLocationAlerts function with useCallback to avoid recreation on each render
   const fetchLocationAlerts = useCallback(async (cityName: string = "Edinburgh", coordinates: {latitude: number; longitude: number} | null = null) => {
@@ -516,6 +612,46 @@ export default function Feed() {
     }
   };
 
+  const handleResetLocation = useCallback(() => {
+    localStorage.removeItem('selectedCity');
+    localStorage.removeItem('selectedLat');
+    localStorage.removeItem('selectedLng');
+    localStorage.removeItem('locationAccuracy');
+    
+    setCity('Edinburgh');
+    setCoords({ latitude: 55.9533, longitude: -3.1883 });
+    setLocationAccuracy(null);
+    setLocationConfirmed(true);
+    
+    fetchLocationAlerts('Edinburgh', { latitude: 55.9533, longitude: -3.1883 });
+  }, [fetchLocationAlerts]);
+
+  // Function to format remainingTime from countdown
+  const formatRemainingTime = ({ days, hours, minutes, seconds }: { days: number, hours: number, minutes: number, seconds: number }) => {
+    if (days > 0) {
+      return `${days}d ${hours}h remaining`;
+    } else if (hours > 0) {
+      return `${hours}h ${minutes}m remaining`;
+    } else if (minutes > 0) {
+      return `${minutes}m ${seconds}s remaining`;
+    } else {
+      return `${seconds}s remaining`;
+    }
+  };
+
+  // Function to format date for display
+  const formatDate = (dateString: string) => {
+    if (!dateString) return '';
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-GB', {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
+
   if (!locationConfirmed) {
     return (
       <Layout>
@@ -593,28 +729,6 @@ export default function Feed() {
   return (
     <Layout onFilterOpen={() => isAuthenticated ? setIsFilterDrawerOpen(true) : setLoginDialogOpen(true)}>
       <Container maxWidth="xl">
-  <Box sx={{ mb: 3, gap: 1 }}>
-  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-<path fill-rule="evenodd" clip-rule="evenodd" d="M8 3.83331C6.61929 3.83331 5.5 4.9526 5.5 6.33331C5.5 7.71403 6.61929 8.83331 8 8.83331C9.38071 8.83331 10.5 7.71403 10.5 6.33331C10.5 4.9526 9.38071 3.83331 8 3.83331ZM6.5 6.33331C6.5 5.50489 7.17157 4.83331 8 4.83331C8.82843 4.83331 9.5 5.50489 9.5 6.33331C9.5 7.16174 8.82843 7.83331 8 7.83331C7.17157 7.83331 6.5 7.16174 6.5 6.33331Z" fill="black"/>
-<path fill-rule="evenodd" clip-rule="evenodd" d="M8 0.833313C5.01483 0.833313 2.5 3.34569 2.5 6.39125C2.5 9.51138 5.07168 11.5963 7.21805 12.9515L7.22668 12.957L7.23551 12.9621C7.46811 13.096 7.73159 13.1666 8 13.1666C8.26841 13.1666 8.53189 13.096 8.76449 12.9621L8.7722 12.9576L8.77974 12.9529C10.9345 11.608 13.5 9.50085 13.5 6.39125C13.5 3.3457 10.9852 0.833313 8 0.833313ZM3.5 6.39125C3.5 3.89164 5.57344 1.83331 8 1.83331C10.4266 1.83331 12.5 3.89164 12.5 6.39125C12.5 8.9117 10.4082 10.7563 8.259 12.0992C8.17936 12.1435 8.09028 12.1666 8 12.1666C7.91008 12.1666 7.82136 12.1437 7.74197 12.0997C5.59283 10.7411 3.5 8.92014 3.5 6.39125Z" fill="black"/>
-<path fill-rule="evenodd" clip-rule="evenodd" d="M4 12.8333C4.27355 12.8333 4.49579 13.053 4.49994 13.3255C4.50468 13.3381 4.52797 13.3841 4.62383 13.4596C4.76361 13.5698 4.99688 13.6908 5.32969 13.8018C5.99008 14.0219 6.93422 14.1666 8 14.1666C9.06578 14.1666 10.0099 14.0219 10.6703 13.8018C11.0031 13.6908 11.2364 13.5698 11.3762 13.4596C11.472 13.3841 11.4953 13.3381 11.5001 13.3255C11.5042 13.053 11.7265 12.8333 12 12.8333C12.2761 12.8333 12.5 13.0572 12.5 13.3333C12.5 13.7363 12.2545 14.0406 11.9951 14.245C11.7301 14.4539 11.3776 14.6201 10.9865 14.7505C10.1992 15.0129 9.14336 15.1666 8 15.1666C6.85664 15.1666 5.80078 15.0129 5.01346 14.7505C4.62241 14.6201 4.26989 14.4539 4.00485 14.245C3.74546 14.0406 3.5 13.7363 3.5 13.3333C3.5 13.0572 3.72386 12.8333 4 12.8333ZM11.5011 13.3221C11.5011 13.3221 11.5011 13.3221 11.5011 13.3221V13.3221Z" fill="black"/>
-</svg>
-
-            <Typography variant="h6" sx={{ fontWeight: '500',fontSize:{xs:'14px',md:'18px'} }}>
-              {city}
-            </Typography>
-            <svg width="5" height="5" viewBox="0 0 5 5" fill="none" xmlns="http://www.w3.org/2000/svg">
-<path d="M2.22 4.158C1.884 4.158 1.576 4.07867 1.296 3.92C1.02533 3.752 0.806 3.53267 0.638 3.262C0.479333 2.982 0.4 2.674 0.4 2.338C0.4 1.82467 0.577333 1.39067 0.932 1.036C1.28667 0.681333 1.716 0.504 2.22 0.504C2.74267 0.504 3.18133 0.681333 3.536 1.036C3.89067 1.39067 4.068 1.82467 4.068 2.338C4.068 2.85133 3.89067 3.28533 3.536 3.64C3.18133 3.98533 2.74267 4.158 2.22 4.158Z" fill="#212121"/>
-</svg>
-
-<Typography variant="body2" color="text.secondary" onClick={() => setLocationConfirmed(false)} sx={{ color:'#000',fontSize:{xs:'14px',md:'15px'} }}>Edit Location</Typography>
-        </Box>
-        <Typography variant="body2" color="text.secondary">
-            Showing {totalCount} alerts
-            </Typography>
-  </Box>
-
 
         {/* Low Accuracy Warning Dialog */}
         <Dialog
@@ -750,14 +864,30 @@ export default function Feed() {
 
                     {alert.city || "EdinBurgh"}
                   </Box>
-                  <Box component="span" sx={{ display: 'flex', alignItems: 'center',gap: 0.5 }}>
+                  
+                  {/* Display expected end date with countdown if available, otherwise show createdAt */}
+                  <Box component="span" sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <path d="M8.49967 5.33334C8.49967 5.05719 8.27582 4.83334 7.99967 4.83334C7.72353 4.83334 7.49967 5.05719 7.49967 5.33334V8C7.49967 8.13261 7.55235 8.25979 7.64612 8.35356L8.97945 9.68689C9.17472 9.88215 9.4913 9.88215 9.68656 9.68689C9.88182 9.49163 9.88182 9.17505 9.68656 8.97978L8.49967 7.7929V5.33334Z" fill="#757575"/>
+                      <path fillRule="evenodd" clipRule="evenodd" d="M7.99967 0.833336C4.04163 0.833336 0.833008 4.04196 0.833008 8C0.833008 11.958 4.04163 15.1667 7.99967 15.1667C11.9577 15.1667 15.1663 11.958 15.1663 8C15.1663 4.04196 11.9577 0.833336 7.99967 0.833336ZM1.83301 8C1.83301 4.59425 4.59392 1.83334 7.99967 1.83334C11.4054 1.83334 14.1663 4.59425 14.1663 8C14.1663 11.4058 11.4054 14.1667 7.99967 14.1667C4.59392 14.1667 1.83301 11.4058 1.83301 8Z" fill="#757575"/>
+                    </svg>
                     
-                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-<path d="M8.49967 5.33334C8.49967 5.05719 8.27582 4.83334 7.99967 4.83334C7.72353 4.83334 7.49967 5.05719 7.49967 5.33334V8C7.49967 8.13261 7.55235 8.25979 7.64612 8.35356L8.97945 9.68689C9.17472 9.88215 9.4913 9.88215 9.68656 9.68689C9.88182 9.49163 9.88182 9.17505 9.68656 8.97978L8.49967 7.7929V5.33334Z" fill="#757575"/>
-<path fillRule="evenodd" clipRule="evenodd" d="M7.99967 0.833336C4.04163 0.833336 0.833008 4.04196 0.833008 8C0.833008 11.958 4.04163 15.1667 7.99967 15.1667C11.9577 15.1667 15.1663 11.958 15.1663 8C15.1663 4.04196 11.9577 0.833336 7.99967 0.833336ZM1.83301 8C1.83301 4.59425 4.59392 1.83334 7.99967 1.83334C11.4054 1.83334 14.1663 4.59425 14.1663 8C14.1663 11.4058 11.4054 14.1667 7.99967 14.1667C4.59392 14.1667 1.83301 11.4058 1.83301 8Z" fill="#757575"/>
-</svg>
-
-                    {alert.createdAt ? formatTime(alert.createdAt) : ""}
+                    {alert.expectedEnd ? (
+                      /* Live countdown timer */
+                      <Countdown 
+                        date={new Date(alert.expectedEnd || '')}
+                        renderer={props => {
+                          // Check if date is in the past
+                          if (props.completed) {
+                            return <span>Ended {formatDate(alert.expectedEnd || '')}</span>;
+                          } else {
+                            return <span>{formatRemainingTime(props)}</span>;
+                          }
+                        }}
+                      />
+                    ) : (
+                      <span>{alert.createdAt ? formatTime(alert.createdAt) : ""}</span>
+                    )}
                   </Box>
                 </Box>
                 <Typography variant="body2" sx={{ mb: 1,fontSize:{xs:'14px',md:'14px'} }}>
@@ -879,6 +1009,12 @@ export default function Feed() {
         resultCount={totalCount}
         onApplyFilters={handleApplyFilters}
         onClearFilters={handleClearFilters}
+        currentCity={city}
+        isUsingCurrentLocation={!!coords && city !== 'Edinburgh'}
+        onUseMyLocation={handleUseMyLocation}
+        onResetLocation={handleResetLocation}
+        locationLoading={locationLoading}
+        locationAccuracy={locationAccuracy}
       />
       <Dialog
         open={loginDialogOpen}

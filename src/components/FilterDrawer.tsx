@@ -15,7 +15,8 @@ import {
   Divider,
   Slider,
   SelectChangeEvent,
-  IconButton
+  IconButton,
+  CircularProgress
 } from '@mui/material';
 import { FilterOptions } from '../types';
 
@@ -46,6 +47,12 @@ interface FilterDrawerProps {
   resultCount?: number;
   onApplyFilters: () => void;
   onClearFilters: () => void;
+  currentCity?: string | null;
+  isUsingCurrentLocation?: boolean;
+  onUseMyLocation?: () => Promise<void>;
+  onResetLocation?: () => void;
+  locationLoading?: boolean;
+  locationAccuracy?: number | null;
 }
 
 const FilterDrawer = ({
@@ -55,7 +62,13 @@ const FilterDrawer = ({
   onFilterChange,
   resultCount,
   onApplyFilters,
-  onClearFilters
+  onClearFilters,
+  currentCity = 'Edinburgh',
+  isUsingCurrentLocation = false,
+  onUseMyLocation = () => Promise.resolve(),
+  onResetLocation = () => {},
+  locationLoading = false,
+  locationAccuracy = null
 }: FilterDrawerProps) => {
   const handleTimeRangeChange = (_event: Event, newValue: number | number[]) => {
     onFilterChange({
@@ -161,6 +174,82 @@ const FilterDrawer = ({
           <Typography variant="h6" mb={3} gutterBottom sx={{fontWeight:'bold'}}>
             Filter By
           </Typography>
+          
+          <Typography variant="body1" gutterBottom sx={{fontWeight:'bold'}}>
+            Location
+          </Typography>
+          <Box sx={{ display: 'flex', flexDirection: 'column', mb: 2 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path fillRule="evenodd" clipRule="evenodd" d="M8 3.83331C6.61929 3.83331 5.5 4.9526 5.5 6.33331C5.5 7.71403 6.61929 8.83331 8 8.83331C9.38071 8.83331 10.5 7.71403 10.5 6.33331C10.5 4.9526 9.38071 3.83331 8 3.83331ZM6.5 6.33331C6.5 5.50489 7.17157 4.83331 8 4.83331C8.82843 4.83331 9.5 5.50489 9.5 6.33331C9.5 7.16174 8.82843 7.83331 8 7.83331C7.17157 7.83331 6.5 7.16174 6.5 6.33331Z" fill="black"/>
+                  <path fillRule="evenodd" clipRule="evenodd" d="M8 0.833313C5.01483 0.833313 2.5 3.34569 2.5 6.39125C2.5 9.51138 5.07168 11.5963 7.21805 12.9515L7.22668 12.957L7.23551 12.9621C7.46811 13.096 7.73159 13.1666 8 13.1666C8.26841 13.1666 8.53189 13.096 8.76449 12.9621L8.7722 12.9576L8.77974 12.9529C10.9345 11.608 13.5 9.50085 13.5 6.39125C13.5 3.3457 10.9852 0.833313 8 0.833313ZM3.5 6.39125C3.5 3.89164 5.57344 1.83331 8 1.83331C10.4266 1.83331 12.5 3.89164 12.5 6.39125C12.5 8.9117 10.4082 10.7563 8.259 12.0992C8.17936 12.1435 8.09028 12.1666 8 12.1666C7.91008 12.1666 7.82136 12.1437 7.74197 12.0997C5.59283 10.7411 3.5 8.92014 3.5 6.39125Z" fill="black"/>
+                </svg>
+                <Typography variant="body2" sx={{ ml: 1 }}>
+                  {currentCity || 'Edinburgh'}
+                </Typography>
+                {locationAccuracy && (
+                  <Typography variant="caption" color="text.secondary" sx={{ ml: 1 }}>
+                    (±{Math.round(locationAccuracy)}m)
+                  </Typography>
+                )}
+              </Box>
+            </Box>
+            <Box sx={{ display: 'flex', gap: 2, mt: 1 }}>
+              {isUsingCurrentLocation ? (
+                <Button
+                  variant="outlined"
+                  onClick={onResetLocation}
+                  size="small"
+                  sx={{ 
+                    color: '#d32f2f', 
+                    borderColor: '#d32f2f',
+                    '&:hover': {
+                      borderColor: '#b71c1c',
+                      bgcolor: 'rgba(211, 47, 47, 0.04)'
+                    },
+                    textTransform: 'none',
+                    fontSize: '0.8rem'
+                  }}
+                >
+                  Reset to Edinburgh
+                </Button>
+              ) : (
+                <Button
+                  variant="outlined"
+                  onClick={onUseMyLocation}
+                  size="small"
+                  disabled={locationLoading}
+                  startIcon={
+                    locationLoading ? (
+                      <CircularProgress size={16} />
+                    ) : (
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                        <path
+                          d="M12 8C9.79 8 8 9.79 8 12C8 14.21 9.79 16 12 16C14.21 16 16 14.21 16 12C16 9.79 14.21 8 12 8ZM20.94 11C20.48 6.83 17.17 3.52 13 3.06V1H11V3.06C6.83 3.52 3.52 6.83 3.06 11H1V13H3.06C3.52 17.17 6.83 20.48 11 20.94V23H13V20.94C17.17 20.48 20.48 17.17 20.94 13H23V11H20.94ZM12 19C8.13 19 5 15.87 5 12C5 8.13 8.13 5 12 5C15.87 5 19 8.13 19 12C19 15.87 15.87 19 12 19Z"
+                          fill="black"
+                        />
+                      </svg>
+                    )
+                  }
+                  sx={{ 
+                    color: 'black', 
+                    borderColor: 'black',
+                    '&:hover': {
+                      borderColor: '#555',
+                      bgcolor: 'rgba(0, 0, 0, 0.04)'
+                    },
+                    textTransform: 'none',
+                    fontSize: '0.8rem'
+                  }}
+                >
+                  Use my location
+                </Button>
+              )}
+            </Box>
+          </Box>
+          <Divider sx={{ my: 2, bgcolor: '#eee' }} />
+          
           <Typography variant="body1" gutterBottom sx={{fontWeight:'bold'}}>
             Alert Type
           </Typography>

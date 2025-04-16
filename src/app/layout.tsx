@@ -1,23 +1,11 @@
 import type { Metadata } from "next";
-import { Inter, Poppins } from "next/font/google";
+import { inter, poppins } from "./fonts";
 import "./globals.css";
 import { AuthProvider } from "@/context/AuthContext";
 import { ThemeRegistry } from "@/components/ThemeRegistry";
 
 // Import Remixicon
 import 'remixicon/fonts/remixicon.css';
-
-const inter = Inter({
-  variable: "--font-inter",
-  subsets: ["latin"],
-  weight: ['400', '500', '600'],
-});
-
-const poppins = Poppins({
-  variable: "--font-poppins",
-  subsets: ["latin"],
-  weight: ['400', '500', '600', '700'],
-});
 
 export const metadata: Metadata = {
   title: "TourPrism",
