@@ -54,15 +54,23 @@ const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, onToggleCollapse, onLogo
   };
 
   const renderIcon = (iconElement: React.ReactNode, isActive: boolean) => {
-    const iconWithColor = React.cloneElement(iconElement as React.ReactElement, {
-      children: React.Children.map((iconElement as React.ReactElement).props.children, child => {
-        if (React.isValidElement(child)) {
-          return React.cloneElement(child, { fill: isActive ? '#000' : '#616161' } as React.SVGProps<SVGPathElement>);
+    if (!React.isValidElement(iconElement)) {
+      return iconElement;
+    }
+    
+    const svgElement = iconElement as React.ReactElement<React.SVGProps<SVGSVGElement>>;
+    
+    return React.cloneElement(svgElement, {}, 
+      React.Children.map(svgElement.props.children, (child) => {
+        if (React.isValidElement(child) && child.type === 'path') {
+          const pathElement = child as React.ReactElement<React.SVGProps<SVGPathElement>>;
+          return React.cloneElement(pathElement, { 
+            fill: isActive ? '#000' : '#616161' 
+          });
         }
         return child;
-      }),
-    });
-    return iconWithColor;
+      })
+    );
   };
 
   return (
@@ -131,7 +139,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, onToggleCollapse, onLogo
                 px: isCollapsed ? 0 : 1.5,
                 mb: 0.5,
                 color: isActive ? '#000' : '#616161',
-                bgcolor: isActive ? '#F5F5F7' : 'transparent',
+                bgcolor: isActive ? '#EBEBEC' : 'transparent',
                 borderRadius: '8px',
                 '&:hover': {
                   bgcolor: '#F5F5F7',
@@ -172,7 +180,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, onToggleCollapse, onLogo
                   primary={item.text}
                   primaryTypographyProps={{
                     fontSize: '14px',
-                    fontWeight: 500,
+                    fontWeight: isActive ? 600 : 500,
                     sx: {
                       opacity: isCollapsed ? 0 : 1,
                       whiteSpace: 'nowrap',
@@ -188,71 +196,6 @@ const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, onToggleCollapse, onLogo
           );
         })}
       </List>
-
-      <Box sx={{ px: isCollapsed ? 1 : 2, pb: 2 }}>
-        <ListItem
-          onClick={onLogout}
-          sx={{
-            py: 1.2,
-            px: isCollapsed ? 0 : 1.5,
-            color: '#616161',
-            borderRadius: '8px',
-            '&:hover': {
-              bgcolor: '#F5F5F7',
-              cursor: 'pointer',
-              borderRadius: '8px',
-              color: '#000',
-              '& .MuiListItemIcon-root': {
-                 '& svg path': {
-                    fill: '#000',
-                 }
-              }
-            },
-            justifyContent: isCollapsed ? 'center' : 'flex-start',
-            alignItems: 'center',
-            transition: theme.transitions.create(['background-color', 'color'], {
-                easing: theme.transitions.easing.sharp,
-                duration: theme.transitions.duration.shortest,
-            }),
-          }}
-        >
-          <Tooltip title={isCollapsed ? "Logout" : ""} placement="right">
-            <ListItemIcon sx={{
-                minWidth: isCollapsed ? 0 : 35,
-                color: 'inherit',
-                display: 'flex',
-                justifyContent: 'center',
-                mr: isCollapsed ? 0 : 1,
-                 '& svg': {
-                    width: 20,
-                    height: 20,
-                }
-             }}>
-              <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M13.1245 5.28769C13.0498 3.40842 11.4838 1.82556 9.41443 1.87618C8.93363 1.88794 8.36843 2.04749 7.48174 2.29779L7.37294 2.3285C4.9365 3.01574 2.5467 4.2454 1.97799 7.1451C1.87489 7.67076 1.87493 8.25098 1.875 9.2244L1.875 10.7756C1.87493 11.749 1.87489 12.3293 1.97799 12.8549C2.5467 15.7546 4.9365 16.9843 7.37294 17.6715L7.48172 17.7022C8.36841 17.9525 8.93363 18.1121 9.41442 18.1238C11.4838 18.1745 13.0498 16.5916 13.1245 14.7123C13.1382 14.3674 12.8697 14.0767 12.5248 14.063C12.1799 14.0493 11.8892 14.3178 11.8755 14.6627C11.8275 15.87 10.8213 16.9079 9.445 16.8742C9.14351 16.8668 8.74417 16.7595 7.71228 16.4685C5.37954 15.8105 3.62923 14.7793 3.20462 12.6143C3.12784 12.2229 3.12501 11.7723 3.12501 10.6977V9.30229C3.12501 8.22772 3.12784 7.77713 3.20462 7.38568C3.62923 5.2207 5.37954 4.18954 7.71228 3.53156C8.74418 3.24049 9.14351 3.13318 9.445 3.12581C10.8213 3.09214 11.8275 4.13004 11.8755 5.33733C11.8892 5.68224 12.1799 5.95073 12.5248 5.93702C12.8697 5.92331 13.1382 5.6326 13.1245 5.28769Z" fill="currentColor"/>
-                <path d="M15.8523 7.46849C15.6048 7.22791 15.2091 7.23353 14.9685 7.48105C14.7279 7.72857 14.7335 8.12426 14.981 8.36484C15.1157 8.49573 15.33 8.66425 15.5339 8.82444L15.5814 8.8617C15.7861 9.02246 16.0051 9.19438 16.2123 9.36995L16.2183 9.375H8.33333C7.98816 9.375 7.70833 9.65482 7.70833 10C7.70833 10.3452 7.98816 10.625 8.33333 10.625H16.2183L16.2123 10.63C16.0051 10.8056 15.7861 10.9775 15.5814 11.1383L15.5339 11.1756C15.33 11.3357 15.1157 11.5043 14.981 11.6352C14.7335 11.8757 14.7279 12.2714 14.9685 12.519C15.2091 12.7665 15.6048 12.7721 15.8523 12.5315C15.9283 12.4576 16.0798 12.3362 16.306 12.1586L16.356 12.1194C16.5578 11.961 16.7945 11.7752 17.0204 11.5837C17.2625 11.3786 17.514 11.1489 17.7096 10.9193C17.8075 10.8043 17.9042 10.6746 17.9788 10.5351C18.0508 10.4006 18.125 10.2152 18.125 10C18.125 9.78476 18.0508 9.59939 17.9788 9.46485C17.9042 9.32536 17.8075 9.1957 17.7096 9.08066C17.514 8.8511 17.2625 8.62145 17.0204 8.41628C16.7945 8.22485 16.5578 8.03905 16.356 7.88066L16.306 7.84142C16.0798 7.66376 15.9283 7.54241 15.8523 7.46849Z" fill="currentColor"/>
-              </svg>
-            </ListItemIcon>
-          </Tooltip>
-          {!isCollapsed && (
-            <ListItemText
-              primary="Logout"
-              primaryTypographyProps={{
-                fontSize: '14px',
-                fontWeight: 500,
-                sx: {
-                  opacity: isCollapsed ? 0 : 1,
-                  whiteSpace: 'nowrap',
-                  transition: theme.transitions.create(['opacity'], {
-                    easing: theme.transitions.easing.easeInOut,
-                    duration: theme.transitions.duration.enteringScreen,
-                  }),
-                }
-              }}
-            />
-          )}
-        </ListItem>
-      </Box>
     </Box>
   );
 };

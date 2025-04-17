@@ -1,3 +1,8 @@
+export interface Collaborator {
+  email: string;
+  role: 'viewer' | 'manager';
+}
+
 export interface User {
   _id: string;
   email: string;
@@ -9,6 +14,25 @@ export interface User {
   firstName?: string;
   lastName?: string;
   emailPrefrences?: boolean;
+  isCollaborator?: boolean;
+  collaborator?: Collaborator;
+  company?: {
+    name?: string;
+    type?: string;
+    MainOperatingRegions?: string;
+  };
+  preferences?: {
+    Communication?: {
+      emailPrefrences?: boolean;
+      whatsappPrefrences?: boolean;
+    };
+    AlertSummaries?: {
+      daily?: boolean;
+      weekly?: boolean;
+      monthly?: boolean;
+    }
+  };
+  collaborators?: Collaborator[];
 }
 
 export interface Alert {

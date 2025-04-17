@@ -355,7 +355,6 @@ export default function EditAlertPage() {
                 <MenuItem value="Low">Low</MenuItem>
                 <MenuItem value="Medium">Medium</MenuItem>
                 <MenuItem value="High">High</MenuItem>
-                <MenuItem value="Critical">Critical</MenuItem>
               </Select>
             </FormControl>
             
@@ -381,7 +380,6 @@ export default function EditAlertPage() {
                 <MenuItem value="low">Low</MenuItem>
                 <MenuItem value="medium">Medium</MenuItem>
                 <MenuItem value="high">High</MenuItem>
-                <MenuItem value="urgent">Urgent</MenuItem>
               </Select>
             </FormControl>
           </Box>

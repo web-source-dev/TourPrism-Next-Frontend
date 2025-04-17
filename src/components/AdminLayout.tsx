@@ -40,7 +40,7 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
     { text: 'Dashboard', icon: 'ri-dashboard-line', path: '/admin' },
     { text: 'Alerts Management', icon: 'ri-notification-4-line', path: '/admin/alerts' },
     { text: 'User Management', icon: 'ri-user-settings-line', path: '/admin/users' },
-    { text: 'Back to Site', icon: 'ri-arrow-left-line', path: '/' },
+    { text: 'Back to Site', icon: 'ri-arrow-left-line', path: '/feed' },
   ];
 
   const handleMenuItemClick = (path: string) => {

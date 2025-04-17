@@ -116,7 +116,7 @@ export default function Feed() {
     severity: 'success' as 'success' | 'error' | 'info' | 'warning'
   });
   const [filters, setFilters] = useState<FilterOptions>({
-    sortBy: 'newest',
+    sortBy: '',
     incidentTypes: [],
     timeRange: 0,
     distance: 50
@@ -223,7 +223,7 @@ export default function Feed() {
     try {
       const params: Record<string, unknown> = {
         page: 1,
-        limit: isAuthenticated ? 10 : 3,
+        limit: isAuthenticated ? 10 : 15, // Already requesting 15 for non-authenticated users
         sortBy: filters.sortBy,
       };
       if (filters.timeRange > 0) {
@@ -260,14 +260,35 @@ export default function Feed() {
         console.warn(`Filtered out ${response.alerts.length - uniqueAlerts.length} duplicate alert(s) in initial load`);
       }
       
+      // Sort alerts so that followed alerts are at the top while maintaining sort order within groups
+      const sortedAlerts = [...uniqueAlerts].sort((a, b) => {
+        // First priority: followed alerts go to the top
+        if (a.isFollowing && !b.isFollowing) return -1;
+        if (!a.isFollowing && b.isFollowing) return 1;
+        
+        // Second priority: maintain the original sort order within each group
+        // If sortBy is 'newest', most recent first
+        if (filters.sortBy === 'newest') {
+          return new Date(b.createdAt || b.updatedAt).getTime() - new Date(a.createdAt || a.updatedAt).getTime();
+        } 
+        // If sortBy is 'oldest', oldest first
+        else if (filters.sortBy === 'oldest') {
+          return new Date(a.createdAt || a.updatedAt).getTime() - new Date(b.createdAt || b.updatedAt).getTime();
+        }
+        // If sortBy is 'relevant', most followed first
+        else {
+          return (b.numberOfFollows || 0) - (a.numberOfFollows || 0);
+        }
+      });
+      
       if (!isAuthenticated) {
-        setAlerts(uniqueAlerts.slice(0, 3));
+        setAlerts(sortedAlerts.slice(0, 15));
       } else {
-        setAlerts(uniqueAlerts);
+        setAlerts(sortedAlerts);
       }
       
       setTotalCount(response.totalCount);
-      setHasMore(isAuthenticated && uniqueAlerts.length < response.totalCount);
+      setHasMore(isAuthenticated && sortedAlerts.length < response.totalCount);
       setPage(1);
     } catch (error) {
       console.error('Error fetching alerts:', error);
@@ -903,20 +924,18 @@ export default function Feed() {
                         alert.risk === 'Low' ? '#e6f4ea' :
                           alert.risk === 'Medium' ? '#fff4e5' :
                             alert.risk === 'High' ? '#fdecea' :
-                            alert.risk === 'Critical' ? '#fbe9e7' :
                               'transparent',
                       borderRadius: 1,
                       color:
                         alert.risk === 'Low' ? '#00855b' :
                           alert.risk === 'Medium' ? '#c17e00' :
                             alert.risk === 'High' ? '#d32f2f' :
-                            alert.risk === 'Critical' ? '#b71c1c' : 
                               'inherit',
                       fontWeight: 400,
                       fontSize: '14px',
                     }}
                   >
-                   {alert.risk} : {alert.impact}
+                   {alert.risk}
                   </Box>
                 )}
 
@@ -959,12 +978,13 @@ export default function Feed() {
               </Paper>
             ))}
 
-            {/* Login to view more alert - for non-logged in users */}
+            {/* Login to view more alerts - for non-logged in users */}
             {!isAuthenticated && alerts.length > 0 && (
               <Box
                 sx={{
                   textAlign: 'center',
                   p: 1,
+                  mt: 2, // Added margin top for better spacing
                   bgcolor: 'rgb(238, 238, 238)',
                   borderRadius: 5,
                   cursor: 'pointer',

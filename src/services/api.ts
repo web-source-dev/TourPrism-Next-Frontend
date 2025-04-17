@@ -148,9 +148,22 @@ api.interceptors.response.use(
   }
 );
 
+// Add Collaborator interface to extend the User type
+interface Collaborator {
+  email: string;
+  role: 'viewer' | 'manager';
+}
+
+// Extend the User interface to include collaborator information
+interface ExtendedUser extends User {
+  collaborator?: Collaborator;
+  isCollaborator?: boolean;
+}
+
+// Update the AuthResponse interface to use ExtendedUser
 interface AuthResponse {
   token: string;
-  user: User;
+  user: ExtendedUser;
   requireMFA?: boolean;
   needsVerification?: boolean;
   userId?: string;
@@ -183,6 +196,7 @@ export const register = async (userData: Record<string, unknown>): Promise<AuthR
   }
 };
 
+// Update login function to handle collaborator login
 export const login = async (credentials: { email: string; password: string }): Promise<AuthResponse> => {
   try {
     const response: CustomAxiosResponse<AuthResponse> = await api.post('/auth/login', credentials);
@@ -191,6 +205,14 @@ export const login = async (credentials: { email: string; password: string }): P
     if (response.data.token && typeof window !== 'undefined') {
       localStorage.setItem('token', response.data.token);
       localStorage.setItem('user', JSON.stringify(response.data.user));
+      
+      // Store collaborator info if present
+      if (response.data.user.collaborator) {
+        localStorage.setItem('isCollaborator', 'true');
+        localStorage.setItem('collaboratorRole', response.data.user.collaborator.role);
+        localStorage.setItem('collaboratorEmail', response.data.user.collaborator.email);
+      }
+      
       // Also set in cookies for middleware
       Cookies.set('token', response.data.token, { path: '/' });
     }
@@ -206,7 +228,7 @@ export const googleLogin = (): void => {
   }
 };
 
-export const handleGoogleCallback = async (token: string): Promise<User> => {
+export const handleGoogleCallback = async (token: string): Promise<ExtendedUser> => {
   if (token && typeof window !== 'undefined') {
     localStorage.setItem('token', token);
     // Also set in cookies for middleware
@@ -214,9 +236,17 @@ export const handleGoogleCallback = async (token: string): Promise<User> => {
     
     // Fetch user data using the token
     try {
-      const response: CustomAxiosResponse<User> = await api.get('/auth/user/profile');
+      const response: CustomAxiosResponse<ExtendedUser> = await api.get('/auth/user/profile');
       // Store the complete user object for consistent auth
       localStorage.setItem('user', JSON.stringify(response.data));
+      
+      // Store collaborator info if present
+      if (response.data.isCollaborator && response.data.collaborator) {
+        localStorage.setItem('isCollaborator', 'true');
+        localStorage.setItem('collaboratorRole', response.data.collaborator.role);
+        localStorage.setItem('collaboratorEmail', response.data.collaborator.email);
+      }
+      
       return response.data;
     } catch (error) {
       throw new Error(getErrorMessage(error as CustomAxiosError));
@@ -225,10 +255,14 @@ export const handleGoogleCallback = async (token: string): Promise<User> => {
   throw new Error('No token provided');
 };
 
+// Update logout function to clear collaborator data
 export const logout = (): void => {
   if (typeof window !== 'undefined') {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
+    localStorage.removeItem('isCollaborator');
+    localStorage.removeItem('collaboratorRole');
+    localStorage.removeItem('collaboratorEmail');
     // Also remove from cookies
     Cookies.remove('token', { path: '/' });
     window.location.href = '/';
@@ -580,6 +614,22 @@ export const updateUserProfile = async (userData: {
   firstName?: string;
   lastName?: string;
   emailPrefrences?: boolean;
+  company?: {
+    name?: string;
+    type?: string;
+    MainOperatingRegions?: string;
+  };
+  preferences?: {
+    Communication?: {
+      emailPrefrences?: boolean;
+      whatsappPrefrences?: boolean;
+    };
+    AlertSummaries?: {
+      daily?: boolean;
+      weekly?: boolean;
+      monthly?: boolean;
+    }
+  }
 }): Promise<User> => {
   try {
     const response = await api.put<{ user: User }>('/auth/user/profile', userData);

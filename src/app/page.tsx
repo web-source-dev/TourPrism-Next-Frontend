@@ -19,6 +19,12 @@ export default function Home() {
       router.push('/signup');
     }
   };
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      router.push('/feed');
+    }
+  }, [isAuthenticated, router]);
   
   // Benefits data
   const benefitsData = [
@@ -196,20 +202,24 @@ export default function Home() {
 
   return (
     <Layout>
-      <Container>
+      <Container sx={{padding: {xs: 0, md: 0}}}>
         {/* Edinburgh Alerts Button */}
         <Box sx={{ 
           display: 'flex', 
           justifyContent: 'center', 
-          mt: 4,
-          mb:8 
+          mt: isMobile ? 1 : 4,
+          mb: isMobile ? 8 : 8 
         }}>
           <Button
             variant="outlined"
-            endIcon={<ArrowRightAlt />}
+            endIcon={
+              <svg width="21" height="20" viewBox="0 0 21 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+<path d="M17.7923 9.99963C17.7923 9.68834 17.6543 9.39953 17.5236 9.18268C17.3825 8.94866 17.1928 8.70706 16.9847 8.47149C16.5672 7.99893 16.0224 7.49145 15.4938 7.03239C14.9621 6.57064 14.4321 6.14546 14.0363 5.83648C13.838 5.68174 13.6726 5.55554 13.5565 5.46778C13.4984 5.42389 13.4525 5.38958 13.421 5.36608L13.3847 5.3391L13.3751 5.33197L13.3717 5.3295C13.0938 5.12478 12.7022 5.18386 12.4975 5.46178C12.2928 5.73968 12.3521 6.13091 12.63 6.33564L12.6406 6.34348L12.674 6.36829C12.7035 6.39029 12.7472 6.42299 12.803 6.46517C12.9147 6.54955 13.0748 6.67171 13.2672 6.82186C13.6526 7.12266 14.1643 7.53341 14.6742 7.9762C15.1872 8.42169 15.6842 8.88738 16.0479 9.29911C16.0709 9.32515 16.0932 9.35074 16.1147 9.37587L3.83398 9.37588C3.48881 9.37588 3.20898 9.6557 3.20898 10.0009C3.20898 10.3461 3.48881 10.6259 3.83398 10.6259L16.1126 10.6259C16.0917 10.6502 16.0702 10.675 16.0479 10.7002C15.6842 11.1119 15.1872 11.5776 14.6742 12.0231C14.1643 12.4659 13.6526 12.8766 13.2672 13.1774C13.0748 13.3276 12.9147 13.4497 12.803 13.5341C12.7472 13.5763 12.7035 13.609 12.674 13.631L12.6406 13.6558L12.63 13.6636C12.3521 13.8684 12.2928 14.2596 12.4975 14.5375C12.7022 14.8154 13.0938 14.8745 13.3717 14.6698L13.3751 14.6673L13.3847 14.6602L13.421 14.6332C13.4525 14.6097 13.4984 14.5754 13.5565 14.5315C13.6726 14.4437 13.838 14.3175 14.0363 14.1628C14.4321 13.8538 14.9621 13.4286 15.4938 12.9669C16.0224 12.5078 16.5672 12.0004 16.9847 11.5278C17.1928 11.2922 17.3825 11.0506 17.5236 10.8166C17.6535 10.6011 17.7907 10.3144 17.7923 10.0052" fill="#212121"/>
+</svg>
+            }
             sx={{
               borderRadius: 28,
-              border: '1px solid #e0e0e0',
+              border: '1px solidrgb(75, 75, 75)',
               color: 'black',
               px: 3,
               py: 1,
@@ -225,8 +235,8 @@ export default function Home() {
           >
             <Box sx={{ display: 'flex', alignItems: 'center' }}>
               <Box sx={{
-                width: 8,
-                height: 8,
+                width: 12,
+                height: 12,
                 borderRadius: '50%',
                 backgroundColor: '#4CAF50',
                 mr: 1.5
@@ -240,22 +250,25 @@ export default function Home() {
         {/* Hero Section */}
         <Box sx={{
           textAlign: 'center',
-          mb: 4
+          mb: 4,
         }}>
           <Typography variant="h1" sx={{
             fontSize: { xs: '24px', md: '40px' },
             fontWeight: '500',
-            maxWidth: '800px',
-            margin: '0 auto',
+            maxWidth: isMobile ? '362px' : '720px',
+            margin: isMobile ? '0 auto' : '0 auto',
             mb: 2,
-            px: 2
+            px: isMobile ? 0 : 2
           }}>
             Don&apos;t Let Travel Disruptions Cost Your Bookings – Act Early
           </Typography>
           <Typography variant="body1" sx={{
             color: 'text.secondary',
-            mb: 3,
-            px: 2
+            mb: 8,
+            fontSize: { xs: '14px', md: '16px' },
+            px: isMobile ? 0 : 2,
+            maxWidth: isMobile ? '360px' : '720px',
+            mx: 'auto'
           }}>
             Prevent costly cancellations and chaos with AI-powered early warnings, uniquely tailored for your business.
           </Typography>
@@ -285,7 +298,7 @@ export default function Home() {
           display: 'flex', 
           justifyContent: 'center', 
           alignItems: 'center',
-          my: 5
+          my: 8
         }}>
           <Typography variant="body2" color="text.secondary" sx={{ mr: 1 }}>
             Backed by
@@ -326,13 +339,16 @@ export default function Home() {
         {/* How You Benefit Section */}
         <Box sx={{ textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center',justifyContent: 'center', mb: 4, px: 1,py:{xs:5,md:0}, height: {xs: 'auto', md: '80vh'}}}>
           <Typography variant="h2" sx={{
-            fontSize: { xs: '20px', md: '32px' },
+            fontSize: { xs: '20px', md: '24px' },
             fontWeight: '500',
             mb: 2,
           }}>
             How You Benefit
           </Typography>
-          <Typography color="text.secondary" sx={{ mb: 5, fontSize: { xs: '14px', md: '20px' } }}>
+          <Typography color="text.secondary" sx={{ mb: 5, fontSize: { xs: '14px', md: '14px' },
+            maxWidth: isMobile ? '360px' : '720px',
+            mx: 'auto'
+          }}>
             Discover how we protect your revenue with proactive alerts.
           </Typography>
           <Box
@@ -340,7 +356,7 @@ export default function Home() {
       flexDirection={isMobile ? 'column' : 'row'}
       justifyContent="center"
       alignItems="stretch"
-      gap={4}
+      gap={3}
     >
       {benefitsData.map((benefit, index) => {
         const isLastItem = index === benefitsData.length - 1;
@@ -350,7 +366,8 @@ export default function Home() {
             key={index}
             sx={{
               flex: 1,
-              p: isMobile ? 0 : 2,
+              py: isMobile ? 0 : 5.5,
+              px: isMobile ? 0 : '16px',
               mb: isMobile ? 0 : 0,
               position: 'relative',
               textAlign: isMobile ? 'center' : 'center',
@@ -372,32 +389,22 @@ export default function Home() {
             <Typography
               variant="h6"
               sx={{
-                fontSize: { xs: '14px', md: '16px' },
+                fontSize: { xs: '16px', md: '16px' },
                 fontWeight: 500,
-                mb: 1,
+                mb: 0.5,
               }}
             >
               {benefit.title}
             </Typography>
             <Typography
               color="text.secondary"
-              sx={{ fontSize: { xs: '12px', md: '16px' } }}
+              sx={{ fontSize: { xs: '14px', md: '14px' },
+                maxWidth: isMobile ? '320px' : '720px',
+                mx: 'auto'
+              }}
             >
               {benefit.description}
             </Typography>
-
-            {/* Bottom center border on mobile */}
-            {isMobile && !isLastItem && (
-              <Box
-                sx={{
-                  height: '1px',
-                  width: '40%',
-                  bgcolor: '#ccc',
-                  mx: 'auto',
-                  mt: 3,
-                }}
-              />
-            )}
           </Box>
         );
       })}
@@ -407,20 +414,23 @@ export default function Home() {
         <Divider sx={{ mb: 6 }} />
 
         {/* What We Predict Section */}
-        <Box sx={{ textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center',justifyContent: 'center', mb: 4, px: 1,py:{xs:5,md:0}, height: {xs: 'auto', md: '100vh'}}}>
+        <Box sx={{ textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center',justifyContent: 'center', mb: 4, px: isMobile ? 0 : 1,py:{xs:5,md:0}, height: {xs: 'auto', md: '100vh'}}}>
           <Typography variant="h2" sx={{
-            fontSize: { xs: '20px', md: '32px' },
+            fontSize: { xs: '20px', md: '24px' },
             fontWeight: '500',
             mb: 2
           }}>
             What We Predict
           </Typography>
-          <Typography color="text.secondary" sx={{ mb: 4, fontSize: { xs: '14px', md: '20px' } }}>
+          <Typography color="text.secondary" sx={{ mb: 4, fontSize: { xs: '14px', md: '14px' },
+            maxWidth: isMobile ? '400px' : '720px',
+            mx: 'auto'
+          }}>
             Explore the types of disruptions we predict to keep you ahead of potential issues.
           </Typography>
 
           {/* Categories grid - using the array */}
-          <Box display="flex" flexWrap="wrap" gap={isMobile ? 0 :3}>
+          <Box display="flex" flexWrap="wrap" gap={isMobile ? 0 : '20px'}>
       {predictionsData.map((prediction, index) => {
         const isLastInRow = (index + 1) % itemsPerRow === 0;
         const isLastRow = index >= predictionsData.length - (predictionsData.length % itemsPerRow || itemsPerRow);
@@ -431,9 +441,10 @@ export default function Home() {
             sx={{
               width: `${100 / itemsPerRow - (isMobile ? 0 : 3)}%`,
               px: isMobile ? 0 : 1,
+              py: isMobile ? 0 : 3,
               boxSizing: 'border-box',
-              borderRight: isMobile && !isLastInRow ? '1px solid rgb(209, 209, 209)' : 'none',
-              borderBottom: isMobile && !isLastRow ? '1px solid rgb(209, 209, 209)' : 'none',
+              borderRight: isMobile && !isLastInRow ? '1px solid #E5E5E6' : 'none',
+              borderBottom: isMobile && !isLastRow ? '1px solid #E5E5E6' : 'none',
               bgcolor:isMobile ? 'none' : "#fff",
               borderRadius: isMobile ? 0 : 3,
             }}
@@ -443,7 +454,7 @@ export default function Home() {
                 display: 'flex',
                 flexDirection: 'column',
                 alignItems: 'center',
-                p: 2,
+                p: isMobile ? 1 : 2,
                 borderRadius: 1,
               }}
             >
@@ -462,7 +473,7 @@ export default function Home() {
               <Typography variant="h6" sx={{ fontSize: '16px', fontWeight: 500 }}>
                 {prediction.title}
               </Typography>
-              <Typography color="text.secondary" sx={{ fontSize: { xs: '12px', md: '16px' }, textAlign: 'center' }}>
+              <Typography color="text.secondary" sx={{ fontSize: { xs: '12px', md: '12px' }, textAlign: 'center' }}>
                 {prediction.description}
               </Typography>
             </Box>
@@ -473,7 +484,10 @@ export default function Home() {
 
           <Button
             variant="contained"
-            endIcon={<ArrowRightAlt />}
+            endIcon={<svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M17.2914 9.9997C17.2914 9.6884 17.1533 9.39959 17.0226 9.18274C16.8815 8.94872 16.6918 8.70712 16.4837 8.47155C16.0662 7.99899 15.5215 7.49151 14.9928 7.03245C14.4611 6.5707 13.9312 6.14552 13.5353 5.83654C13.3371 5.6818 13.1717 5.5556 13.0555 5.46784C12.9974 5.42395 12.9516 5.38964 12.92 5.36614L12.8837 5.33916L12.8741 5.33203L12.8708 5.32956C12.5928 5.12484 12.2012 5.18392 11.9965 5.46184C11.7918 5.73974 11.8511 6.13097 12.129 6.3357L12.1396 6.34354L12.173 6.36835C12.2025 6.39035 12.2462 6.42305 12.302 6.46523C12.4137 6.54961 12.5738 6.67177 12.7662 6.82192C13.1516 7.12272 13.6633 7.53347 14.1732 7.97626C14.6863 8.42176 15.1832 8.88744 15.5469 9.29917C15.5699 9.32521 15.5922 9.3508 15.6137 9.37594L3.33301 9.37594C2.98783 9.37594 2.70801 9.65576 2.70801 10.0009C2.70801 10.3461 2.98783 10.6259 3.33301 10.6259L15.6116 10.6259C15.5907 10.6503 15.5692 10.675 15.5469 10.7002C15.1832 11.112 14.6863 11.5776 14.1732 12.0231C13.6633 12.4659 13.1516 12.8767 12.7662 13.1775C12.5738 13.3276 12.4137 13.4498 12.302 13.5342C12.2462 13.5764 12.2025 13.6091 12.173 13.6311L12.1396 13.6559L12.129 13.6637C11.8511 13.8684 11.7918 14.2597 11.9965 14.5376C12.2012 14.8155 12.5928 14.8746 12.8708 14.6698L12.8741 14.6674L12.8837 14.6602L12.92 14.6333C12.9516 14.6098 12.9974 14.5755 13.0555 14.5316C13.1717 14.4438 13.3371 14.3176 13.5353 14.1629C13.9312 13.8539 14.4611 13.4287 14.9928 12.967C15.5215 12.5079 16.0662 12.0004 16.4837 11.5279C16.6918 11.2923 16.8815 11.0507 17.0226 10.8167C17.1525 10.6011 17.2897 10.3145 17.2913 10.0053" fill="white"/>
+              </svg>
+              }
             onClick={handleCreateAccount}
             sx={{
               bgcolor: 'black',
@@ -483,7 +497,7 @@ export default function Home() {
               mt: 4,
               mb: 2,
               fontSize: '14px',
-              fontWeight: '500',
+              fontWeight: '400',
               textTransform: 'none',
               '&:hover': {
                 bgcolor: '#333'
@@ -497,15 +511,15 @@ export default function Home() {
         <Divider sx={{ mb: 6 }} />
 
         {/* How It Works Section */}
-        <Box sx={{ textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center',justifyContent: 'center', mb: 4,py:{xs:5,md:0} ,px: 1, height: {xs: 'auto', md: '90vh'}}}>
+        <Box sx={{ textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center',justifyContent: 'center', mb: 4,py:{xs:5,md:0} ,px: isMobile ? 0 : 1, height: {xs: 'auto', md: '90vh'}}}>
           <Typography variant="h2" sx={{
-            fontSize: { xs: '24px', md: '32px' },
+            fontSize: { xs: '20px', md: '24px' },
             fontWeight: '500',
             mb: 2
           }}>
             How It Works
           </Typography>
-          <Typography variant="body1" color="text.secondary" sx={{ mb: 4 }}>
+          <Typography variant="body1" color="text.secondary" sx={{ mb: 4, fontSize: { xs: '14px', md: '14px' } }}>
             Learn how our AI detects disruptions early and delivers real-time insights to protect your business.
           </Typography>
 
@@ -524,7 +538,8 @@ export default function Home() {
             key={index}
             sx={{
               flex: 1,
-              p: isMobile ? 0 : 2,
+              px: isMobile ? 0 : 2,
+              py: isMobile ? 0 : 3,
               mb: isMobile ? 1 : 0,
               position: 'relative',
               borderRadius: isMobile ? 0 : 3,
@@ -543,8 +558,8 @@ export default function Home() {
                   display: 'flex',
                   justifyContent: 'center',
                   alignItems: 'center',
-                  width: 60,
-                  height: 60,
+                  width: 40,
+                  height: 40,
                   borderRadius: '50%',
                   bgcolor: isMobile ? '#fff' : '#f5f5f5',
                   mb: isMobile ? 1 : 2,
@@ -554,11 +569,14 @@ export default function Home() {
               </Box>
               <Typography
                 variant="h6"
-                sx={{ fontSize: '18px', fontWeight: 500, mb: 1 }}
+                sx={{ fontSize: '16px', fontWeight: 500, mb: 1 ,letterSpacing: '-0.25px' }}
               >
                 {step.title}
               </Typography>
-              <Typography variant="body2" color="text.secondary" textAlign="center">
+              <Typography variant="body2" color="text.secondary" textAlign="center" sx={{ fontSize: { xs: '14px', md: '14px' },
+                maxWidth: isMobile ? '340px' : '720px',
+                mx: 'auto'
+              }}>
                 {step.description}
               </Typography>
             </Box>
@@ -587,16 +605,16 @@ export default function Home() {
       <Typography
         variant="h2"
         sx={{
-          fontSize: { xs: '24px', md: '32px' },
-          fontWeight: '600',
-          mb: 4,
+          fontSize: { xs: '20px', md: '24px' },
+          fontWeight: '500',
+          mb: 1.5,
           textAlign: 'center',
         }}
       >
         FAQs
       </Typography>
 
-      <Typography variant="body1" color="text.secondary" sx={{ mb: 4 }}>
+      <Typography variant="body1" color="text.secondary" sx={{ mb: 4, fontSize: { xs: '14px', md: '14px' } }}>
       Find answers to common questions about our features and how it benefits your business.
       </Typography>
 
@@ -608,17 +626,20 @@ export default function Home() {
               mb: 2,
               bgcolor: isMobile ? '#EBEBEC' : "#fff",
               borderRadius: 2,
-              px: 3,
-              py: 2.5,
+              px: isMobile ? 2 : 3,
+              py: isMobile ? 2 : 3,
             }}
           >
             <Typography
               variant="subtitle1"
-              sx={{ fontWeight: 600, mb: 1 }}
+              sx={{ fontWeight: 600, mb: 0.5, fontSize: { xs: '16px', md: '14px' ,letterSpacing: '-0.25px'} }}
             >
               {faq.question}
             </Typography>
-            <Typography variant="body2" color="text.secondary">
+            <Typography variant="body2" color="text.secondary" sx={{ fontSize: { xs: '14px', md: '14px' },
+              maxWidth: isMobile ? '340px' : '720px',
+              mx: 'auto'
+            }}>
               {faq.answer}
             </Typography>
           </Box>
@@ -628,15 +649,20 @@ export default function Home() {
       <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4 }}>
         <Button
           variant="contained"
-          endIcon={<ArrowRightAlt />}
+          endIcon={
+            <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+<path d="M17.2914 9.99957C17.2914 9.68827 17.1533 9.39947 17.0226 9.18261C16.8815 8.9486 16.6918 8.70699 16.4837 8.47143C16.0662 7.99887 15.5215 7.49139 14.9928 7.03233C14.4611 6.57058 13.9312 6.1454 13.5353 5.83642C13.3371 5.68167 13.1717 5.55548 13.0555 5.46772C12.9974 5.42383 12.9516 5.38952 12.92 5.36602L12.8837 5.33903L12.8741 5.33191L12.8708 5.32944C12.5928 5.12472 12.2012 5.1838 11.9965 5.46171C11.7918 5.73962 11.8511 6.13085 12.129 6.33558L12.1396 6.34342L12.173 6.36823C12.2025 6.39023 12.2462 6.42293 12.302 6.46511C12.4137 6.54949 12.5738 6.67165 12.7662 6.82179C13.1516 7.1226 13.6633 7.53335 14.1732 7.97614C14.6863 8.42163 15.1832 8.88732 15.5469 9.29905C15.5699 9.32509 15.5922 9.35068 15.6137 9.37581L3.33301 9.37582C2.98783 9.37582 2.70801 9.65564 2.70801 10.0008C2.70801 10.346 2.98783 10.6258 3.33301 10.6258L15.6116 10.6258C15.5907 10.6502 15.5692 10.6749 15.5469 10.7001C15.1832 11.1118 14.6863 11.5775 14.1732 12.023C13.6633 12.4658 13.1516 12.8766 12.7662 13.1774C12.5738 13.3275 12.4137 13.4497 12.302 13.5341C12.2462 13.5762 12.2025 13.6089 12.173 13.6309L12.1396 13.6557L12.129 13.6636C11.8511 13.8683 11.7918 14.2595 11.9965 14.5374C12.2012 14.8154 12.5928 14.8744 12.8708 14.6697L12.8741 14.6673L12.8837 14.6601L12.92 14.6331C12.9516 14.6096 12.9974 14.5753 13.0555 14.5314C13.1717 14.4437 13.3371 14.3175 13.5353 14.1627C13.9312 13.8538 14.4611 13.4286 14.9928 12.9668C15.5215 12.5078 16.0662 12.0003 16.4837 11.5277C16.6918 11.2922 16.8815 11.0506 17.0226 10.8165C17.1525 10.601 17.2897 10.3143 17.2913 10.0052" fill="white"/>
+</svg>
+
+          }
           onClick={handleCreateAccount}
           sx={{
             bgcolor: 'black',
             borderRadius: 2,
             py: 1,
-            px: 3,
+            px: 2,
             fontSize: '14px',
-            fontWeight: '500',
+            fontWeight: '400',
             textTransform: 'none',
             boxShadow: 'none',
             '&:hover': {
@@ -651,15 +677,16 @@ export default function Home() {
     <Divider sx={{ mb: 6 }} />
 
     <Box sx={{ textAlign: 'center', py: {xs:5,md:15} }}>
-  <Typography variant="h5" fontWeight="600" mb={1}>
+  <Typography variant="h5" fontWeight="500" mb={1}>
     Our Partners
   </Typography>
   <Typography
     variant="body1"
     color="text.secondary"
     mb={4}
-    maxWidth={600}
+    maxWidth={800}
     mx="auto"
+    sx={{ fontSize: { xs: '14px', md: '14px' } }}
   >
     We collaborate with industry leaders and innovators to deliver powerful solutions for the travel industry.
   </Typography>
@@ -681,7 +708,7 @@ export default function Home() {
         zIndex: 1,
       }}
     >
-      <Typography fontWeight="600" fontSize="14px" sx={{ whiteSpace: 'nowrap' }}>
+      <Typography fontWeight="500" fontSize="14px" sx={{ whiteSpace: 'nowrap' }}>
         {next.title}
       </Typography>
       <Box
@@ -691,6 +718,7 @@ export default function Home() {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
+          mixBlendMode:'multiply',
           position: 'relative', // Required for Next.js Image component
         }}
       >
@@ -723,7 +751,7 @@ export default function Home() {
         zIndex: 2,
       }}
     >
-      <Typography fontWeight="600" fontSize="14px" sx={{ whiteSpace: 'nowrap' }}>
+      <Typography fontWeight="500" fontSize="14px" sx={{ whiteSpace: 'nowrap' }}>
         {current.title}
       </Typography>
       <Box
@@ -733,6 +761,7 @@ export default function Home() {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
+          mixBlendMode:'multiply',
           position: 'relative', // Required for Next.js Image component
         }}
       >
