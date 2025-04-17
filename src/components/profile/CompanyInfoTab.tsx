@@ -124,8 +124,6 @@ export default function CompanyInfoTab({ user, onUpdate }: CompanyInfoTabProps) 
       setNameSuggestions([]);
     }
   };
-  
-  // Fetch region suggestions when user types in the region search
   useEffect(() => {
     if (regionSearch && regionSearch.length > 1 && placesService) {
       const delayDebounce = setTimeout(() => {
@@ -159,7 +157,6 @@ export default function CompanyInfoTab({ user, onUpdate }: CompanyInfoTabProps) 
     }
   }, [regionSearch, placesService]);
   
-  // Handle form submission
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
@@ -177,7 +174,6 @@ export default function CompanyInfoTab({ user, onUpdate }: CompanyInfoTabProps) 
       // Log current state before submitting
       console.log('Current company name before submit:', companyName);
       
-      // Join company types with comma for storage
       const updateData = {
         companyName: companyName.trim(),
         companyType: companyTypes.join(', '),
@@ -190,7 +186,6 @@ export default function CompanyInfoTab({ user, onUpdate }: CompanyInfoTabProps) 
       console.log('Updated user from server:', updatedUser);
       console.log('Updated company name from server:', updatedUser.company?.name);
       
-      // Make sure the company name state reflects the value from the server
       if (updatedUser.company?.name !== undefined) {
         setCompanyName(updatedUser.company.name);
       }
