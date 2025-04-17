@@ -22,12 +22,12 @@ interface AuthContextType {
   collaboratorEmail: string | null;
   // Role-based utility flags
   isAdmin: boolean;
-  isSuperAdmin: boolean;
   isManager: boolean;
   isViewer: boolean;
   isEditor: boolean;
   isCollaboratorViewer: boolean;
   isCollaboratorManager: boolean;
+  accessAdminDashboard: boolean;
   // Role check utility function
   hasRole: (role: string | string[]) => boolean;
 }
@@ -43,12 +43,12 @@ const defaultContext: AuthContextType = {
   collaboratorEmail: null,
   // Role-based utility flags default values
   isAdmin: false,
-  isSuperAdmin: false,
   isManager: false,
   isViewer: false,
   isEditor: false,
   isCollaboratorViewer: false,
   isCollaboratorManager: false,
+  accessAdminDashboard: false,
   // Role check utility function
   hasRole: () => false
 };
@@ -66,12 +66,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   
   // Role-based state values
   const [isAdmin, setIsAdmin] = useState<boolean>(false);
-  const [isSuperAdmin, setIsSuperAdmin] = useState<boolean>(false);
   const [isManager, setIsManager] = useState<boolean>(false);
   const [isViewer, setIsViewer] = useState<boolean>(false);
   const [isEditor, setIsEditor] = useState<boolean>(false);
   const [isCollaboratorViewer, setIsCollaboratorViewer] = useState<boolean>(false);
   const [isCollaboratorManager, setIsCollaboratorManager] = useState<boolean>(false);
+  const [accessAdminDashboard, setAccessAdminDashboard] = useState<boolean>(false);
   
   const router = useRouter();
   const pathname = usePathname();
@@ -100,16 +100,33 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     if (user) {
       const userRole = user.role || 'user';
       setIsAdmin(userRole === 'admin');
-      setIsSuperAdmin(userRole === 'superadmin');
       setIsManager(userRole === 'manager');
       setIsViewer(userRole === 'viewer');
       setIsEditor(userRole === 'editor');
+      
+      // Update the admin dashboard access flag
+      const hasAdminAccess = userRole === 'admin' || 
+        userRole === 'manager' || 
+        userRole === 'viewer' || 
+        userRole === 'editor';
+      
+      setAccessAdminDashboard(hasAdminAccess);
+      
+      // Store the admin access flag in localStorage
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('accessAdminDashboard', hasAdminAccess.toString());
+      }
     } else {
       setIsAdmin(false);
-      setIsSuperAdmin(false);
       setIsManager(false);
       setIsViewer(false);
       setIsEditor(false);
+      setAccessAdminDashboard(false);
+      
+      // Clear the admin access flag from localStorage
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('accessAdminDashboard');
+      }
     }
     
     // Set collaborator role flags
@@ -128,6 +145,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           const storedIsCollaborator = localStorage.getItem('isCollaborator');
           const storedCollaboratorRole = localStorage.getItem('collaboratorRole');
           const storedCollaboratorEmail = localStorage.getItem('collaboratorEmail');
+          const storedAccessAdminDashboard = localStorage.getItem('accessAdminDashboard');
           
           if (storedUser && token) {
             // Ensure token is also in cookies for middleware
@@ -144,6 +162,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
               setIsCollaborator(true);
               setCollaboratorRole(storedCollaboratorRole);
               setCollaboratorEmail(storedCollaboratorEmail);
+            }
+            
+            // Set admin dashboard access flag if present
+            if (storedAccessAdminDashboard === 'true') {
+              setAccessAdminDashboard(true);
             }
           } else {
             // Clear any existing cookies if no token in localStorage
@@ -175,6 +198,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       localStorage.removeItem('isCollaborator');
       localStorage.removeItem('collaboratorRole');
       localStorage.removeItem('collaboratorEmail');
+      localStorage.removeItem('accessAdminDashboard');
       
       // Also remove cookies
       Cookies.remove('token', { path: '/' });
@@ -185,12 +209,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setCollaboratorRole(null);
       setCollaboratorEmail(null);
       setIsAdmin(false);
-      setIsSuperAdmin(false);
       setIsManager(false);
       setIsViewer(false);
       setIsEditor(false);
       setIsCollaboratorViewer(false);
       setIsCollaboratorManager(false);
+      setAccessAdminDashboard(false);
       
       router.push('/');
     }
@@ -206,13 +230,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     collaboratorRole,
     collaboratorEmail,
     isAdmin,
-    isSuperAdmin,
     isManager,
     isViewer,
     isEditor,
+    accessAdminDashboard,
     isCollaboratorViewer,
     isCollaboratorManager,
-    hasRole
+    hasRole,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

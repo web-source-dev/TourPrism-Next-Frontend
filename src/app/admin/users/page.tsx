@@ -33,10 +33,12 @@ import {
   CardContent,
   useMediaQuery,
   useTheme,
+  Tooltip
 } from '@mui/material';
 import AdminLayout from '@/components/AdminLayout';
 import { getAllUsers, updateUserRole } from '@/services/api';
 import { User } from '@/types';
+import { useAuth } from '@/context/AuthContext';
 
 // Extend User type for additional admin-related fields
 interface ExtendedUser extends User {
@@ -58,6 +60,15 @@ export default function UsersManagement() {
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' as 'success' | 'error' });
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+  const { isAdmin } = useAuth();
+
+  // Permission check for changing user roles - only admin can change roles
+  const canChangeUserRole = isAdmin;
+  
+  // Permission tooltips
+  const changeRoleTooltip = !canChangeUserRole 
+    ? "Only administrators can change user roles" 
+    : "";
 
   const fetchUsers = useCallback(async () => {
     setLoading(true);
@@ -160,8 +171,6 @@ export default function UsersManagement() {
     switch (role) {
       case 'admin':
         return { bg: '#e3f2fd', color: '#1565c0' };
-      case 'superadmin':
-        return { bg: '#e8f5e9', color: '#2e7d32' };
       default:
         return { bg: '#f5f5f5', color: '#616161' };
     }
@@ -234,18 +243,23 @@ export default function UsersManagement() {
               </Box>
               
               <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
-                <Button
-                  size="small"
-                  variant="outlined"
-                  onClick={() => handleRoleChangeClick(user)}
-                  sx={{ 
-                    borderColor: '#ccc', 
-                    color: '#555',
-                    '&:hover': { borderColor: '#999', backgroundColor: '#f5f5f5' }
-                  }}
-                >
-                  Change Role
-                </Button>
+                <Tooltip title={changeRoleTooltip}>
+                  <span>
+                    <Button
+                      size="small"
+                      variant="outlined"
+                      onClick={() => handleRoleChangeClick(user)}
+                      disabled={!canChangeUserRole}
+                      sx={{ 
+                        borderColor: '#ccc', 
+                        color: '#555',
+                        '&:hover': { borderColor: '#999', backgroundColor: '#f5f5f5' }
+                      }}
+                    >
+                      Change Role
+                    </Button>
+                  </span>
+                </Tooltip>
               </Box>
             </CardContent>
           </Card>
@@ -296,18 +310,23 @@ export default function UsersManagement() {
                     />
                   </TableCell>
                   <TableCell>
-                    <Button
-                      size="small"
-                      variant="outlined"
-                      onClick={() => handleRoleChangeClick(user)}
-                      sx={{ 
-                        borderColor: '#ccc', 
-                        color: '#555',
-                        '&:hover': { borderColor: '#999', backgroundColor: '#f5f5f5' }
-                      }}
-                    >
-                      Change Role
-                    </Button>
+                    <Tooltip title={changeRoleTooltip}>
+                      <span>
+                        <Button
+                          size="small"
+                          variant="outlined"
+                          onClick={() => handleRoleChangeClick(user)}
+                          disabled={!canChangeUserRole}
+                          sx={{ 
+                            borderColor: '#ccc', 
+                            color: '#555',
+                            '&:hover': { borderColor: '#999', backgroundColor: '#f5f5f5' }
+                          }}
+                        >
+                          Change Role
+                        </Button>
+                      </span>
+                    </Tooltip>
                   </TableCell>
                 </TableRow>
               ))
@@ -364,8 +383,7 @@ export default function UsersManagement() {
             >
               <MenuItem value="all">All Roles</MenuItem>
               <MenuItem value="user">User</MenuItem>
-              <MenuItem value="admin">Admin</MenuItem>
-              <MenuItem value="superadmin">Superadmin</MenuItem>
+                <MenuItem value="admin">Admin</MenuItem>
             </Select>
           </FormControl>
         </Stack>
@@ -423,7 +441,6 @@ export default function UsersManagement() {
             >
               <MenuItem value="user">User</MenuItem>
               <MenuItem value="admin">Admin</MenuItem>
-              <MenuItem value="superadmin">Superadmin</MenuItem>
             </Select>
           </FormControl>
         </DialogContent>

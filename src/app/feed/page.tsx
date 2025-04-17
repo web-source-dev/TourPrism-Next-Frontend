@@ -149,7 +149,7 @@ export default function Feed() {
       setSnackbar({
         open: true,
         message: 'A new alert has been added',
-        severity: 'info' as 'info'
+        severity: 'info'
       });
     });
     
@@ -165,7 +165,7 @@ export default function Feed() {
       setSnackbar({
         open: true,
         message: 'An alert has been updated',
-        severity: 'info' as 'info'
+        severity: 'info'
       });
     });
     
@@ -177,7 +177,7 @@ export default function Feed() {
       setSnackbar({
         open: true,
         message: 'An alert has been removed',
-        severity: 'info' as 'info'
+        severity: 'info'
       });
     });
     

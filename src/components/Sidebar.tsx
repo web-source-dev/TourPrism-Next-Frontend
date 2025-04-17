@@ -8,7 +8,7 @@ interface SidebarProps {
   onLogout: () => void;
 }
 
-const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, onToggleCollapse, onLogout }) => {
+const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, onToggleCollapse }) => {
   const pathname = usePathname();
   const router = useRouter();
   const theme = useTheme();

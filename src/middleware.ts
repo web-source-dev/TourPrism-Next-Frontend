@@ -55,8 +55,10 @@ export async function middleware(request: NextRequest) {
       // and decode it properly with the secret key
       const user = JSON.parse(atob(token.split('.')[1]));
       
-      if (user.role !== 'admin' && user.role !== 'superadmin') {
-        // Redirect to homepage if not admin
+      // Allow any admin-type role to access admin routes
+      const adminRoles = ['admin', 'manager', 'viewer', 'editor'];
+      if (!adminRoles.includes(user.role)) {
+        // Redirect to homepage if not an admin role
         return NextResponse.redirect(new URL('/', request.url));
       }
     } catch (error) {

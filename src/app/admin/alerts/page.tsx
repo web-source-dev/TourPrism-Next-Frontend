@@ -33,12 +33,14 @@ import {
   Card,
   CardContent,
   useMediaQuery,
-  useTheme
+  useTheme,
+  Tooltip
 } from '@mui/material';
 import AdminLayout from '@/components/AdminLayout';
 import { getAllAlertsAdmin, updateAlertStatus, deleteAlert } from '@/services/api';
 import { Alert as AlertType } from '@/types';
 import { useRouter } from 'next/navigation';
+import { useAuth } from '@/context/AuthContext';
 
 export default function AlertsManagement() {
   const [alerts, setAlerts] = useState<AlertType[]>([]);
@@ -57,6 +59,27 @@ export default function AlertsManagement() {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const router = useRouter();
+  const { isAdmin, isManager, isEditor } = useAuth();
+
+  // Permission check functions
+  const canCreateAlert = isAdmin || isManager || isEditor;
+  const canUpdateStatus = isAdmin || isManager || isEditor;
+  const canEditAlert = isAdmin || isManager || isEditor;
+  const canDeleteAlert = isAdmin || isManager;
+  
+  // Permission tooltips
+  const createAlertTooltip = !canCreateAlert 
+    ? "You don't have permission to create alerts" 
+    : "";
+  const updateStatusTooltip = !canUpdateStatus 
+    ? "You don't have permission to update alert status" 
+    : "";
+  const editAlertTooltip = !canEditAlert 
+    ? "You don't have permission to edit alerts" 
+    : "";
+  const deleteAlertTooltip = !canDeleteAlert 
+    ? "You don't have permission to delete alerts" 
+    : "";
 
   const fetchAlerts = useCallback(async () => {
     setLoading(true);
@@ -191,8 +214,6 @@ export default function AlertsManagement() {
         return { bg: '#e8f5e9', color: '#2e7d32' };
       case 'rejected':
         return { bg: '#ffebee', color: '#c62828' };
-      case 'published':
-        return { bg: '#e3f2fd', color: '#1565c0' };
       default:
         return { bg: '#fff8e1', color: '#f57f17' };
     }
@@ -258,38 +279,53 @@ export default function AlertsManagement() {
               </Box>
               
               <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1 }}>
-                <Button
-                  size="small"
-                  variant="outlined"
-                  onClick={() => handleStatusChangeClick(alert)}
-                  sx={{ 
-                    borderColor: '#ccc', 
-                    color: '#555',
-                    '&:hover': { borderColor: '#999', backgroundColor: '#f5f5f5' }
-                  }}
-                >
-                  Update Status
-                </Button>
-                <Button
-                  size="small"
-                  variant="outlined"
-                  onClick={() => router.push(`/admin/alerts/edit/${alert._id}`)}
-                  sx={{ 
-                    borderColor: '#1976d2', 
-                    color: '#1976d2',
-                    '&:hover': { backgroundColor: '#e3f2fd' }
-                  }}
-                >
-                  <i className="ri-edit-line" style={{ marginRight: '4px' }} />
-                  Edit
-                </Button>
-                <IconButton
-                  size="small"
-                  color="error"
-                  onClick={() => handleDeleteClick(alert)}
-                >
-                  <i className="ri-delete-bin-line" />
-                </IconButton>
+                <Tooltip title={updateStatusTooltip}>
+                  <span>
+                    <Button
+                      size="small"
+                      variant="outlined"
+                      onClick={() => handleStatusChangeClick(alert)}
+                      disabled={!canUpdateStatus}
+                      sx={{ 
+                        borderColor: '#ccc', 
+                        color: '#555',
+                        '&:hover': { borderColor: '#999', backgroundColor: '#f5f5f5' }
+                      }}
+                    >
+                      Update Status
+                    </Button>
+                  </span>
+                </Tooltip>
+                <Tooltip title={editAlertTooltip}>
+                  <span>
+                    <Button
+                      size="small"
+                      variant="outlined"
+                      onClick={() => router.push(`/admin/alerts/edit/${alert._id}`)}
+                      disabled={!canEditAlert}
+                      sx={{ 
+                        borderColor: '#1976d2', 
+                        color: '#1976d2',
+                        '&:hover': { backgroundColor: '#e3f2fd' }
+                      }}
+                    >
+                      <i className="ri-edit-line" style={{ marginRight: '4px' }} />
+                      Edit
+                    </Button>
+                  </span>
+                </Tooltip>
+                <Tooltip title={deleteAlertTooltip}>
+                  <span>
+                    <IconButton
+                      size="small"
+                      color="error"
+                      onClick={() => handleDeleteClick(alert)}
+                      disabled={!canDeleteAlert}
+                    >
+                      <i className="ri-delete-bin-line" />
+                    </IconButton>
+                  </span>
+                </Tooltip>
               </Box>
             </CardContent>
           </Card>
@@ -336,38 +372,53 @@ export default function AlertsManagement() {
                   </TableCell>
                   <TableCell>
                     <Stack direction="row" spacing={1}>
-                      <Button
-                        size="small"
-                        variant="outlined"
-                        onClick={() => handleStatusChangeClick(alert)}
-                        sx={{ 
-                          borderColor: '#ccc', 
-                          color: '#555',
-                          '&:hover': { borderColor: '#999', backgroundColor: '#f5f5f5' }
-                        }}
-                      >
-                        Update Status
-                      </Button>
-                      <Button
-                        size="small"
-                        variant="outlined"
-                        onClick={() => router.push(`/admin/alerts/edit/${alert._id}`)}
-                        sx={{ 
-                          borderColor: '#1976d2', 
-                          color: '#1976d2',
-                          '&:hover': { backgroundColor: '#e3f2fd' }
-                        }}
-                      >
-                        <i className="ri-edit-line" style={{ marginRight: '4px' }} />
-                        Edit
-                      </Button>
-                      <IconButton
-                        size="small"
-                        color="error"
-                        onClick={() => handleDeleteClick(alert)}
-                      >
-                        <i className="ri-delete-bin-line" />
-                      </IconButton>
+                      <Tooltip title={updateStatusTooltip}>
+                        <span>
+                          <Button
+                            size="small"
+                            variant="outlined"
+                            onClick={() => handleStatusChangeClick(alert)}
+                            disabled={!canUpdateStatus}
+                            sx={{ 
+                              borderColor: '#ccc', 
+                              color: '#555',
+                              '&:hover': { borderColor: '#999', backgroundColor: '#f5f5f5' }
+                            }}
+                          >
+                            Update Status
+                          </Button>
+                        </span>
+                      </Tooltip>
+                      <Tooltip title={editAlertTooltip}>
+                        <span>
+                          <Button
+                            size="small"
+                            variant="outlined"
+                            onClick={() => router.push(`/admin/alerts/edit/${alert._id}`)}
+                            disabled={!canEditAlert}
+                            sx={{ 
+                              borderColor: '#1976d2', 
+                              color: '#1976d2',
+                              '&:hover': { backgroundColor: '#e3f2fd' }
+                            }}
+                          >
+                            <i className="ri-edit-line" style={{ marginRight: '4px' }} />
+                            Edit
+                          </Button>
+                        </span>
+                      </Tooltip>
+                      <Tooltip title={deleteAlertTooltip}>
+                        <span>
+                          <IconButton
+                            size="small"
+                            color="error"
+                            onClick={() => handleDeleteClick(alert)}
+                            disabled={!canDeleteAlert}
+                          >
+                            <i className="ri-delete-bin-line" />
+                          </IconButton>
+                        </span>
+                      </Tooltip>
                     </Stack>
                   </TableCell>
                 </TableRow>
@@ -443,22 +494,26 @@ export default function AlertsManagement() {
               <MenuItem value="pending">Pending</MenuItem>
               <MenuItem value="approved">Approved</MenuItem>
               <MenuItem value="rejected">Rejected</MenuItem>
-              <MenuItem value="published">Published</MenuItem>
             </Select>
           </FormControl>
-          <Button
-            variant="contained"
-            color="primary"
-            startIcon={<i className="ri-add-line" />}
-            onClick={() => router.push('/admin/alerts/create')}
-            sx={{ 
-              ml: { sm: 'auto' },
-              whiteSpace: 'nowrap',
-              minWidth: { xs: '100%', sm: 'auto' }
-            }}
-          >
-            Create New Alert
-          </Button>
+          <Tooltip title={createAlertTooltip}>
+            <span>
+              <Button
+                variant="contained"
+                color="primary"
+                startIcon={<i className="ri-add-line" />}
+                onClick={() => router.push('/admin/alerts/create')}
+                disabled={!canCreateAlert}
+                sx={{ 
+                  ml: { sm: 'auto' },
+                  whiteSpace: 'nowrap',
+                  minWidth: { xs: '100%', sm: 'auto' }
+                }}
+              >
+                Create New Alert
+              </Button>
+            </span>
+          </Tooltip>
         </Stack>
 
         {loading ? (
@@ -544,7 +599,6 @@ export default function AlertsManagement() {
               <MenuItem value="pending">Pending</MenuItem>
               <MenuItem value="approved">Approved</MenuItem>
               <MenuItem value="rejected">Rejected</MenuItem>
-              <MenuItem value="published">Published</MenuItem>
             </Select>
           </FormControl>
         </DialogContent>

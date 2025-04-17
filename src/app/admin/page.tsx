@@ -13,6 +13,7 @@ import {
 import AdminLayout from '@/components/AdminLayout';
 import { getDashboardStats } from '@/services/api';
 
+
 // Define the type for dashboard stats
 interface DashboardStats {
   totalUsers: number;
@@ -21,7 +22,6 @@ interface DashboardStats {
     pending: number;
     approved: number;
     rejected: number;
-    published: number;
   };
   recentAlerts: {
     _id: string;
@@ -40,6 +40,7 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   
+
   const fetchStats = useCallback(async () => {
     try {
       setLoading(true);
@@ -53,7 +54,6 @@ export default function AdminDashboard() {
           pending: data?.alertsByStatus?.pending || 0,
           approved: data?.alertsByStatus?.approved || 0,
           rejected: data?.alertsByStatus?.rejected || 0,
-          published: data?.alertsByStatus?.published || 0
         },
         recentAlerts: Array.isArray(data?.recentAlerts) ? data.recentAlerts : [],
         totalSubscribers: data?.totalSubscribers || 0,
@@ -68,6 +68,7 @@ export default function AdminDashboard() {
       setLoading(false);
     }
   }, []);
+
 
   useEffect(() => {
     fetchStats();
@@ -111,7 +112,6 @@ export default function AdminDashboard() {
   const pendingPercentage = (stats.alertsByStatus.pending / totalAlerts) * 100;
   const approvedPercentage = (stats.alertsByStatus.approved / totalAlerts) * 100;
   const rejectedPercentage = (stats.alertsByStatus.rejected / totalAlerts) * 100;
-  const publishedPercentage = (stats.alertsByStatus.published / totalAlerts) * 100;
 
   // StatsCard component for code reuse
   const StatsCard = ({ title, value, color }: { title: string; value: number; color: string }) => (
@@ -243,12 +243,10 @@ export default function AdminDashboard() {
                       fontSize: '0.75rem',
                       bgcolor: 
                         alert.status === 'approved' ? '#e8f5e9' : 
-                        alert.status === 'rejected' ? '#ffebee' : 
-                        alert.status === 'published' ? '#e3f2fd' : '#fff8e1',
+                        alert.status === 'rejected' ? '#ffebee' : '#fff8e1',
                       color:
                         alert.status === 'approved' ? '#2e7d32' : 
-                        alert.status === 'rejected' ? '#c62828' : 
-                        alert.status === 'published' ? '#1565c0' : '#f57f17'
+                        alert.status === 'rejected' ? '#c62828' : '#f57f17'
                     }}
                   >
                     {alert.status 
@@ -366,35 +364,6 @@ export default function AdminDashboard() {
                     />
                   </Box>
                   <Typography variant="body2">{stats.alertsByStatus.rejected}</Typography>
-                </Box>
-              </Box>
-              
-              <Box>
-                <Typography variant="subtitle2" color="text.secondary">Published</Typography>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                  <Box 
-                    sx={{ 
-                      flexGrow: 1, 
-                      height: 10, 
-                      bgcolor: '#e3f2fd', 
-                      borderRadius: 5,
-                      position: 'relative',
-                      overflow: 'hidden'
-                    }}
-                  >
-                    <Box 
-                      sx={{ 
-                        position: 'absolute',
-                        top: 0,
-                        left: 0,
-                        height: '100%',
-                        width: `${publishedPercentage}%`,
-                        bgcolor: '#42a5f5',
-                        borderRadius: 5
-                      }}
-                    />
-                  </Box>
-                  <Typography variant="body2">{stats.alertsByStatus.published}</Typography>
                 </Box>
               </Box>
             </Box>

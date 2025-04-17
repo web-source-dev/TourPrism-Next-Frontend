@@ -359,7 +359,6 @@ export default function Home() {
       gap={3}
     >
       {benefitsData.map((benefit, index) => {
-        const isLastItem = index === benefitsData.length - 1;
 
         return (
           <Box

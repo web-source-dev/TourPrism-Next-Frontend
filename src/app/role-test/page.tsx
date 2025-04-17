@@ -127,7 +127,7 @@ export default function RoleTestPage() {
               roleToCheck = feature.roles;
             }
             
-            const hasAccess = hasRole(feature.roles);
+            const hasAccess = hasRole(roleToCheck);
             
             return (
               <ListItem key={index} divider>

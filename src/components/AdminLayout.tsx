@@ -20,6 +20,8 @@ import {
 import { usePathname, useRouter } from 'next/navigation';
 import { useAuth } from '../context/AuthContext';
 
+
+
 interface AdminLayoutProps {
   children: ReactNode;
 }
@@ -30,7 +32,7 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
   const [mobileOpen, setMobileOpen] = useState(false);
   const pathname = usePathname();
   const router = useRouter();
-  const { logout } = useAuth();
+  const { logout} = useAuth();
 
   const handleDrawerToggle = () => {
     setMobileOpen(!mobileOpen);

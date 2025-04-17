@@ -3,6 +3,11 @@ export interface Collaborator {
   role: 'viewer' | 'manager';
 }
 
+export interface Company {
+  _id: string;
+  name: string;
+}
+
 export interface User {
   _id: string;
   email: string;
@@ -19,7 +24,7 @@ export interface User {
   company?: {
     name?: string;
     type?: string;
-    MainOperatingRegions?: string;
+    MainOperatingRegions?: string[];
   };
   preferences?: {
     Communication?: {

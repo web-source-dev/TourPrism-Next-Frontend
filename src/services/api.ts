@@ -29,6 +29,8 @@ interface CustomAxiosInstance {
   patch: <T>(url: string, data?: unknown, config?: CustomAxiosRequestConfig) => Promise<CustomAxiosResponse<T>>;
 }
 
+
+
 interface CustomAxiosResponse<T = unknown> {
   data: T;
   status: number;
@@ -592,58 +594,95 @@ export const getDashboardStats = async (): Promise<DashboardStats> => {
   }
 };
 
-// User profile functions
+// User Profile Related API Functions
 export const getUserProfile = async (): Promise<User> => {
   try {
-    const response = await api.get<{ user: User }>('/auth/user/profile');
-    
-    // Update the user in localStorage
-    if (typeof window !== 'undefined') {
-      const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
-      const updatedUser = { ...currentUser, ...response.data.user };
-      localStorage.setItem('user', JSON.stringify(updatedUser));
-    }
-    
-    return response.data.user;
+    const response = await api.get<User>('/auth/user/profile');
+    return response.data;
   } catch (error) {
     throw getErrorMessage(error as CustomAxiosError);
   }
 };
 
-export const updateUserProfile = async (userData: {
-  firstName?: string;
-  lastName?: string;
-  emailPrefrences?: boolean;
-  company?: {
-    name?: string;
-    type?: string;
-    MainOperatingRegions?: string;
-  };
-  preferences?: {
-    Communication?: {
-      emailPrefrences?: boolean;
-      whatsappPrefrences?: boolean;
-    };
-    AlertSummaries?: {
-      daily?: boolean;
-      weekly?: boolean;
-      monthly?: boolean;
-    }
-  }
+export const updatePersonalInfo = async (data: { 
+  firstName: string; 
+  lastName: string; 
+  email?: string;
 }): Promise<User> => {
   try {
-    const response = await api.put<{ user: User }>('/auth/user/profile', userData);
+    console.log('Updating personal info with data:', data);
+    const response = await api.put<User>('/profile/personal-info', data);
+    console.log('Personal info update response:', response.data);
+    return response.data;
+  } catch (error) {
+    console.error('Error updating personal info:', error);
+    throw getErrorMessage(error as CustomAxiosError);
+  }
+};
+
+export const updateCompanyInfo = async (data: {
+  companyName?: string;
+  companyType?: string;
+  mainOperatingRegions?: string[];
+}): Promise<User> => {
+  try {
+    console.log('API: Sending company info update with data:', JSON.stringify(data));
     
-    // Update the user in localStorage
-    if (typeof window !== 'undefined') {
-      const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
-      const updatedUser = { ...currentUser, ...response.data.user };
-      localStorage.setItem('user', JSON.stringify(updatedUser));
+    if (data.companyName === undefined) {
+      console.warn('Warning: companyName is undefined in updateCompanyInfo');
     }
     
-    return response.data.user;
+    const response = await api.put<User>('/profile/company-info', data);
+    
+    if (!response.data) {
+      throw new Error('No data returned from server');
+    }
+    
+    console.log('API: Company info update response:', response.data);
+    
+    if (!response.data.company) {
+      console.warn('Warning: Company data missing in server response');
+    }
+    
+    return response.data;
   } catch (error) {
+    console.error('Error updating company info:', error);
     throw getErrorMessage(error as CustomAxiosError);
+  }
+};
+
+export const updatePreferences = async (data: {
+  communication?: {
+    emailPrefrences?: boolean;
+    whatsappPrefrences?: boolean;
+  };
+  alertSummaries?: {
+    daily?: boolean;
+    weekly?: boolean;
+    monthly?: boolean;
+  };
+}): Promise<User> => {
+  try {
+    console.log('Updating preferences with data:', data);
+    const response = await api.put<User>('/profile/preferences', data);
+    console.log('Preferences update response:', response.data);
+    return response.data;
+  } catch (error) {
+    console.error('Error updating preferences:', error);
+    throw getErrorMessage(error as CustomAxiosError);
+  }
+};
+
+export const getCompanySuggestions = async (query: string): Promise<string[]> => {
+  try {
+    const response = await api.get<string[]>('/profile/company-suggestions', {
+      params: { query }
+    });
+    console.log('Company suggestions response:', response.data);
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching company suggestions:', error);
+    return [];
   }
 };
 
