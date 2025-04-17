@@ -18,8 +18,10 @@ import {
 } from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
 import AddIcon from '@mui/icons-material/Add';
+import InfoIcon from '@mui/icons-material/Info';
 import { User } from '@/types';
 import { updateCompanyInfo, getCompanySuggestions } from '@/services/api';
+import { useAuth } from '@/context/AuthContext';
 
 // Google Maps Places API Script
 import { useLoadScript } from '@react-google-maps/api';
@@ -49,6 +51,10 @@ interface CompanyInfoTabProps {
 }
 
 export default function CompanyInfoTab({ user, onUpdate }: CompanyInfoTabProps) {
+  // Get auth context for collaborator status
+  const { isCollaborator, collaboratorRole } = useAuth();
+  const isViewOnly = isCollaborator && collaboratorRole === 'viewer';
+  
   // Form state
   const [companyName, setCompanyName] = useState(user.company?.name || '');
   
@@ -162,6 +168,9 @@ export default function CompanyInfoTab({ user, onUpdate }: CompanyInfoTabProps) 
     setError(null);
     setSuccess(null);
     
+    // Prevent viewers from submitting
+    if (isViewOnly) return;
+    
     // Validate form
     if (!companyName.trim()) {
       setError('Company name is required');
@@ -200,11 +209,13 @@ export default function CompanyInfoTab({ user, onUpdate }: CompanyInfoTabProps) 
   };
   // Handle removing a company type
   const handleRemoveType = (typeToRemove: string) => {
+    if (isViewOnly) return;
     setCompanyTypes(companyTypes.filter(type => type !== typeToRemove));
   };
   
   // Add a region to the selected regions
   const handleAddRegion = () => {
+    if (isViewOnly) return;
     if (regionSearch && !operatingRegions.includes(regionSearch)) {
       setOperatingRegions([...operatingRegions, regionSearch]);
       setRegionSearch('');
@@ -213,17 +224,36 @@ export default function CompanyInfoTab({ user, onUpdate }: CompanyInfoTabProps) 
   
   // Remove a region from the selected regions
   const handleDeleteRegion = (region: string) => {
+    if (isViewOnly) return;
     setOperatingRegions(operatingRegions.filter((r) => r !== region));
   };
   
   return (
     <Paper elevation={0} sx={{ p: 2 }}>
       <Box component="form" noValidate>
-        <Typography variant="h6" sx={{ mb: 3 }}>
-          Company Information
-        </Typography>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+          <Typography variant="h6">
+            Company Information
+          </Typography>
+          
+          {isCollaborator && (
+            <Chip 
+              icon={<InfoIcon />} 
+              label={isViewOnly ? "View Only Access" : "Manager Access"} 
+              color={isViewOnly ? "default" : "primary"} 
+              variant="outlined" 
+              size="small"
+            />
+          )}
+        </Box>
         
         <Divider sx={{ mb: 3 }} />
+        
+        {isViewOnly && (
+          <Alert severity="info" sx={{ mb: 3 }}>
+            You have view-only access to this company information. Contact the account owner for edit permissions.
+          </Alert>
+        )}
         
         {error && (
           <Alert severity="error" sx={{ mb: 3 }}>
@@ -248,12 +278,14 @@ export default function CompanyInfoTab({ user, onUpdate }: CompanyInfoTabProps) 
               value={companyName}
               options={nameSuggestions}
               onInputChange={(event, newInputValue) => {
+                if (isViewOnly) return;
                 // Update company name directly as user types
                 setCompanyName(newInputValue);
                 // Also fetch suggestions
                 fetchCompanySuggestions(newInputValue);
               }}
               onChange={(event, newValue) => {
+                if (isViewOnly) return;
                 // This handles selection from dropdown
                 if (newValue) {
                   setCompanyName(newValue);
@@ -262,14 +294,19 @@ export default function CompanyInfoTab({ user, onUpdate }: CompanyInfoTabProps) 
               blurOnSelect
               selectOnFocus
               clearOnBlur={false}
+              disabled={isViewOnly}
               renderInput={(params) => (
                 <TextField
                   {...params}
                   label="Company Name"
                   required
                   fullWidth
-                  disabled={isSubmitting}
+                  disabled={isSubmitting || isViewOnly}
                   helperText="Start typing to get suggestions from existing companies"
+                  InputProps={{
+                    ...params.InputProps,
+                    readOnly: isViewOnly,
+                  }}
                 />
               )}
             />
@@ -294,16 +331,22 @@ export default function CompanyInfoTab({ user, onUpdate }: CompanyInfoTabProps) 
               options={COMPANY_TYPES.filter(type => !companyTypes.includes(type))}
               value={companyTypes}
               onChange={(event, newValue) => {
+                if (isViewOnly) return;
                 setCompanyTypes(newValue);
               }}
               renderTags={() => null}
+              disabled={isViewOnly}
               renderInput={(params) => (
                 <TextField
                   {...params}
                   label="Company Types"
                   placeholder={companyTypes.length > 0 ? "Add more types" : "Select or type company types"}
-                  disabled={isSubmitting}
+                  disabled={isSubmitting || isViewOnly}
                   helperText="Select from list or type a custom type and press Enter"
+                  InputProps={{
+                    ...params.InputProps,
+                    readOnly: isViewOnly,
+                  }}
                 />
               )}
             />
@@ -314,7 +357,7 @@ export default function CompanyInfoTab({ user, onUpdate }: CompanyInfoTabProps) 
                 <Chip
                   key={type}
                   label={type}
-                  onDelete={() => handleRemoveType(type)}
+                  onDelete={isViewOnly ? undefined : () => handleRemoveType(type)}
                   color="primary"
                   variant="outlined"
                 />
@@ -338,8 +381,8 @@ export default function CompanyInfoTab({ user, onUpdate }: CompanyInfoTabProps) 
               label="Add Operating Region"
               placeholder="Start typing a city, state, or country"
               value={regionSearch}
-              onChange={(e) => setRegionSearch(e.target.value)}
-              disabled={isSubmitting || (!isLoaded || !!loadError)}
+              onChange={(e) => isViewOnly ? null : setRegionSearch(e.target.value)}
+              disabled={isSubmitting || isViewOnly || (!isLoaded || !!loadError)}
               helperText={
                 loadError 
                   ? "Google Places API could not be loaded. Please check your connection." 
@@ -348,12 +391,13 @@ export default function CompanyInfoTab({ user, onUpdate }: CompanyInfoTabProps) 
                     : "Type to search for locations"
               }
               InputProps={{
+                readOnly: isViewOnly,
                 endAdornment: (
                   <InputAdornment position="end">
                     <IconButton 
                       edge="end" 
                       onClick={handleAddRegion}
-                      disabled={!regionSearch || isSubmitting}
+                      disabled={!regionSearch || isSubmitting || isViewOnly}
                     >
                       <AddIcon />
                     </IconButton>
@@ -363,7 +407,7 @@ export default function CompanyInfoTab({ user, onUpdate }: CompanyInfoTabProps) 
             />
             
             {/* Region Suggestions */}
-            {regionSearch && regionSuggestions.length > 0 && (
+            {!isViewOnly && regionSearch && regionSuggestions.length > 0 && (
               <Paper elevation={3} sx={{ mt: 1, maxHeight: 200, overflow: 'auto' }}>
                 <Stack>
                   {regionSuggestions.map((suggestion) => (
@@ -376,6 +420,7 @@ export default function CompanyInfoTab({ user, onUpdate }: CompanyInfoTabProps) 
                         borderColor: 'divider',
                       }}
                       onClick={() => {
+                        if (isViewOnly) return;
                         if (suggestion && !operatingRegions.includes(suggestion)) {
                           setOperatingRegions([...operatingRegions, suggestion]);
                           setRegionSearch('');
@@ -394,7 +439,7 @@ export default function CompanyInfoTab({ user, onUpdate }: CompanyInfoTabProps) 
             )}
             
             {/* Message when no suggestions found */}
-            {regionSearch && regionSearch.length > 1 && regionSuggestions.length === 0 && !loadError && isLoaded && (
+            {!isViewOnly && regionSearch && regionSearch.length > 1 && regionSuggestions.length === 0 && !loadError && isLoaded && (
               <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
                 No locations found. You can still add this location manually by clicking the + button.
               </Typography>
@@ -406,7 +451,7 @@ export default function CompanyInfoTab({ user, onUpdate }: CompanyInfoTabProps) 
                 <Chip
                   key={region}
                   label={region}
-                  onDelete={() => handleDeleteRegion(region)}
+                  onDelete={isViewOnly ? undefined : () => handleDeleteRegion(region)}
                   color="primary"
                   variant="outlined"
                 />
@@ -420,15 +465,17 @@ export default function CompanyInfoTab({ user, onUpdate }: CompanyInfoTabProps) 
           </Box>
         </Stack>
         
-        <Button
-          variant="contained"
-          color="primary"
-          onClick={handleSubmit}
-          disabled={isSubmitting}
-          startIcon={isSubmitting ? <CircularProgress size={20} color="inherit" /> : null}
-        >
-          {isSubmitting ? 'Saving...' : 'Save Changes '}
-        </Button>
+        {!isViewOnly && (
+          <Button
+            variant="contained"
+            color="primary"
+            onClick={handleSubmit}
+            disabled={isSubmitting}
+            startIcon={isSubmitting ? <CircularProgress size={20} color="inherit" /> : null}
+          >
+            {isSubmitting ? 'Saving...' : 'Save Changes '}
+          </Button>
+        )}
       </Box>
     </Paper>
   );

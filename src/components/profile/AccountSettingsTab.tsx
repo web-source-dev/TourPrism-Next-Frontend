@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Box,
   TextField,
@@ -11,10 +11,15 @@ import {
   Stack,
   Divider,
   Paper,
+  Chip,
 } from '@mui/material';
+import InfoIcon from '@mui/icons-material/Info';
 import { api } from '@/services/api';
+import { useAuth } from '@/context/AuthContext';
 
 export default function AccountSettingsTab() {
+  const { isCollaborator, collaboratorRole } = useAuth();
+  
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -22,8 +27,24 @@ export default function AccountSettingsTab() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
+  // If collaborator is viewing this tab, they shouldn't be able to change passwords
+  // This should also be hidden in the UI from the parent component,
+  // but this is a fallback in case they somehow access this tab
+  useEffect(() => {
+    if (isCollaborator) {
+      setError('Collaborators cannot change the account password. This action is restricted to the account owner.');
+    }
+  }, [isCollaborator]);
+
   const handleChangePassword = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Prevent collaborators from submitting
+    if (isCollaborator) {
+      setError('Collaborators cannot change the account password.');
+      return;
+    }
+    
     setError(null);
     setSuccess(null);
 
@@ -82,11 +103,29 @@ export default function AccountSettingsTab() {
 
   return (
     <Paper elevation={0} sx={{ p: 2 }}>
-      <Typography variant="h6" sx={{ mb: 3 }}>
-        Account Settings
-      </Typography>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+        <Typography variant="h6">
+          Account Settings
+        </Typography>
+        
+        {isCollaborator && (
+          <Chip 
+            icon={<InfoIcon />} 
+            label="Access Restricted" 
+            color="error" 
+            variant="outlined" 
+            size="small"
+          />
+        )}
+      </Box>
       
       <Divider sx={{ mb: 3 }} />
+      
+      {isCollaborator && (
+        <Alert severity="warning" sx={{ mb: 3 }}>
+          Account settings can only be modified by the account owner. Collaborators do not have permission to change the account password.
+        </Alert>
+      )}
       
       {error && (
         <Alert severity="error" sx={{ mb: 3 }}>
@@ -100,61 +139,63 @@ export default function AccountSettingsTab() {
         </Alert>
       )}
       
-      {/* Password Change Form */}
-      <Box component="form" onSubmit={handleChangePassword} noValidate>
-        <Typography variant="subtitle1" sx={{ mb: 2 }}>
-          Change Password
-        </Typography>
-        
-        <Stack spacing={3} sx={{ mb: 4 }}>
-          <TextField
-            fullWidth
-            label="Current Password"
-            type="password"
-            value={currentPassword}
-            onChange={(e) => setCurrentPassword(e.target.value)}
-            disabled={isSubmitting}
-            required
-          />
+      {/* Password Change Form - Only shown to account owners */}
+      {!isCollaborator && (
+        <Box component="form" onSubmit={handleChangePassword} noValidate>
+          <Typography variant="subtitle1" sx={{ mb: 2 }}>
+            Change Password
+          </Typography>
           
-          <TextField
-            fullWidth
-            label="New Password"
-            type="password"
-            value={newPassword}
-            onChange={(e) => setNewPassword(e.target.value)}
-            disabled={isSubmitting}
-            required
-            helperText="Password must be at least 6 characters"
-          />
+          <Stack spacing={3} sx={{ mb: 4 }}>
+            <TextField
+              fullWidth
+              label="Current Password"
+              type="password"
+              value={currentPassword}
+              onChange={(e) => setCurrentPassword(e.target.value)}
+              disabled={isSubmitting}
+              required
+            />
+            
+            <TextField
+              fullWidth
+              label="New Password"
+              type="password"
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+              disabled={isSubmitting}
+              required
+              helperText="Password must be at least 6 characters"
+            />
+            
+            <TextField
+              fullWidth
+              label="Confirm New Password"
+              type="password"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              disabled={isSubmitting}
+              required
+              error={newPassword !== confirmPassword && confirmPassword !== ''}
+              helperText={
+                newPassword !== confirmPassword && confirmPassword !== ''
+                  ? 'Passwords do not match'
+                  : ''
+              }
+            />
+          </Stack>
           
-          <TextField
-            fullWidth
-            label="Confirm New Password"
-            type="password"
-            value={confirmPassword}
-            onChange={(e) => setConfirmPassword(e.target.value)}
+          <Button
+            variant="contained"
+            color="primary"
+            type="submit"
             disabled={isSubmitting}
-            required
-            error={newPassword !== confirmPassword && confirmPassword !== ''}
-            helperText={
-              newPassword !== confirmPassword && confirmPassword !== ''
-                ? 'Passwords do not match'
-                : ''
-            }
-          />
-        </Stack>
-        
-        <Button
-          variant="contained"
-          color="primary"
-          type="submit"
-          disabled={isSubmitting}
-          startIcon={isSubmitting ? <CircularProgress size={20} color="inherit" /> : null}
-        >
-          {isSubmitting ? 'Changing Password...' : 'Change Password'}
-        </Button>
-      </Box>
+            startIcon={isSubmitting ? <CircularProgress size={20} color="inherit" /> : null}
+          >
+            {isSubmitting ? 'Changing Password...' : 'Change Password'}
+          </Button>
+        </Box>
+      )}
     </Paper>
   );
 } 

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, use } from 'react';
 import { Box, Paper, Typography, Tab, Tabs, Container, CircularProgress, Alert, Button } from '@mui/material';
 import { User } from '@/types';
 import PersonalInfoTab from '@/components/profile/PersonalInfoTab';
@@ -10,6 +10,8 @@ import PreferencesTab from '@/components/profile/PreferencesTab';
 import { getUserProfile } from '@/services/api';
 import { useRouter } from 'next/navigation';
 import Layout from '@/components/Layout';
+import { useAuth } from '@/context/AuthContext';
+import CollaboratorTab from '@/components/profile/CollaboratorTab';
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -50,7 +52,7 @@ export default function ProfilePage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
-
+  const { isAuthenticated, isCollaborator, collaboratorRole, user: authUser } = useAuth();
   
   const fetchUserProfile = async () => {
     try {
@@ -58,22 +60,50 @@ export default function ProfilePage() {
       setError(null);
       const userData = await getUserProfile();
       console.log('Fetched user profile:', userData);
-      setUser(userData);
+      
+      // Handle the collaborator data structure when a collaborator is logged in
+      // When a collaborator logs in, we need to ensure we have all the profile data
+      if (isCollaborator && userData && !userData.firstName) {
+        console.log('Collaborator data received, processing...', userData);
+        // The profile data is incomplete for collaborator, let's make adjustments
+        // We need to ensure basic fields exist even if they're empty
+        const enhancedUserData = {
+          ...userData,
+          firstName: userData.firstName || '',
+          lastName: userData.lastName || '',
+          company: userData.company || { name: '', type: '', MainOperatingRegions: [] },
+          preferences: userData.preferences || {
+            Communication: { emailPrefrences: false, whatsappPrefrences: false },
+            AlertSummaries: { daily: false, weekly: false, monthly: false }
+          },
+          createdAt: userData.createdAt || new Date().toISOString()
+        };
+        
+        setUser(enhancedUserData);
+      } else {
+        setUser(userData);
+      }
     } catch (error) {
       console.error('Failed to fetch user profile:', error);
       setError('Failed to load profile. Please try again later.');
-      // Only redirect to login if it's an authentication error
-      if (error instanceof Error && (error.toString().includes('401') || error.toString().includes('auth'))) {
-        router.push('/login');
-      }
     } finally {
       setLoading(false);
     }
   };
+  
   useEffect(() => {
+    if(!isAuthenticated) {
+      router.push('/');
+      return;
+    }
+    
+    // If we have authUser and it's a collaborator, we can use some of that data
+    if (isCollaborator && authUser) {
+      console.log('Collaborator logged in, auth data:', authUser);
+    }
+    
     fetchUserProfile();
-  }, []);
-
+  }, [isAuthenticated, isCollaborator, authUser]);
 
   const handleChange = (event: React.SyntheticEvent, newValue: number) => {
     setValue(newValue);
@@ -120,9 +150,22 @@ export default function ProfilePage() {
     );
   }
 
+  // Determine profile access level
+  const canEdit = !isCollaborator || (isCollaborator && collaboratorRole === 'manager');
+  const isViewerCollaborator = isCollaborator && collaboratorRole === 'viewer';
+  
+  // For the page title and description
+  const accessLabel = isCollaborator 
+    ? `Collaborator Access (${collaboratorRole})` 
+    : 'Account Owner';
+    
+  // Display collaborator's viewing context if they're logged in
+  const viewingAsCollaborator = isCollaborator ? 
+    `Viewing ${user.email || "owner"}'s profile as collaborator` : '';
+
   return (
     <Layout isFooter={false}>
-    <Container maxWidth="xl" sx={{ mt: 4, mb: 4 }}>
+    <Container maxWidth="xl" sx={{ mt: 0, mb: 4 }}>
       <Paper elevation={3} sx={{ borderRadius: 2, overflow: 'hidden' }}>
         <Box sx={{ p: 3, backgroundColor: 'primary.main', color: 'white' }}>
           <Typography variant="h4" component="h1">
@@ -130,7 +173,17 @@ export default function ProfilePage() {
           </Typography>
           <Typography variant="subtitle1">
             Manage your personal information and account settings
+            {isCollaborator && (
+              <Typography component="span" sx={{ ml: 1, p: 0.5, bgcolor: 'rgba(255,255,255,0.2)', borderRadius: 1 }}>
+                {accessLabel}
+              </Typography>
+            )}
           </Typography>
+          {viewingAsCollaborator && (
+            <Typography variant="caption" sx={{ mt: 1, display: 'block', color: 'rgba(255,255,255,0.8)' }}>
+              {viewingAsCollaborator}
+            </Typography>
+          )}
         </Box>
 
         <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
@@ -143,8 +196,11 @@ export default function ProfilePage() {
           >
             <Tab label="Personal Info" {...a11yProps(0)} />
             <Tab label="Company Info" {...a11yProps(1)} />
-            <Tab label="Account Settings" {...a11yProps(2)} />
+            {/* Hide Account Settings for collaborators */}
+            {!isCollaborator && <Tab label="Account Settings" {...a11yProps(2)} />}
             <Tab label="Preferences" {...a11yProps(3)} />
+            {/* Show Collaborator tab only for account owner */}
+            {!isCollaborator && <Tab label="Collaborator" {...a11yProps(4)} />}
           </Tabs>
         </Box>
 
@@ -154,12 +210,19 @@ export default function ProfilePage() {
         <TabPanel value={value} index={1}>
           <CompanyInfoTab user={user} onUpdate={handleUserUpdate} />
         </TabPanel>
-        <TabPanel value={value} index={2}>
-          <AccountSettingsTab />
-        </TabPanel>
-        <TabPanel value={value} index={3}>
+        {!isCollaborator && (
+          <TabPanel value={value} index={2}>
+            <AccountSettingsTab />
+          </TabPanel>
+        )}
+        <TabPanel value={value} index={isCollaborator ? 2 : 3}>
           <PreferencesTab user={user} onUpdate={handleUserUpdate} />
         </TabPanel>
+        {!isCollaborator && (
+          <TabPanel value={value} index={4}>
+            <CollaboratorTab />
+          </TabPanel>
+        )}
       </Paper>
     </Container>
     </Layout>

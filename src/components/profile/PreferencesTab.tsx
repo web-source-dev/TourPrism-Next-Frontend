@@ -15,9 +15,12 @@ import {
   Card,
   CardContent,
   FormGroup,
+  Chip,
 } from '@mui/material';
+import InfoIcon from '@mui/icons-material/Info';
 import { User } from '@/types';
 import { updatePreferences } from '@/services/api';
+import { useAuth } from '@/context/AuthContext';
 
 interface PreferencesTabProps {
   user: User;
@@ -25,6 +28,10 @@ interface PreferencesTabProps {
 }
 
 export default function PreferencesTab({ user, onUpdate }: PreferencesTabProps) {
+  // Get auth context for collaborator status
+  const { isCollaborator, collaboratorRole } = useAuth();
+  const isViewOnly = isCollaborator && collaboratorRole === 'viewer';
+  
   // Communication preferences
   const [emailPreferences, setEmailPreferences] = useState(
     user.preferences?.Communication?.emailPrefrences || false
@@ -62,6 +69,9 @@ export default function PreferencesTab({ user, onUpdate }: PreferencesTabProps) 
     e.preventDefault();
     setError(null);
     setSuccess(null);
+    
+    // Prevent viewers from submitting
+    if (isViewOnly) return;
 
     try {
       setIsSubmitting(true);
@@ -92,11 +102,29 @@ export default function PreferencesTab({ user, onUpdate }: PreferencesTabProps) 
   return (
     <Paper elevation={0} sx={{ p: 2 }}>
       <Box component="form" onSubmit={handleSubmit} noValidate>
-        <Typography variant="h6" sx={{ mb: 3 }}>
-          Preferences
-        </Typography>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+          <Typography variant="h6">
+            Preferences
+          </Typography>
+          
+          {isCollaborator && (
+            <Chip 
+              icon={<InfoIcon />} 
+              label={isViewOnly ? "View Only Access" : "Manager Access"} 
+              color={isViewOnly ? "default" : "primary"} 
+              variant="outlined" 
+              size="small"
+            />
+          )}
+        </Box>
 
         <Divider sx={{ mb: 3 }} />
+        
+        {isViewOnly && (
+          <Alert severity="info" sx={{ mb: 3 }}>
+            You have view-only access to these preferences. Contact the account owner for edit permissions.
+          </Alert>
+        )}
 
         {error && (
           <Alert severity="error" sx={{ mb: 3 }}>
@@ -125,8 +153,8 @@ export default function PreferencesTab({ user, onUpdate }: PreferencesTabProps) 
                   control={
                     <Switch
                       checked={emailPreferences}
-                      onChange={(e) => setEmailPreferences(e.target.checked)}
-                      disabled={isSubmitting}
+                      onChange={(e) => !isViewOnly && setEmailPreferences(e.target.checked)}
+                      disabled={isSubmitting || isViewOnly}
                     />
                   }
                   label="Email Notifications"
@@ -135,8 +163,8 @@ export default function PreferencesTab({ user, onUpdate }: PreferencesTabProps) 
                   control={
                     <Switch
                       checked={whatsappPreferences}
-                      onChange={(e) => setWhatsappPreferences(e.target.checked)}
-                      disabled={isSubmitting}
+                      onChange={(e) => !isViewOnly && setWhatsappPreferences(e.target.checked)}
+                      disabled={isSubmitting || isViewOnly}
                     />
                   }
                   label="WhatsApp Notifications"
@@ -159,8 +187,8 @@ export default function PreferencesTab({ user, onUpdate }: PreferencesTabProps) 
                   control={
                     <Switch
                       checked={dailySummary}
-                      onChange={(e) => setDailySummary(e.target.checked)}
-                      disabled={isSubmitting}
+                      onChange={(e) => !isViewOnly && setDailySummary(e.target.checked)}
+                      disabled={isSubmitting || isViewOnly}
                     />
                   }
                   label="Daily Alert Summary"
@@ -169,8 +197,8 @@ export default function PreferencesTab({ user, onUpdate }: PreferencesTabProps) 
                   control={
                     <Switch
                       checked={weeklySummary}
-                      onChange={(e) => setWeeklySummary(e.target.checked)}
-                      disabled={isSubmitting}
+                      onChange={(e) => !isViewOnly && setWeeklySummary(e.target.checked)}
+                      disabled={isSubmitting || isViewOnly}
                     />
                   }
                   label="Weekly Alert Summary"
@@ -179,8 +207,8 @@ export default function PreferencesTab({ user, onUpdate }: PreferencesTabProps) 
                   control={
                     <Switch
                       checked={monthlySummary}
-                      onChange={(e) => setMonthlySummary(e.target.checked)}
-                      disabled={isSubmitting}
+                      onChange={(e) => !isViewOnly && setMonthlySummary(e.target.checked)}
+                      disabled={isSubmitting || isViewOnly}
                     />
                   }
                   label="Monthly Alert Summary"
@@ -190,15 +218,17 @@ export default function PreferencesTab({ user, onUpdate }: PreferencesTabProps) 
           </Card>
         </Stack>
 
-        <Button
-          variant="contained"
-          color="primary"
-          type="submit"
-          disabled={isSubmitting}
-          startIcon={isSubmitting ? <CircularProgress size={20} color="inherit" /> : null}
-        >
-          {isSubmitting ? 'Saving...' : 'Save Preferences'}
-        </Button>
+        {!isViewOnly && (
+          <Button
+            variant="contained"
+            color="primary"
+            type="submit"
+            disabled={isSubmitting}
+            startIcon={isSubmitting ? <CircularProgress size={20} color="inherit" /> : null}
+          >
+            {isSubmitting ? 'Saving...' : 'Save Preferences'}
+          </Button>
+        )}
       </Box>
     </Paper>
   );

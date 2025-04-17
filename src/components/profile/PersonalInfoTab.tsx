@@ -10,10 +10,13 @@ import {
   CircularProgress,
   Stack,
   Divider,
-  Paper
+  Paper,
+  Chip
 } from '@mui/material';
+import InfoIcon from '@mui/icons-material/Info';
 import { User } from '@/types';
 import { updatePersonalInfo } from '@/services/api';
+import { useAuth } from '@/context/AuthContext';
 
 interface PersonalInfoTabProps {
   user: User;
@@ -28,6 +31,9 @@ export default function PersonalInfoTab({ user, onUpdate }: PersonalInfoTabProps
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  
+  const { isCollaborator, collaboratorRole } = useAuth();
+  const isViewOnly = isCollaborator && collaboratorRole === 'viewer';
 
   // Update form fields when user prop changes
   useEffect(() => {
@@ -40,6 +46,9 @@ export default function PersonalInfoTab({ user, onUpdate }: PersonalInfoTabProps
     e.preventDefault();
     setError(null);
     setSuccess(null);
+    
+    // Prevent viewers from submitting
+    if (isViewOnly) return;
     
     // Validate inputs
     if (!firstName.trim()) {
@@ -88,11 +97,29 @@ export default function PersonalInfoTab({ user, onUpdate }: PersonalInfoTabProps
   return (
     <Paper elevation={0} sx={{ p: 2 }}>
       <Box component="form" onSubmit={handleSubmit} noValidate>
-        <Typography variant="h6" sx={{ mb: 3 }}>
-          Personal Information
-        </Typography>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+          <Typography variant="h6">
+            Personal Information
+          </Typography>
+          
+          {isCollaborator && (
+            <Chip 
+              icon={<InfoIcon />} 
+              label={isViewOnly ? "View Only Access" : "Manager Access"} 
+              color={isViewOnly ? "default" : "primary"} 
+              variant="outlined" 
+              size="small"
+            />
+          )}
+        </Box>
         
         <Divider sx={{ mb: 3 }} />
+        
+        {isViewOnly && (
+          <Alert severity="info" sx={{ mb: 3 }}>
+            You have view-only access to this profile. Contact the account owner for edit permissions.
+          </Alert>
+        )}
         
         {error && (
           <Alert severity="error" sx={{ mb: 3 }}>
@@ -113,16 +140,22 @@ export default function PersonalInfoTab({ user, onUpdate }: PersonalInfoTabProps
               label="First Name"
               value={firstName}
               onChange={(e) => setFirstName(e.target.value)}
-              disabled={isSubmitting}
+              disabled={isSubmitting || isViewOnly}
               required
+              InputProps={{
+                readOnly: isViewOnly,
+              }}
             />
             <TextField
               fullWidth
               label="Last Name"
               value={lastName}
               onChange={(e) => setLastName(e.target.value)}
-              disabled={isSubmitting}
+              disabled={isSubmitting || isViewOnly}
               required
+              InputProps={{
+                readOnly: isViewOnly,
+              }}
             />
           </Box>
           
@@ -132,31 +165,32 @@ export default function PersonalInfoTab({ user, onUpdate }: PersonalInfoTabProps
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            disabled={isSubmitting}
+            disabled={isSubmitting || isViewOnly}
             required
-            helperText={email !== user.email ? "You'll need to verify your new email address" : ""}
+            helperText={email !== user.email && !isViewOnly ? "You'll need to verify your new email address" : ""}
+            InputProps={{
+              readOnly: isViewOnly,
+            }}
           />
           
           <Box sx={{ mt: 2 }}>
-            <Typography variant="body2" color="text.secondary" gutterBottom>
-              Account Status: <strong>{user.isVerified ? 'Verified' : 'Not Verified'}</strong>
-            </Typography>
-            
             <Typography variant="body2" color="text.secondary">
               Member Since: <strong>{new Date(user.createdAt).toLocaleDateString()}</strong>
             </Typography>
           </Box>
         </Stack>
         
-        <Button
-          variant="contained"
-          color="primary"
-          type="submit"
-          disabled={isSubmitting}
-          startIcon={isSubmitting ? <CircularProgress size={20} color="inherit" /> : null}
-        >
-          {isSubmitting ? 'Saving...' : 'Save Changes'}
-        </Button>
+        {!isViewOnly && (
+          <Button
+            variant="contained"
+            color="primary"
+            type="submit"
+            disabled={isSubmitting}
+            startIcon={isSubmitting ? <CircularProgress size={20} color="inherit" /> : null}
+          >
+            {isSubmitting ? 'Saving...' : 'Save Changes'}
+          </Button>
+        )}
       </Box>
     </Paper>
   );

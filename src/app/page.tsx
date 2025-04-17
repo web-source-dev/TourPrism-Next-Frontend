@@ -356,7 +356,7 @@ export default function Home() {
       flexDirection={isMobile ? 'column' : 'row'}
       justifyContent="center"
       alignItems="stretch"
-      gap={3}
+      gap={isMobile ? 5 : 3}
     >
       {benefitsData.map((benefit, index) => {
 
@@ -453,7 +453,8 @@ export default function Home() {
                 display: 'flex',
                 flexDirection: 'column',
                 alignItems: 'center',
-                p: isMobile ? 1 : 2,
+                py: isMobile ? 4 : 2,
+                px: isMobile ? 1 : 2,
                 borderRadius: 1,
               }}
             >
@@ -492,7 +493,7 @@ export default function Home() {
               bgcolor: 'black',
               borderRadius: 2,
               py: 1,
-              px: 3,
+              px: 2,
               mt: 4,
               mb: 2,
               fontSize: '14px',
@@ -560,8 +561,9 @@ export default function Home() {
                   width: 40,
                   height: 40,
                   borderRadius: '50%',
-                  bgcolor: isMobile ? '#fff' : '#f5f5f5',
+                  bgcolor: isMobile ? '#EBEBEC' : '#f5f5f5',
                   mb: isMobile ? 1 : 2,
+                  color: isMobile ? '#f5f5f5' : '#111'
                 }}
               >
                 {step.icon}
@@ -585,8 +587,8 @@ export default function Home() {
               <Box
                 sx={{
                   height: '1px',
-                  width: '40%',
-                  bgcolor: '#ccc',
+                  width: '30%',
+                  bgcolor: '#EBEBEC',
                   mx: 'auto',
                   mt: 3,
                 }}

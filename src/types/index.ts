@@ -1,6 +1,7 @@
 export interface Collaborator {
   email: string;
   role: 'viewer' | 'manager';
+  password?: string;
 }
 
 export interface Company {

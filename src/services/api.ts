@@ -598,7 +598,35 @@ export const getDashboardStats = async (): Promise<DashboardStats> => {
 export const getUserProfile = async (): Promise<User> => {
   try {
     const response = await api.get<User>('/auth/user/profile');
-    return response.data;
+    const userData = response.data;
+    
+    // Check if this is a collaborator response with minimal data
+    if (userData.isCollaborator && !userData.firstName) {
+      console.log('Received collaborator data structure, fetching full profile data');
+      
+      // When a collaborator is logged in, we need to make an additional call to get the full profile
+      try {
+        // Use the Profile endpoint directly which has collaborator permissions
+        const fullProfileResponse = await api.get<User>('/profile');
+        const fullProfileData = fullProfileResponse.data;
+        
+        console.log('Fetched full profile data for collaborator view:', fullProfileData);
+        
+        // Return the enhanced user profile with collaborator context
+        return {
+          ...fullProfileData,
+          // Preserve collaborator information from original response
+          isCollaborator: userData.isCollaborator,
+          collaborator: userData.collaborator
+        };
+      } catch (profileError) {
+        console.error('Error fetching full profile as collaborator:', profileError);
+        // Still return the basic collaborator data if full profile fetch fails
+        return userData;
+      }
+    }
+    
+    return userData;
   } catch (error) {
     throw getErrorMessage(error as CustomAxiosError);
   }

@@ -214,14 +214,15 @@ const Layout = ({ children, isFooter = true, onFilterOpen }: LayoutProps) => {
       }),
     }}>
         <Box sx={{
-          px: { xs: 1, sm: 1, md: 1 },
+          px: { xs: 0.5, sm: 0.5, md: 1 },
           py: 0,
-          mx: { xs: 1, sm: 1.5, md: 3 },
+          mx: { xs: 1, sm: 1, md: 3 },
           my: 1.5,
           bgcolor: pathname === '/feed' ? '#EBEBEC' : '#fff',
-          borderRadius: '16px',
-          boxShadow: 'none'
+          borderRadius: '8px',
+          boxShadow: 'none',
         }}>
+
           <Toolbar
             disableGutters
             sx={{
@@ -238,9 +239,9 @@ const Layout = ({ children, isFooter = true, onFilterOpen }: LayoutProps) => {
                 aria-label="open drawer"
                 edge="start"
                 onClick={handleDrawerToggle}
-                sx={{ display: { sm: 'none' }, color: 'black' }}
+                sx={{ display: { sm: 'none' }, color: 'black', mx: 0.2 }}
               >
-                <i className="ri-menu-2-line" style={{ fontSize: '24px' }}></i>
+                <i className="ri-menu-2-line" style={{ fontSize: '18px' }}></i>
               </IconButton>
 
               {/* Logo */}
@@ -257,7 +258,7 @@ const Layout = ({ children, isFooter = true, onFilterOpen }: LayoutProps) => {
                     textDecoration: 'none'
                   }}
                 >
-                  <Image src="/tourprism.png" alt="tourprism" width={20} height={32} />
+                  <Image src="/tourprism.png" alt="tourprism" style={{ marginRight: isMobile ? '4px' : 0}} width={20} height={32} />
                   <Typography sx={{ fontSize: '18px', ml: 0.5, fontWeight: '550', color: 'black', display: { xs: 'none', md: 'block' } }}>tourprism</Typography>
                 </Typography>
               )}
