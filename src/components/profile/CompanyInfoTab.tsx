@@ -23,6 +23,7 @@ import { updateCompanyInfo, getCompanySuggestions } from '@/services/api';
 
 // Google Maps Places API Script
 import { useLoadScript } from '@react-google-maps/api';
+import { Libraries } from '@react-google-maps/api/dist/utils/make-load-script-url';
 
 // Predefined company types
 const COMPANY_TYPES = [
@@ -73,7 +74,7 @@ export default function CompanyInfoTab({ user, onUpdate }: CompanyInfoTabProps) 
   // Google Maps Places API
   const { isLoaded, loadError } = useLoadScript({
     googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || '',
-    libraries: ['places'] as unknown,
+    libraries: ['places'] as Libraries,
   });
   
   // Initialize Google Places Autocomplete service
@@ -222,7 +223,7 @@ export default function CompanyInfoTab({ user, onUpdate }: CompanyInfoTabProps) 
   
   return (
     <Paper elevation={0} sx={{ p: 2 }}>
-      <Box component="form" onSubmit={handleSubmit} noValidate>
+      <Box component="form" noValidate>
         <Typography variant="h6" sx={{ mb: 3 }}>
           Company Information
         </Typography>
@@ -427,7 +428,7 @@ export default function CompanyInfoTab({ user, onUpdate }: CompanyInfoTabProps) 
         <Button
           variant="contained"
           color="primary"
-          type="submit"
+          onClick={handleSubmit}
           disabled={isSubmitting}
           startIcon={isSubmitting ? <CircularProgress size={20} color="inherit" /> : null}
         >
