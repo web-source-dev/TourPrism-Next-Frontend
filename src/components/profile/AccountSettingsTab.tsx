@@ -18,7 +18,7 @@ import { api } from '@/services/api';
 import { useAuth } from '@/context/AuthContext';
 
 export default function AccountSettingsTab() {
-  const { isCollaborator, collaboratorRole } = useAuth();
+  const { isCollaborator } = useAuth();
   
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');

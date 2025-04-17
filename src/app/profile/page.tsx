@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, use } from 'react';
+import { useState, useEffect } from 'react';
 import { Box, Paper, Typography, Tab, Tabs, Container, CircularProgress, Alert, Button } from '@mui/material';
 import { User } from '@/types';
 import PersonalInfoTab from '@/components/profile/PersonalInfoTab';
@@ -149,10 +149,6 @@ export default function ProfilePage() {
       </Container>
     );
   }
-
-  // Determine profile access level
-  const canEdit = !isCollaborator || (isCollaborator && collaboratorRole === 'manager');
-  const isViewerCollaborator = isCollaborator && collaboratorRole === 'viewer';
   
   // For the page title and description
   const accessLabel = isCollaborator 
