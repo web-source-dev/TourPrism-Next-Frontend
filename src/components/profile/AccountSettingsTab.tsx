@@ -27,9 +27,6 @@ export default function AccountSettingsTab() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
-  // If collaborator is viewing this tab, they shouldn't be able to change passwords
-  // This should also be hidden in the UI from the parent component,
-  // but this is a fallback in case they somehow access this tab
   useEffect(() => {
     if (isCollaborator) {
       setError('Collaborators cannot change the account password. This action is restricted to the account owner.');

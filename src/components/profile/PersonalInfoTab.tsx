@@ -165,11 +165,10 @@ export default function PersonalInfoTab({ user, onUpdate }: PersonalInfoTabProps
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            disabled={isSubmitting || isViewOnly}
+            disabled={true}
             required
-            helperText={email !== user.email && !isViewOnly ? "You'll need to verify your new email address" : ""}
             InputProps={{
-              readOnly: isViewOnly,
+              readOnly: true,
             }}
           />
           
