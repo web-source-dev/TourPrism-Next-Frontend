@@ -684,19 +684,6 @@ export default function Feed() {
     }
   };
 
-  // Function to format date for display
-  const formatDate = (dateString: string) => {
-    if (!dateString) return '';
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-GB', {
-      day: 'numeric',
-      month: 'short',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-  };
-
   if (!locationConfirmed) {
     return (
       <Layout>
