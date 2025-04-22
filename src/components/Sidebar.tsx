@@ -86,7 +86,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, onToggleCollapse, onLogo
     ), path: '/logout' },
   ] : [
     { text: 'About', icon: <i className="ri-information-fill text-xl"></i>, path: '/about' },
-    { text: 'Feature', icon: (
+    { text: 'Feature', icon: ( 
       <i className="ri-bard-fill text-xl"></i>
     ), path: '/feature' },
     { text: 'Resources', icon: <i className="ri-external-link-line text-xl"></i>, path: '/resources' },
