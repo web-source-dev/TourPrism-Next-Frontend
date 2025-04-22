@@ -3,7 +3,6 @@
 import React, { useEffect, useState } from 'react';
 import { Box, Typography, Container, Button, Divider, useTheme, useMediaQuery } from '@mui/material';
 import { useRouter } from 'next/navigation';
-import { ArrowRightAlt } from '@mui/icons-material';
 import { useAuth } from '@/context/AuthContext';
 import Layout from '@/components/Layout';
 import Image from 'next/image';
@@ -203,11 +202,10 @@ export default function Home() {
   return (
     <Layout>
       <Container sx={{ padding: { xs: 0, md: 0 } }}>
-        {/* Edinburgh Alerts Button */}
+        <Box sx={{ textAlign: 'center', display: 'flex', py:8, flexDirection: 'column', alignItems: 'center', justifyContent: 'center',height:'80vh' }}>
+          
         <Box sx={{
           display: 'flex',
-          justifyContent: 'center',
-          mt: isMobile ? 2 : 4,
           mb: isMobile ? '40px' : 8,
         }}
         onClick={() => router.push('/feed')}>
@@ -251,13 +249,16 @@ export default function Home() {
           </Typography>
           <Button
             variant="contained"
-            endIcon={<ArrowRightAlt />}
+            endIcon={<svg width="21" height="20" viewBox="0 0 21 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+<path d="M17.7923 9.99963C17.7923 9.68834 17.6543 9.39953 17.5236 9.18268C17.3825 8.94866 17.1928 8.70706 16.9847 8.47149C16.5672 7.99893 16.0224 7.49145 15.4938 7.03239C14.9621 6.57064 14.4321 6.14546 14.0363 5.83648C13.838 5.68174 13.6726 5.55554 13.5565 5.46778C13.4984 5.42389 13.4525 5.38958 13.421 5.36608L13.3847 5.3391L13.3751 5.33197L13.3717 5.3295C13.0938 5.12478 12.7022 5.18386 12.4975 5.46178C12.2928 5.73968 12.3521 6.13091 12.63 6.33564L12.6406 6.34348L12.674 6.36829C12.7035 6.39029 12.7472 6.42299 12.803 6.46517C12.9147 6.54955 13.0748 6.67171 13.2672 6.82186C13.6526 7.12266 14.1643 7.53341 14.6742 7.9762C15.1872 8.42169 15.6842 8.88738 16.0479 9.29911C16.0709 9.32515 16.0932 9.35074 16.1147 9.37587L3.83398 9.37588C3.48881 9.37588 3.20898 9.6557 3.20898 10.0009C3.20898 10.3461 3.48881 10.6259 3.83398 10.6259L16.1126 10.6259C16.0917 10.6502 16.0702 10.675 16.0479 10.7002C15.6842 11.1119 15.1872 11.5776 14.6742 12.0231C14.1643 12.4659 13.6526 12.8766 13.2672 13.1774C13.0748 13.3276 12.9147 13.4497 12.803 13.5341C12.7472 13.5763 12.7035 13.609 12.674 13.631L12.6406 13.6558L12.63 13.6636C12.3521 13.8684 12.2928 14.2596 12.4975 14.5375C12.7022 14.8154 13.0938 14.8745 13.3717 14.6698L13.3751 14.6673L13.3847 14.6602L13.421 14.6332C13.4525 14.6097 13.4984 14.5754 13.5565 14.5315C13.6726 14.4437 13.838 14.3175 14.0363 14.1628C14.4321 13.8538 14.9621 13.4286 15.4938 12.9669C16.0224 12.5078 16.5672 12.0004 16.9847 11.5278C17.1928 11.2922 17.3825 11.0506 17.5236 10.8166C17.6535 10.6011 17.7907 10.3144 17.7923 10.0052" fill="white"/>
+</svg>
+}
             onClick={handleCreateAccount}
             sx={{
               bgcolor: 'black',
               borderRadius: 2,
               py: 1,
-              px: 3,
+              px: 2,
               fontSize: '14px',
               fontWeight: '500',
               textTransform: 'none',
@@ -275,7 +276,7 @@ export default function Home() {
           display: 'flex',
           justifyContent: 'center',
           alignItems: 'center',
-          my: 8
+          my: 4
         }}>
           <Typography variant="body2" color="#212121" sx={{ mr: 1, fontSize: { xs: '14px', md: '16px' }, lineHeight: { xs: '20px', md: '32px' } }}>
             Backed by
@@ -310,11 +311,12 @@ export default function Home() {
           </Box>
           <Typography variant="body2" sx={{ fontSize: { xs: '14px', md: '16px' }, lineHeight: { xs: '20px', md: '32px' }, color: '#616161' }}>Techscaler</Typography>
         </Box>
+        </Box>
 
-        {isMobile && <Divider sx={{ mb: 6 }} />}
+        {<Divider sx={{ my: 8 }} />}
 
         {/* How You Benefit Section */}
-        <Box sx={{ textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', mb: 4, px: 1, py: { xs: 5, md: 0 }, height: { xs: 'auto', md: '80vh' } }}>
+        <Box sx={{ textAlign: 'center', display: 'flex',py:8, flexDirection: 'column', alignItems: 'center', justifyContent: 'center',height:{xs:'95vh' , md:'70vh'}}}>
           <Typography variant="h2" sx={{
             fontSize: { xs: '20px', md: '24px' },
             fontWeight: '500',
@@ -389,10 +391,10 @@ export default function Home() {
           </Box>
         </Box>
 
-        <Divider sx={{ mb: 6 }} />
+        <Divider sx={{ my: 8 }} />
 
         {/* What We Predict Section */}
-        <Box sx={{ textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', mb: 4, px: isMobile ? 0 : 1, py: { xs: 5, md: 0 }, height: { xs: 'auto', md: '100vh' } }}>
+        <Box sx={{ textAlign: 'center',display: 'flex',flexDirection: 'column', alignItems: 'center', justifyContent: 'center',height:{xs:'115vh',md:'100vh'}}}>
           <Typography variant="h2" sx={{
             fontSize: { xs: '20px', md: '24px' },
             fontWeight: '500',
@@ -475,7 +477,6 @@ export default function Home() {
               py: 1,
               px: 2,
               mt: 4,
-              mb: 2,
               fontSize: '14px',
               fontWeight: '400',
               textTransform: 'none',
@@ -488,10 +489,10 @@ export default function Home() {
           </Button>
         </Box>
 
-        <Divider sx={{ mb: 6 }} />
+        <Divider sx={{ my: {xs:8,md:8} }} />
 
         {/* How It Works Section */}
-        <Box sx={{ textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', mb: 4, py: { xs: 5, md: 0 }, px: isMobile ? 0 : 1, height: { xs: 'auto', md: '90vh' } }}>
+        <Box sx={{ textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',height:{xs:'100vh',md:'65vh'}}}>
           <Typography variant="h2" sx={{
             fontSize: { xs: '20px', md: '24px' },
             fontWeight: '500',
@@ -581,9 +582,9 @@ export default function Home() {
           </Box>
         </Box>
 
-        <Divider sx={{ mb: 6 }} />
+        <Divider sx={{ my: 8 }} />
 
-        <Box sx={{ textAlign: 'center', my: { xs: 10, md: 15 } }}>
+        <Box sx={{ textAlign: 'center', height: '100vh', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
           <Typography
             variant="h2"
             sx={{
@@ -657,9 +658,9 @@ export default function Home() {
             </Button>
           </Box>
         </Box>
-        <Divider sx={{ mb: 6 }} />
+        <Divider sx={{ my: 8 }} />
 
-        <Box sx={{ textAlign: 'center', py: { xs: 5, md: 15 } }}>
+        <Box sx={{ textAlign: 'center', height: {xs:'45vh',md:'45vh'}, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
           <Typography variant="h5" fontWeight="500" mb={1}>
             Our Partners
           </Typography>
@@ -673,94 +674,108 @@ export default function Home() {
           >
             We collaborate with industry leaders and innovators to deliver powerful solutions for the travel industry.
           </Typography>
-
           <Box sx={{ height: 60, overflow: 'hidden', position: 'relative' }}>
-            {/* Next (slides in from bottom) */}
-            <motion.div
-              key={`next-${index}`}
-              initial={{ y: 60 }}
-              animate={{ y: isAnimating ? 0 : 60 }}
-              transition={{ duration: 0.4, ease: 'easeInOut' }}
-              style={{
-                position: 'absolute',
-                width: '100%',
-                display: 'flex',
-                justifyContent: 'center',
-                alignItems: 'center',
-                gap: '12px',
-                zIndex: 1,
-              }}
-            >
-              <Typography fontWeight="500" fontSize="14px" sx={{ whiteSpace: 'nowrap' }}>
-                {next.title}
-              </Typography>
-              <Box
-                sx={{
-                  width: 40,  // Set fixed width
-                  height: 40, // Set fixed height
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  mixBlendMode: 'multiply',
-                  position: 'relative', // Required for Next.js Image component
-                }}
-              >
-                <Image
-                  src={next.logo}
-                  alt={next.alt}
-                  fill
-                  sizes="40px"
-                  style={{
-                    objectFit: 'contain',
-                  }}
-                />
-              </Box>
-              <Typography sx={{ whiteSpace: 'nowrap', fontSize: '12px' }}>{next.name}</Typography>
-            </motion.div>
+  {/* Next (slides in from bottom) */}
+  <motion.div
+    key={`next-${index}`}
+    initial={{ y: 60 }}
+    animate={{ y: isAnimating ? 0 : 60 }}
+    transition={{ duration: 0.4, ease: 'easeInOut' }}
+    style={{
+      position: 'absolute',
+      width: '100%',
+      height: '100%',
+      display: 'flex',
+      alignItems: 'center',
+    }}
+  >
+    <Box sx={{ flex: 1, textAlign: 'right', pr: 3 }}>
+      <Typography fontWeight="500" fontSize="14px" sx={{ whiteSpace: 'nowrap' }}>
+        {next.title}
+      </Typography>
+    </Box>
 
-            {/* Current (slides out up) */}
-            <motion.div
-              key={`current-${index}`}
-              initial={{ y: 0 }}
-              animate={{ y: isAnimating ? -60 : 0 }}
-              transition={{ duration: 0.4, ease: 'easeInOut' }}
-              style={{
-                position: 'absolute',
-                width: '100%',
-                display: 'flex',
-                justifyContent: 'center',
-                alignItems: 'center',
-                gap: '12px',
-                zIndex: 2,
-              }}
-            >
-              <Typography fontWeight="500" fontSize="14px" sx={{ whiteSpace: 'nowrap' }}>
-                {current.title}
-              </Typography>
-              <Box
-                sx={{
-                  width: 40,  // Set fixed width
-                  height: 40, // Set fixed height
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  mixBlendMode: 'multiply',
-                  position: 'relative', // Required for Next.js Image component
-                }}
-              >
-                <Image
-                  src={current.logo}
-                  alt={current.alt}
-                  fill
-                  sizes="40px"
-                  style={{
-                    objectFit: 'contain',
-                  }}
-                />
-              </Box>
-              <Typography sx={{ whiteSpace: 'nowrap', fontSize: '12px' }}>{current.name}</Typography>
-            </motion.div>
-          </Box>
+    {/* Center icon */}
+    <Box
+      sx={{
+        width: 40,
+        height: 40,
+        position: 'absolute',
+        left: '50%',
+        transform: 'translateX(-50%)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        mixBlendMode: 'multiply',
+      }}
+    >
+      <Image
+        src={next.logo}
+        alt={next.alt}
+        fill
+        sizes="40px"
+        style={{
+          objectFit: 'contain',
+        }}
+      />
+    </Box>
+
+    <Box sx={{ flex: 1, textAlign: 'left', pl: 3 }}>
+      <Typography sx={{ whiteSpace: 'nowrap', fontSize: '12px' }}>{next.name}</Typography>
+    </Box>
+  </motion.div>
+
+  {/* Current (slides out up) */}
+  <motion.div
+    key={`current-${index}`}
+    initial={{ y: 0 }}
+    animate={{ y: isAnimating ? -60 : 0 }}
+    transition={{ duration: 0.4, ease: 'easeInOut' }}
+    style={{
+      position: 'absolute',
+      width: '100%',
+      height: '100%',
+      display: 'flex',
+      alignItems: 'center',
+    }}
+  >
+    <Box sx={{ flex: 1, textAlign: 'right', pr: 3 }}>
+      <Typography fontWeight="500" fontSize="14px" sx={{ whiteSpace: 'nowrap' }}>
+        {current.title}
+      </Typography>
+    </Box>
+
+    {/* Center icon */}
+    <Box
+      sx={{
+        width: 40,
+        height: 40,
+        position: 'absolute',
+        left: '50%',
+        transform: 'translateX(-50%)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        mixBlendMode: 'multiply',
+      }}
+    >
+      <Image
+        src={current.logo}
+        alt={current.alt}
+        fill
+        sizes="40px"
+        style={{
+          objectFit: 'contain',
+        }}
+      />
+    </Box>
+
+    <Box sx={{ flex: 1, textAlign: 'left', pl: 3 }}>
+      <Typography sx={{ whiteSpace: 'nowrap', fontSize: '12px' }}>{current.name}</Typography>
+    </Box>
+  </motion.div>
+</Box>
+
         </Box>
 
 

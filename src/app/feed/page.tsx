@@ -938,7 +938,7 @@ export default function Feed() {
                   {alert.description || ""}
                   {alert.recommendedAction && ` ${alert.recommendedAction}`}
                 </Typography>
-                {(alert.risk && isAuthenticated) && (
+                {(alert.risk) && (
                   <Chip
                     label={alert.risk}
                     sx={{
