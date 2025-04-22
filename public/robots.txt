@@ -4,5 +4,5 @@ Allow: /
 
 
 # Sitemaps
-Sitemap: https://alerts.tourprism.com/sitemap.xml
-Sitemap: https://alerts.tourprism.com/server-sitemap.xml
+Sitemap: https://tourprism.com/sitemap.xml
+Sitemap: https://tourprism.com/server-sitemap.xml
