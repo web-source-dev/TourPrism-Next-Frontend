@@ -129,7 +129,7 @@ export default function Feed() {
   // Socket.io connection setup
   useEffect(() => {
     // Connect to Socket.io server
-    const SOCKET_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+    const SOCKET_URL = process.env.NEXT_PUBLIC_API_URL || 'https://tourprism-backend-w5c1.onrender.com';
     socketRef.current = io(SOCKET_URL);
 
     // Connection event handlers
