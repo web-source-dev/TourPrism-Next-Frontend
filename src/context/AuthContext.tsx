@@ -7,7 +7,7 @@ import Cookies from 'js-cookie';
 
 // Public routes that don't require authentication
 // Keep this in sync with the list in ProtectedRoute.tsx
-const publicRoutes = ['/', '/login', '/signup', '/forgot-password','/action-hub','/insights','/subscription', '/feed','/feature','/resources', '/about', '/pricing', '/ambassadors', '/not-found'];
+const publicRoutes = ['/', '/login', '/signup', '/forgot-password','/action-hub','/insights','/subscription', '/feed','/feature','/resources', '/about', '/pricing', '/ambassadors', '/not-found', '/archive'];
 // Auth process routes should never redirect, even during auth loading
 const authProcessRoutes = ['/auth/google/callback'];
 
@@ -99,10 +99,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     if (user) {
       const userRole = user.role || 'user';
-      setIsAdmin(userRole === 'admin');
-      setIsManager(userRole === 'manager');
-      setIsViewer(userRole === 'viewer');
-      setIsEditor(userRole === 'editor');
+      if (userRole === 'admin') {
+        setIsAdmin(true);
+      } else if (userRole === 'manager') {
+        setIsManager(true);
+      } else if (userRole === 'viewer') {
+        setIsViewer(true);
+      } else if (userRole === 'editor') {
+        setIsEditor(true);
+      }
       
       // Update the admin dashboard access flag
       const hasAdminAccess = userRole === 'admin' || 

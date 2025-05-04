@@ -13,19 +13,26 @@ export interface User {
   _id: string;
   email: string;
   name?: string;
-  isVerified: boolean;
-  role?: string;
-  createdAt: string;
-  updatedAt: string;
   firstName?: string;
   lastName?: string;
+  isVerified: boolean;
+  role?: string;
+  status?: 'active' | 'restricted' | 'pending' | 'deleted';
+  createdAt: string;
+  updatedAt: string;
+  lastLogin?: string;
   emailPrefrences?: boolean;
   isCollaborator?: boolean;
   collaborator?: Collaborator;
   company?: {
     name?: string;
     type?: string;
-    MainOperatingRegions?: string[];
+    MainOperatingRegions?: {
+      name: string;
+      latitude: number;
+      longitude: number;
+      placeId: string;
+    }[];
   };
   preferences?: {
     Communication?: {
@@ -51,9 +58,9 @@ export interface Alert {
   title?: string;
   description: string;
   risk?: string;
-  impact?: string;
+  impact?: "Minor" | "Moderate" | "Severe";
   priority?: string;
-  targetAudience?: string;
+  targetAudience?: string[] | string;
   recommendedAction?: string;
   status?: string;
   linkToSource?: string;
@@ -61,13 +68,33 @@ export interface Alert {
   addToEmailSummary?: boolean;
   previousVersionNotes?: string;
   updatedBy?: string;
-  location: string;
-  latitude: number;
-  longitude: number;
-  city: string;
+  
+  originLatitude?: number;
+  originLongitude?: number;
+  originCity?: string;
+  originCountry?: string;
+  originPlaceId?: string;
+  
+  impactLocations?: {
+    latitude: number;
+    longitude: number;
+    city: string;
+    country?: string;
+    placeId?: string;
+  }[];
+  
+  location?: string;
+  latitude?: number;
+  longitude?: number;
+  city?: string;
   country?: string;
+  
   media?: Media[];
   isFollowing?: boolean;
+  flagged?: boolean;
+  flaggedBy?: string[];
+  isFlagged?: boolean;
+  flagCount?: number;
   createdBy: User | string;
   createdAt: string;
   updatedAt: string;
@@ -146,4 +173,52 @@ export interface AuthResponse {
   needsVerification?: boolean;
   userId?: string;
   message?: string;
+}
+
+export interface ActionLog {
+  _id: string;
+  user: User | string;
+  userEmail?: string;
+  displayName?: string;
+  isCollaborator?: boolean;
+  actionType: 'flag' | 'resolve' | 'note_added' | 'notify_guests' | 'message_team' | 'edit' | 'copy_message';
+  actionDetails?: string;
+  timestamp: string;
+}
+
+export interface Guest {
+  _id: string;
+  email: string;
+  name?: string;
+  notificationSent: boolean;
+  sentTimestamp?: string;
+}
+
+export interface TeamMessage {
+  _id: string;
+  content: string;
+  createdBy: User | string;
+  createdAt: string;
+  recipients?: string[];
+  isPreWritten: boolean;
+}
+
+export interface Note {
+  _id: string;
+  content: string;
+  createdBy: User | string;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export interface ActionHubItem extends Alert {
+  actionHubId: string;
+  status: 'pending' | 'resolved';
+  currentActiveTab?: 'notify_guests' | 'message_team' | 'add_notes';
+  guests?: Guest[];
+  teamMessages?: TeamMessage[];
+  notes?: Note[];
+  actionLogs?: ActionLog[];
+  resolvedBy?: User | string;
+  resolvedAt?: string;
 } 

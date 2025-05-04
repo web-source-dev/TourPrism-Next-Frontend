@@ -1,11 +1,10 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Box,
   Typography,
-  Paper,
   TextField,
   Button,
   MenuItem,
@@ -15,33 +14,128 @@ import {
   CircularProgress,
   Snackbar,
   Alert as MuiAlert,
-  Divider,
   Stack,
-  SelectChangeEvent
+  SelectChangeEvent,
+  Chip,
+  Autocomplete,
+  Card,
+  CardContent,
+  styled,
+  alpha,
+  useTheme,
 } from '@mui/material';
 import AdminLayout from '@/components/AdminLayout';
 import { createNewAlert } from '@/services/api';
 import { Alert } from '@/types';
 import { useAuth } from '@/context/AuthContext';
+import Script from 'next/script';
+
+// Define the category-type mapping
+const ALERT_TYPE_MAP: Record<string, string[]> = {
+  "Weather": ["Flood", "Rain", "Heat Warning", "Storm", "Snow", "Fog", "Other"],
+  "Transport": ["Strike", "Delay", "Cancellation", "Infrastructure Issue", "Traffic", "Other"],
+  "Health": ["Outbreak", "Epidemic", "Pandemic", "Contamination", "Other"],
+  "Civil Unrest": ["Protest", "Riot", "Strike", "Demonstration", "Other"],
+  "General Safety": ["Terrorism", "Crime", "Cyber Attack", "Data Breach", "Other"],
+  "Natural Disaster": ["Earthquake", "Tsunami", "Volcanic Activity", "Wildfire", "Landslide", "Other"]
+};
+
+// Define target audience options
+const TARGET_AUDIENCE_OPTIONS = [
+  "Hotels", 
+  "Tour Operators", 
+  "Travel Agencies", 
+  "DMOs", 
+  "Airlines", 
+  "Cruise Lines", 
+  "OTAs", 
+  "Event Managers", 
+  "Attractions", 
+  "Car Rentals", 
+  "Tour Guides", 
+  "Other"
+];
+
+// Styled components for improved UI
+const StyledSection = styled(Card)(({ theme }) => ({
+  marginBottom: theme.spacing(4),
+  borderRadius: 12,
+  boxShadow: '0 4px 20px rgba(0, 0, 0, 0.08)',
+  border: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
+  overflow: 'visible',
+}));
+
+const SectionHeader = styled(CardContent)(({ theme }) => ({
+  background: alpha(theme.palette.primary.main, 0.03),
+  borderBottom: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
+  padding: theme.spacing(2.5, 3),
+}));
+
+const SectionContent = styled(CardContent)(({ theme }) => ({
+  padding: theme.spacing(3),
+}));
+
+const StyledTextField = styled(TextField)(({ theme }) => ({
+  '& .MuiOutlinedInput-root': {
+    borderRadius: 8,
+    '&:hover .MuiOutlinedInput-notchedOutline': {
+      borderColor: theme.palette.primary.light,
+    },
+  },
+}));
+
+const StyledFormControl = styled(FormControl)(({ theme }) => ({
+  '& .MuiOutlinedInput-root': {
+    borderRadius: 8,
+    '&:hover .MuiOutlinedInput-notchedOutline': {
+      borderColor: theme.palette.primary.light,
+    },
+  },
+}));
+
+const StyledButton = styled(Button)(({ theme }) => ({
+  borderRadius: 8,
+  padding: theme.spacing(1, 3),
+  textTransform: 'none',
+  fontWeight: 600,
+}));
+
+const LocationCard = styled(Box)(({ theme }) => ({
+  position: 'relative',
+  padding: theme.spacing(2.5),
+  borderRadius: 12,
+  backgroundColor: alpha(theme.palette.background.default, 0.8),
+  border: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
+  boxShadow: '0 2px 12px rgba(0, 0, 0, 0.05)',
+  marginTop: theme.spacing(2),
+}));
 
 export default function CreateAlertPage() {
   const router = useRouter();
   const { isAdmin, isManager, isEditor } = useAuth();
+  const theme = useTheme();
+  
+  // Google Maps autocomplete refs
+  const [googleLoaded, setGoogleLoaded] = useState(false);
+  
+  // State for alert types based on selected category
+  const [availableAlertTypes, setAvailableAlertTypes] = useState<string[]>([]);
   
   const [saving, setSaving] = useState(false);
   const [formValues, setFormValues] = useState<Partial<Alert>>({
     status: 'pending',
-    latitude: undefined,
-    longitude: undefined,
-    city: '',
+    originLatitude: undefined,
+    originLongitude: undefined,
+    originCity: '',
+    impactLocations: [],
     title: '',
     description: '',
     alertCategory: '',
     alertType: '',
     risk: '',
-    impact: '',
+    impact: 'Minor',
     priority: '',
-    targetAudience: '',
+    targetAudience: [],
     recommendedAction: '',
     linkToSource: '',
   });
@@ -55,15 +149,104 @@ export default function CreateAlertPage() {
   // Permission check
   const canCreateAlert = isAdmin || isManager || isEditor;
   
+  // Setup autocomplete for impact locations - wrap with useCallback before other hooks use it
+  const setupImpactLocationAutocomplete = useCallback(() => {
+    if (typeof window !== 'undefined' && window.google && window.google.maps) {
+      const impactInput = document.getElementById('impact-location-input') as HTMLInputElement;
+      if (impactInput) {
+        const autocompleteOptions: google.maps.places.AutocompleteOptions = {
+          fields: ['place_id', 'geometry', 'name', 'formatted_address', 'address_components'],
+        };
+        const autocomplete = new google.maps.places.Autocomplete(impactInput, autocompleteOptions);
+        
+        // Listen for place selection
+        autocomplete.addListener('place_changed', () => {
+          const place = autocomplete.getPlace();
+          if (place.geometry && place.geometry.location) {
+            // Extract city and country
+            let city = '';
+            let country = '';
+            
+            place.address_components?.forEach(component => {
+              if (component.types.includes('locality')) {
+                city = component.long_name;
+              } else if (component.types.includes('country')) {
+                country = component.long_name;
+              }
+            });
+            
+            // Add to impact locations list
+            const newImpactLocation = {
+              placeId: place.place_id,
+              latitude: place.geometry?.location.lat() || 0,
+              longitude: place.geometry?.location.lng() || 0,
+              city: city || place.name || '',
+              country: country,
+            };
+            
+            // Update form values
+            setFormValues(prev => ({
+              ...prev,
+              impactLocations: [...(prev.impactLocations || []), newImpactLocation]
+            }));
+            
+            // Clear the input
+            if (impactInput) {
+              impactInput.value = '';
+            }
+          }
+        });
+      }
+    }
+  }, []);  // Empty dependency array as this doesn't depend on any props or state
+
+  // Initialize Google Maps autocomplete
+  useEffect(() => {
+    if (typeof window !== 'undefined' && window.google && window.google.maps && canCreateAlert && googleLoaded) {
+      // Origin location autocomplete
+      const originInput = document.getElementById('origin-location-input') as HTMLInputElement;
+      if (originInput) {
+        const autocompleteOptions: google.maps.places.AutocompleteOptions = {
+          fields: ['place_id', 'geometry', 'name', 'formatted_address', 'address_components'],
+        };
+        const autocomplete = new google.maps.places.Autocomplete(originInput, autocompleteOptions);
+        
+        // Listen for place selection
+        autocomplete.addListener('place_changed', () => {
+          const place = autocomplete.getPlace();
+          if (place.geometry && place.geometry.location) {
+            // Extract city and country
+            let city = '';
+            let country = '';
+            
+            place.address_components?.forEach(component => {
+              if (component.types.includes('locality')) {
+                city = component.long_name;
+              } else if (component.types.includes('country')) {
+                country = component.long_name;
+              }
+            });
+            
+            setFormValues(prev => ({
+              ...prev,
+              originPlaceId: place.place_id,
+              originLatitude: place.geometry?.location?.lat(),
+              originLongitude: place.geometry?.location?.lng(),
+              originCity: city || place.name,
+              originCountry: country,
+            }));
+          }
+        });
+      }
+
+      // Set up Impact location input
+      setupImpactLocationAutocomplete();
+    }
+  }, [canCreateAlert, googleLoaded, setupImpactLocationAutocomplete]);
+
   // Redirect if not authorized
   useEffect(() => {
     if (!canCreateAlert) {
-      setSnackbar({
-        open: true,
-        message: 'You do not have permission to create alerts',
-        severity: 'error'
-      });
-      
       // Redirect after showing message briefly
       const redirectTimer = setTimeout(() => {
         router.push('/admin/alerts');
@@ -72,6 +255,20 @@ export default function CreateAlertPage() {
       return () => clearTimeout(redirectTimer);
     }
   }, [canCreateAlert, router]);
+
+  // Update alert types when category changes
+  useEffect(() => {
+    if (formValues.alertCategory) {
+      setAvailableAlertTypes(ALERT_TYPE_MAP[formValues.alertCategory] || []);
+      
+      // Clear the alert type if it's not valid for the new category
+      if (formValues.alertType && !ALERT_TYPE_MAP[formValues.alertCategory]?.includes(formValues.alertType)) {
+        setFormValues(prev => ({ ...prev, alertType: '' }));
+      }
+    } else {
+      setAvailableAlertTypes([]);
+    }
+  }, [formValues.alertCategory, formValues.alertType]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -82,24 +279,47 @@ export default function CreateAlertPage() {
     const { name, value } = e.target;
     setFormValues(prev => ({ ...prev, [name]: value }));
   };
+  
+  const handleTargetAudienceChange = (event: React.SyntheticEvent, newValue: string[]) => {
+    setFormValues(prev => ({ ...prev, targetAudience: newValue }));
+  };
+
+  // Handle removing an impact location
+  const handleRemoveImpactLocation = (indexToRemove: number) => {
+    setFormValues(prev => ({
+      ...prev,
+      impactLocations: prev.impactLocations?.filter((_, index) => index !== indexToRemove)
+    }));
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     // Double-check permissions
     if (!canCreateAlert) {
+      setTimeout(() => {
       setSnackbar({
         open: true,
         message: 'You do not have permission to create alerts',
         severity: 'error'
       });
+      }, 2000);
       return;
     }
+    
+    // Ensure legacy fields are set for backward compatibility
+    const submissionData = {
+      ...formValues,
+      // Copy origin fields to legacy fields for backward compatibility
+      latitude: formValues.originLatitude,
+      longitude: formValues.originLongitude,
+      city: formValues.originCity
+    };
     
     setSaving(true);
 
     try {
-      await createNewAlert(formValues);
+      await createNewAlert(submissionData);
       setSnackbar({
         open: true,
         message: 'Alert created successfully',
@@ -108,7 +328,7 @@ export default function CreateAlertPage() {
       
       // Wait a moment to show the success message before redirecting
       setTimeout(() => {
-        router.push('/admin/alerts');
+        window.location.href = '/admin/alerts';
       }, 1500);
     } catch (err) {
       console.error('Error creating alert:', err);
@@ -121,9 +341,14 @@ export default function CreateAlertPage() {
       setSaving(false);
     }
   };
+  
+  // Handle Google Maps API load success
+  const handleGoogleMapsLoaded = () => {
+    setGoogleLoaded(true);
+  };
 
   const handleCancel = () => {
-    router.push('/admin/alerts');
+    window.location.href = '/admin/alerts';
   };
 
   const handleCloseSnackbar = () => {
@@ -132,20 +357,19 @@ export default function CreateAlertPage() {
 
   return (
     <AdminLayout>
-      {/* Unauthorized access warning */}
-      {!canCreateAlert && (
-        <Box sx={{ p: 3, mb: 3, bgcolor: '#ffebee', borderRadius: 2, border: '1px solid #ffcdd2' }}>
-          <Typography variant="subtitle1" color="error" sx={{ fontWeight: 'medium' }}>
-            <i className="ri-error-warning-line" style={{ marginRight: '8px', verticalAlign: 'middle' }} />
-            You do not have permission to create alerts
-          </Typography>
-          <Typography variant="body2" color="error.dark" sx={{ mt: 1, opacity: 0.8 }}>
-            You are being redirected to the alerts list.
-          </Typography>
-        </Box>
-      )}
+      {/* Load Google Maps API */}
+      <Script
+        src={`https://maps.googleapis.com/maps/api/js?key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}&libraries=places`}
+        onLoad={handleGoogleMapsLoaded}
+      />
 
-      <Box sx={{ mb: 4 }}>
+      <Box 
+        sx={{ 
+          mb: 4,
+          maxWidth: 1200,
+          mx: 'auto',
+        }}
+      >
         <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 1 }}>
           <Button 
             variant="text" 
@@ -155,285 +379,474 @@ export default function CreateAlertPage() {
           >
             Back
           </Button>
-          <Typography variant="h4" sx={{ fontWeight: 'bold' }}>
+          <Typography variant="h4" sx={{ fontWeight: 700, letterSpacing: '-0.01em' }}>
             Create New Alert
           </Typography>
         </Stack>
-        <Typography variant="body1" color="text.secondary">
+        <Typography variant="body1" color="text.secondary" sx={{ mt: 1 }}>
           Create a new alert with all necessary details
         </Typography>
       </Box>
 
       {/* Only display form if authorized */}
       {canCreateAlert && (
-        <Paper sx={{ p: 3, borderRadius: 2 }} elevation={0}>
-          <form onSubmit={handleSubmit}>
-            {/* Basic Information */}
-            <Typography variant="h6" sx={{ fontWeight: 'bold', mb: 2 }}>
-              Basic Information
-            </Typography>
-            <Divider sx={{ mb: 3 }} />
-            
-            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, mb: 4 }}>
-              <TextField
-                name="title"
-                label="Title"
+        <Box component="form" onSubmit={handleSubmit} sx={{ maxWidth: 1200, mx: 'auto' }}>
+          {/* Basic Information */}
+          <StyledSection>
+            <SectionHeader>
+              <Typography variant="h6" sx={{ fontWeight: 600, display: 'flex', alignItems: 'center' }}>
+                <i className="ri-information-line" style={{ marginRight: '10px', fontSize: '1.2em' }}></i>
+                Basic Information
+              </Typography>
+            </SectionHeader>
+            <SectionContent>
+              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
+                <StyledTextField
+                  name="title"
+                  label="Title"
+                  fullWidth
+                  variant="outlined"
+                  value={formValues.title || ''}
+                  onChange={handleInputChange}
+                  sx={{ flex: '1 1 60%', minWidth: '250px' }}
+                  required
+                  placeholder="Enter a descriptive title for the alert"
+                />
+                
+                <StyledFormControl sx={{ flex: '1 1 30%', minWidth: '200px' }} required>
+                  <InputLabel id="status-label">Status</InputLabel>
+                  <Select
+                    labelId="status-label"
+                    id="status"
+                    name="status"
+                    value={formValues.status || 'pending'}
+                    label="Status"
+                    onChange={handleSelectChange}
+                  >
+                    <MenuItem value="pending">Pending</MenuItem>
+                    <MenuItem value="approved">Approved</MenuItem>
+                    <MenuItem value="rejected">Rejected</MenuItem>
+                  </Select>
+                </StyledFormControl>
+                
+                <StyledTextField
+                  name="description"
+                  label="Description"
+                  fullWidth
+                  multiline
+                  rows={4}
+                  variant="outlined"
+                  value={formValues.description || ''}
+                  onChange={handleInputChange}
+                  sx={{ width: '100%' }}
+                  required
+                  placeholder="Provide a detailed description of the alert"
+                />
+              </Box>
+            </SectionContent>
+          </StyledSection>
+
+          {/* Origin Location Information */}
+          <StyledSection>
+            <SectionHeader>
+              <Typography variant="h6" sx={{ fontWeight: 600, display: 'flex', alignItems: 'center' }}>
+                <i className="ri-map-pin-line" style={{ marginRight: '10px', fontSize: '1.2em' }}></i>
+                Origin Location Information
+              </Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                The location where the alert event originates
+              </Typography>
+            </SectionHeader>
+            <SectionContent>
+              <StyledTextField
+                id="origin-location-input"
+                name="originLocation"
+                label="Search for Origin Location"
+                variant="outlined"
                 fullWidth
-                variant="outlined"
-                value={formValues.title || ''}
-                onChange={handleInputChange}
-                sx={{ flex: '1 1 60%', minWidth: '250px' }}
+                placeholder="Start typing to search for a location..."
+                inputProps={{
+                  autoComplete: "new-password", // disable browser autocomplete
+                }}
                 required
+                sx={{ mb: 2 }}
               />
               
-              <FormControl sx={{ flex: '1 1 30%', minWidth: '200px' }} required>
-                <InputLabel id="status-label">Status</InputLabel>
-                <Select
-                  labelId="status-label"
-                  id="status"
-                  name="status"
-                  value={formValues.status || 'pending'}
-                  label="Status"
-                  onChange={handleSelectChange}
-                >
-                  <MenuItem value="pending">Pending</MenuItem>
-                  <MenuItem value="approved">Approved</MenuItem>
-                  <MenuItem value="rejected">Rejected</MenuItem>
-                </Select>
-              </FormControl>
-              
-              <TextField
-                name="description"
-                label="Description"
+              {formValues.originCity && (
+                <LocationCard>
+                  <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 2, color: theme.palette.primary.main }}>
+                    Selected Origin Location:
+                  </Typography>
+                  <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
+                    <StyledTextField
+                      name="originCity"
+                      label="City"
+                      variant="outlined"
+                      value={formValues.originCity || ''}
+                      onChange={handleInputChange}
+                      sx={{ flex: '1 1 30%', minWidth: '200px' }}
+                      InputProps={{
+                        readOnly: true,
+                      }}
+                    />
+                    
+                    <StyledTextField
+                      name="originCountry"
+                      label="Country"
+                      variant="outlined"
+                      value={formValues.originCountry || ''}
+                      onChange={handleInputChange}
+                      sx={{ flex: '1 1 30%', minWidth: '200px' }}
+                      InputProps={{
+                        readOnly: true,
+                      }}
+                    />
+                    
+                    <StyledTextField
+                      name="originLatitude"
+                      label="Latitude"
+                      variant="outlined"
+                      type="number"
+                      inputProps={{ step: 'any', readOnly: true }}
+                      value={formValues.originLatitude || ''}
+                      onChange={handleInputChange}
+                      sx={{ flex: '1 1 30%', minWidth: '150px' }}
+                    />
+                    
+                    <StyledTextField
+                      name="originLongitude"
+                      label="Longitude"
+                      variant="outlined"
+                      type="number"
+                      inputProps={{ step: 'any', readOnly: true }}
+                      value={formValues.originLongitude || ''}
+                      onChange={handleInputChange}
+                      sx={{ flex: '1 1 30%', minWidth: '150px' }}
+                    />
+                  </Box>
+                </LocationCard>
+              )}
+            </SectionContent>
+          </StyledSection>
+          
+          {/* Impact Locations Information */}
+          <StyledSection>
+            <SectionHeader>
+              <Typography variant="h6" sx={{ fontWeight: 600, display: 'flex', alignItems: 'center' }}>
+                <i className="ri-earth-line" style={{ marginRight: '10px', fontSize: '1.2em' }}></i>
+                Impact Locations
+              </Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                The locations affected by this alert. You can add multiple locations.
+              </Typography>
+            </SectionHeader>
+            <SectionContent>
+              <StyledTextField
+                id="impact-location-input"
+                name="impactLocation"
+                label="Search for Impact Location"
+                variant="outlined"
                 fullWidth
-                multiline
-                rows={4}
-                variant="outlined"
-                value={formValues.description || ''}
-                onChange={handleInputChange}
-                sx={{ width: '100%' }}
-                required
+                placeholder="Start typing to search for a location..."
+                inputProps={{
+                  autoComplete: "new-password", // disable browser autocomplete
+                }}
+                sx={{ mb: 2 }}
               />
-            </Box>
+              
+              {formValues.impactLocations && formValues.impactLocations.length > 0 && (
+                <Box sx={{ width: '100%', mt: 2 }}>
+                  <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 2, color: theme.palette.primary.main }}>
+                    Selected Impact Locations:
+                  </Typography>
+                  <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                    {formValues.impactLocations.map((location, index) => (
+                      <Chip
+                        key={index}
+                        label={location.city || 'Unknown Location'}
+                        onDelete={() => handleRemoveImpactLocation(index)}
+                        sx={{
+                          borderRadius: '16px',
+                          backgroundColor: alpha(theme.palette.primary.main, 0.08),
+                          color: theme.palette.primary.main,
+                          fontWeight: 500,
+                          padding: '4px 8px',
+                          '& .MuiChip-label': {
+                            padding: '0 8px',
+                          },
+                          '& .MuiChip-deleteIcon': {
+                            color: theme.palette.primary.main,
+                            '&:hover': {
+                              color: theme.palette.error.main,
+                            }
+                          }
+                        }}
+                        deleteIcon={<i className="ri-close-line" />}
+                      />
+                    ))}
+                  </Box>
+                  
+                  {/* Hidden info panel that shows details when expanded */}
+                  <Box 
+                    sx={{ 
+                      mt: 2, 
+                      pt: 2, 
+                      borderTop: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'flex-end'
+                    }}
+                  >
+                    <Button
+                      size="small"
+                      startIcon={<i className="ri-information-line" />}
+                      onClick={() => {
+                        setSnackbar({
+                          open: true,
+                          message: `${formValues.impactLocations?.length || 0} impact location(s) added`,
+                          severity: 'info'
+                        });
+                      }}
+                      sx={{ 
+                        textTransform: 'none', 
+                        color: theme.palette.text.secondary,
+                        '&:hover': {
+                          backgroundColor: 'transparent',
+                          color: theme.palette.primary.main
+                        }
+                      }}
+                    >
+                      {formValues.impactLocations?.length || 0} location{formValues.impactLocations?.length !== 1 ? 's' : ''} added
+                    </Button>
+                  </Box>
+                </Box>
+              )}
+            </SectionContent>
+          </StyledSection>
 
-            {/* Location Information */}
-            <Typography variant="h6" sx={{ fontWeight: 'bold', mb: 2, mt: 2 }}>
-              Location Information
-            </Typography>
-            <Divider sx={{ mb: 3 }} />
-            
-            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, mb: 4 }}>
-              <TextField
-                name="city"
-                label="City"
-                variant="outlined"
-                value={formValues.city || ''}
-                onChange={handleInputChange}
-                sx={{ flex: '1 1 30%', minWidth: '200px' }}
-                required
-              />
-              
-              <TextField
-                name="latitude"
-                label="Latitude"
-                variant="outlined"
-                type="number"
-                inputProps={{ step: 'any' }}
-                value={formValues.latitude || ''}
-                onChange={handleInputChange}
-                sx={{ flex: '1 1 30%', minWidth: '200px' }}
-                required
-              />
-              
-              <TextField
-                name="longitude"
-                label="Longitude"
-                variant="outlined"
-                type="number"
-                inputProps={{ step: 'any' }}
-                value={formValues.longitude || ''}
-                onChange={handleInputChange}
-                sx={{ flex: '1 1 30%', minWidth: '200px' }}
-                required
-              />
-            </Box>
+          {/* Time Information */}
+          <StyledSection>
+            <SectionHeader>
+              <Typography variant="h6" sx={{ fontWeight: 600, display: 'flex', alignItems: 'center' }}>
+                <i className="ri-time-line" style={{ marginRight: '10px', fontSize: '1.2em' }}></i>
+                Time Information
+              </Typography>
+            </SectionHeader>
+            <SectionContent>
+              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
+                <StyledTextField
+                  name="expectedStart"
+                  label="Expected Start"
+                  variant="outlined"
+                  type="datetime-local"
+                  value={formValues.expectedStart ? new Date(formValues.expectedStart as string).toISOString().substring(0, 16) : ''}
+                  onChange={handleInputChange}
+                  InputLabelProps={{ shrink: true }}
+                  sx={{ flex: '1 1 45%', minWidth: '250px' }}
+                  helperText="When is this alert expected to start?"
+                />
+                
+                <StyledTextField
+                  name="expectedEnd"
+                  label="Expected End"
+                  variant="outlined"
+                  type="datetime-local"
+                  value={formValues.expectedEnd ? new Date(formValues.expectedEnd as string).toISOString().substring(0, 16) : ''}
+                  onChange={handleInputChange}
+                  InputLabelProps={{ shrink: true }}
+                  sx={{ flex: '1 1 45%', minWidth: '250px' }}
+                  helperText="When is this alert expected to end?"
+                />
+              </Box>
+            </SectionContent>
+          </StyledSection>
 
-            {/* Time Information */}
-            <Typography variant="h6" sx={{ fontWeight: 'bold', mb: 2, mt: 2 }}>
-              Time Information
-            </Typography>
-            <Divider sx={{ mb: 3 }} />
-            
-            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, mb: 4 }}>
-              <TextField
-                name="expectedStart"
-                label="Expected Start"
-                variant="outlined"
-                type="datetime-local"
-                value={formValues.expectedStart ? new Date(formValues.expectedStart as string).toISOString().substring(0, 16) : ''}
-                onChange={handleInputChange}
-                InputLabelProps={{ shrink: true }}
-                sx={{ flex: '1 1 45%', minWidth: '250px' }}
-              />
-              
-              <TextField
-                name="expectedEnd"
-                label="Expected End"
-                variant="outlined"
-                type="datetime-local"
-                value={formValues.expectedEnd ? new Date(formValues.expectedEnd as string).toISOString().substring(0, 16) : ''}
-                onChange={handleInputChange}
-                InputLabelProps={{ shrink: true }}
-                sx={{ flex: '1 1 45%', minWidth: '250px' }}
-              />
-            </Box>
+          {/* Alert Classification */}
+          <StyledSection>
+            <SectionHeader>
+              <Typography variant="h6" sx={{ fontWeight: 600, display: 'flex', alignItems: 'center' }}>
+                <i className="ri-alert-line" style={{ marginRight: '10px', fontSize: '1.2em' }}></i>
+                Alert Classification
+              </Typography>
+            </SectionHeader>
+            <SectionContent>
+              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
+                <StyledFormControl sx={{ flex: '1 1 45%', minWidth: '250px' }}>
+                  <InputLabel id="alert-category-label">Alert Category</InputLabel>
+                  <Select
+                    labelId="alert-category-label"
+                    id="alertCategory"
+                    name="alertCategory"
+                    value={formValues.alertCategory || ''}
+                    label="Alert Category"
+                    onChange={handleSelectChange}
+                  >
+                    <MenuItem value="Weather">Weather</MenuItem>
+                    <MenuItem value="Transport">Transport</MenuItem>
+                    <MenuItem value="Health">Health</MenuItem>
+                    <MenuItem value="Civil Unrest">Civil Unrest</MenuItem>
+                    <MenuItem value="General Safety">General Safety</MenuItem>
+                    <MenuItem value="Natural Disaster">Natural Disaster</MenuItem>
+                  </Select>
+                </StyledFormControl>
+                
+                <StyledFormControl sx={{ flex: '1 1 45%', minWidth: '250px' }}>
+                  <InputLabel id="alert-type-label">Alert Type</InputLabel>
+                  <Select
+                    labelId="alert-type-label"
+                    id="alertType"
+                    name="alertType"
+                    value={formValues.alertType || ''}
+                    label="Alert Type"
+                    onChange={handleSelectChange}
+                    disabled={availableAlertTypes.length === 0}
+                  >
+                    {availableAlertTypes.map((type) => (
+                      <MenuItem key={type} value={type}>{type}</MenuItem>
+                    ))}
+                  </Select>
+                </StyledFormControl>
+                
+                <StyledFormControl sx={{ flex: '1 1 30%', minWidth: '200px' }}>
+                  <InputLabel id="risk-label">Risk Level</InputLabel>
+                  <Select
+                    labelId="risk-label"
+                    id="risk"
+                    name="risk"
+                    value={formValues.risk || ''}
+                    label="Risk Level"
+                    onChange={handleSelectChange}
+                  >
+                    <MenuItem value="Low">Low</MenuItem>
+                    <MenuItem value="Medium">Medium</MenuItem>
+                    <MenuItem value="High">High</MenuItem>
+                  </Select>
+                </StyledFormControl>
+                
+                <StyledFormControl sx={{ flex: '1 1 30%', minWidth: '200px' }}>
+                  <InputLabel id="impact-label">Impact Severity</InputLabel>
+                  <Select
+                    labelId="impact-label"
+                    id="impact"
+                    name="impact"
+                    value={formValues.impact || ''}
+                    label="Impact Severity"
+                    onChange={handleSelectChange}
+                  >
+                    <MenuItem value="Minor">Minor</MenuItem>
+                    <MenuItem value="Moderate">Moderate</MenuItem>
+                    <MenuItem value="Severe">Severe</MenuItem>
+                  </Select>
+                </StyledFormControl>
+                
+                <StyledFormControl sx={{ flex: '1 1 30%', minWidth: '200px' }}>
+                  <InputLabel id="priority-label">Priority</InputLabel>
+                  <Select
+                    labelId="priority-label"
+                    id="priority"
+                    name="priority"
+                    value={formValues.priority || ''}
+                    label="Priority"
+                    onChange={handleSelectChange}
+                  >
+                    <MenuItem value="low">Low</MenuItem>
+                    <MenuItem value="medium">Medium</MenuItem>
+                    <MenuItem value="high">High</MenuItem>
+                  </Select>
+                </StyledFormControl>
+              </Box>
+            </SectionContent>
+          </StyledSection>
 
-            {/* Alert Classification */}
-            <Typography variant="h6" sx={{ fontWeight: 'bold', mb: 2, mt: 2 }}>
-              Alert Classification
-            </Typography>
-            <Divider sx={{ mb: 3 }} />
-            
-            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, mb: 4 }}>
-              <FormControl sx={{ flex: '1 1 45%', minWidth: '250px' }}>
-                <InputLabel id="alert-category-label">Alert Category</InputLabel>
-                <Select
-                  labelId="alert-category-label"
-                  id="alertCategory"
-                  name="alertCategory"
-                  value={formValues.alertCategory || ''}
-                  label="Alert Category"
-                  onChange={handleSelectChange}
-                >
-                  <MenuItem value="Weather">Weather</MenuItem>
-                  <MenuItem value="Transport">Transport</MenuItem>
-                  <MenuItem value="Health">Health</MenuItem>
-                  <MenuItem value="Civil Unrest">Civil Unrest</MenuItem>
-                  <MenuItem value="General Safety">General Safety</MenuItem>
-                  <MenuItem value="Natural Disaster">Natural Disaster</MenuItem>
-                </Select>
-              </FormControl>
-              
-              <FormControl sx={{ flex: '1 1 45%', minWidth: '250px' }}>
-                <InputLabel id="alert-type-label">Alert Type</InputLabel>
-                <Select
-                  labelId="alert-type-label"
-                  id="alertType"
-                  name="alertType"
-                  value={formValues.alertType || ''}
-                  label="Alert Type"
-                  onChange={handleSelectChange}
-                >
-                  <MenuItem value="Rain">Rain</MenuItem>
-                  <MenuItem value="Strike">Strike</MenuItem>
-                  <MenuItem value="Protest">Protest</MenuItem>
-                  <MenuItem value="Cyber Attack">Cyber Attack</MenuItem>
-                  <MenuItem value="Fire">Fire</MenuItem>
-                  <MenuItem value="Fog">Fog</MenuItem>
-                  <MenuItem value="Data Breach">Data Breach</MenuItem>
-                  <MenuItem value="Storm">Storm</MenuItem>
-                  <MenuItem value="Flood">Flood</MenuItem>
-                </Select>
-              </FormControl>
-              
-              <FormControl sx={{ flex: '1 1 30%', minWidth: '200px' }}>
-                <InputLabel id="risk-label">Risk Level</InputLabel>
-                <Select
-                  labelId="risk-label"
-                  id="risk"
-                  name="risk"
-                  value={formValues.risk || ''}
-                  label="Risk Level"
-                  onChange={handleSelectChange}
-                >
-                  <MenuItem value="Low">Low</MenuItem>
-                  <MenuItem value="Medium">Medium</MenuItem>
-                  <MenuItem value="High">High</MenuItem>
-                </Select>
-              </FormControl>
-              
-              <TextField
-                name="impact"
-                label="Impact"
-                variant="outlined"
-                value={formValues.impact || ''}
-                onChange={handleInputChange}
-                sx={{ flex: '1 1 30%', minWidth: '200px' }}
-              />
-              
-              <FormControl sx={{ flex: '1 1 30%', minWidth: '200px' }}>
-                <InputLabel id="priority-label">Priority</InputLabel>
-                <Select
-                  labelId="priority-label"
-                  id="priority"
-                  name="priority"
-                  value={formValues.priority || ''}
-                  label="Priority"
-                  onChange={handleSelectChange}
-                >
-                  <MenuItem value="low">Low</MenuItem>
-                  <MenuItem value="medium">Medium</MenuItem>
-                  <MenuItem value="high">High</MenuItem>
-                </Select>
-              </FormControl>
-            </Box>
+          {/* Additional Information */}
+          <StyledSection>
+            <SectionHeader>
+              <Typography variant="h6" sx={{ fontWeight: 600, display: 'flex', alignItems: 'center' }}>
+                <i className="ri-question-answer-line" style={{ marginRight: '10px', fontSize: '1.2em' }}></i>
+                Additional Information
+              </Typography>
+            </SectionHeader>
+            <SectionContent>
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                <StyledFormControl sx={{ width: '100%' }}>
+                  <Autocomplete
+                    multiple
+                    id="targetAudience"
+                    options={TARGET_AUDIENCE_OPTIONS}
+                    value={Array.isArray(formValues.targetAudience) ? formValues.targetAudience : []}
+                    onChange={handleTargetAudienceChange}
+                    renderInput={(params) => (
+                      <StyledTextField
+                        {...params}
+                        variant="outlined"
+                        label="Target Audience"
+                        placeholder="Select target audiences"
+                      />
+                    )}
+                    renderTags={(value, getTagProps) =>
+                      value.map((option, index) => (
+                        <Chip
+                          label={option}
+                          {...getTagProps({ index })}
+                          key={index}
+                          sx={{ 
+                            borderRadius: '16px',
+                            backgroundColor: alpha(theme.palette.primary.main, 0.1),
+                            color: theme.palette.primary.main,
+                            fontWeight: 500
+                          }}
+                        />
+                      ))
+                    }
+                  />
+                </StyledFormControl>
+                
+                <StyledTextField
+                  name="recommendedAction"
+                  label="Recommended Action"
+                  variant="outlined"
+                  value={formValues.recommendedAction || ''}
+                  onChange={handleInputChange}
+                  placeholder="What actions should be taken in response to this alert?"
+                  multiline
+                  rows={3}
+                />
+                
+                <StyledTextField
+                  name="linkToSource"
+                  label="Link to Source"
+                  variant="outlined"
+                  value={formValues.linkToSource || ''}
+                  onChange={handleInputChange}
+                  placeholder="Enter a URL linking to more information about this alert"
+                  fullWidth
+                />
+              </Box>
+            </SectionContent>
+          </StyledSection>
 
-            {/* Additional Information */}
-            <Typography variant="h6" sx={{ fontWeight: 'bold', mb: 2, mt: 2 }}>
-              Additional Information
-            </Typography>
-            <Divider sx={{ mb: 3 }} />
-            
-            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, mb: 4 }}>
-              <TextField
-                name="targetAudience"
-                label="Target Audience"
-                variant="outlined"
-                value={formValues.targetAudience || ''}
-                onChange={handleInputChange}
-                sx={{ flex: '1 1 45%', minWidth: '250px' }}
-              />
-              
-              <TextField
-                name="recommendedAction"
-                label="Recommended Action"
-                variant="outlined"
-                value={formValues.recommendedAction || ''}
-                onChange={handleInputChange}
-                sx={{ flex: '1 1 45%', minWidth: '250px' }}
-              />
-              
-              <TextField
-                name="linkToSource"
-                label="Link to Source"
-                variant="outlined"
-                value={formValues.linkToSource || ''}
-                onChange={handleInputChange}
-                sx={{ width: '100%' }}
-              />
-            </Box>
-
-            {/* Actions */}
-            <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 2, mt: 4 }}>
-              <Button
-                variant="outlined"
-                onClick={handleCancel}
-                disabled={saving}
-              >
-                Cancel
-              </Button>
-              <Button
-                type="submit"
-                variant="contained"
-                color="primary"
-                disabled={saving}
-                startIcon={saving ? <CircularProgress size={20} /> : <i className="ri-save-line" />}
-              >
-                {saving ? 'Creating...' : 'Create Alert'}
-              </Button>
-            </Box>
-          </form>
-        </Paper>
+          {/* Actions */}
+          <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 2, mt: 4, mb: 6 }}>
+            <StyledButton
+              variant="outlined"
+              onClick={handleCancel}
+              disabled={saving}
+              sx={{ minWidth: 120 }}
+            >
+              Cancel
+            </StyledButton>
+            <StyledButton
+              type="submit"
+              variant="contained"
+              color="primary"
+              disabled={saving}
+              startIcon={saving ? <CircularProgress size={20} /> : <i className="ri-save-line" />}
+              sx={{ minWidth: 150 }}
+            >
+              {saving ? 'Creating...' : 'Create Alert'}
+            </StyledButton>
+          </Box>
+        </Box>
       )}
 
       {/* Snackbar for notifications */}
@@ -447,7 +860,7 @@ export default function CreateAlertPage() {
           onClose={handleCloseSnackbar} 
           severity={snackbar.severity}
           variant="filled"
-          sx={{ width: '100%' }}
+          sx={{ width: '100%', borderRadius: 2 }}
         >
           {snackbar.message}
         </MuiAlert>

@@ -14,7 +14,6 @@ import {
   TablePagination,
   Button,
   IconButton,
-  TextField,
   MenuItem,
   Chip,
   Dialog,
@@ -26,7 +25,6 @@ import {
   FormControl,
   InputLabel,
   Select,
-  SelectChangeEvent,
   Stack,
   Snackbar,
   Alert,
@@ -37,10 +35,49 @@ import {
   Tooltip
 } from '@mui/material';
 import AdminLayout from '@/components/AdminLayout';
-import { getAllAlertsAdmin, updateAlertStatus, deleteAlert } from '@/services/api';
+import { 
+  getAllAlertsAdmin, 
+  updateAlertStatus, 
+  deleteAlert, 
+  archiveAlert, 
+  duplicateAlert 
+} from '@/services/api';
 import { Alert as AlertType } from '@/types';
-import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
+import AlertFilters from '@/components/AlertFilters';
+import AlertViewDialog from '@/components/AlertViewDialog';
+import ConfirmationDialog from '@/components/ConfirmationDialog';
+import VisibilityIcon from '@mui/icons-material/Visibility';
+import EditIcon from '@mui/icons-material/Edit';
+import DeleteIcon from '@mui/icons-material/Delete';
+import FileCopyIcon from '@mui/icons-material/FileCopy';
+import ArchiveIcon from '@mui/icons-material/Archive';
+
+// Define a more specific type for filters
+interface FilterOptions {
+  status?: string[];
+  categories?: string[];
+  types?: string[];
+  city?: string;
+  audience?: string[];
+  priority?: string[];
+  risk?: string[];
+  startDate?: Date | string | null;
+  endDate?: Date | string | null;
+  sortBy?: string;
+}
+
+// Define the FilterRecord type to match AlertFilters component expectations
+interface FilterRecord {
+  status?: string[];
+  categories?: string[];
+  types?: string[];
+  audience?: string[];
+  city?: string;
+  startDate?: Date | null;
+  endDate?: Date | null;
+  sortBy?: string;
+}
 
 export default function AlertsManagement() {
   const [alerts, setAlerts] = useState<AlertType[]>([]);
@@ -49,16 +86,23 @@ export default function AlertsManagement() {
   const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
-  const [statusFilter, setStatusFilter] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const [activeFilters, setActiveFilters] = useState<FilterOptions>({});
+  
+  // Dialog states
   const [selectedAlert, setSelectedAlert] = useState<AlertType | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [archiveDialogOpen, setArchiveDialogOpen] = useState(false);
+  const [duplicateDialogOpen, setDuplicateDialogOpen] = useState(false);
   const [statusDialogOpen, setStatusDialogOpen] = useState(false);
+  const [viewDialogOpen, setViewDialogOpen] = useState(false);
+  const [actionLoading, setActionLoading] = useState(false);
+  
   const [newStatus, setNewStatus] = useState('');
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' as 'success' | 'error' });
+  
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
-  const router = useRouter();
   const { isAdmin, isManager, isEditor } = useAuth();
 
   // Permission check functions
@@ -66,6 +110,8 @@ export default function AlertsManagement() {
   const canUpdateStatus = isAdmin || isManager || isEditor;
   const canEditAlert = isAdmin || isManager || isEditor;
   const canDeleteAlert = isAdmin || isManager;
+  const canArchiveAlert = isAdmin || isManager || isEditor;
+  const canDuplicateAlert = isAdmin || isManager || isEditor;
   
   // Permission tooltips
   const createAlertTooltip = !canCreateAlert 
@@ -80,23 +126,101 @@ export default function AlertsManagement() {
   const deleteAlertTooltip = !canDeleteAlert 
     ? "You don't have permission to delete alerts" 
     : "";
+  const archiveAlertTooltip = !canArchiveAlert
+    ? "You don't have permission to archive alerts"
+    : "";
+  const duplicateAlertTooltip = !canDuplicateAlert
+    ? "You don't have permission to duplicate alerts"
+    : "";
 
   const fetchAlerts = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const params: Record<string, string | number> = {
+      const params: Record<string, string | number | string[]> = {
         page: page + 1,
         limit: rowsPerPage
       };
       
-      if (statusFilter !== 'all') {
-        params.status = statusFilter;
-      }
-      
+      // Add search query
       if (searchQuery) {
         params.search = searchQuery;
       }
+      
+      // Add status filter
+      if (activeFilters.status && activeFilters.status.length > 0) {
+        params.status = activeFilters.status.join(',');
+      }
+      
+      // Add category filter
+      if (activeFilters.categories && activeFilters.categories.length > 0) {
+        params.categories = activeFilters.categories.join(',');
+      }
+      
+      // Add type filter
+      if (activeFilters.types && activeFilters.types.length > 0) {
+        params.types = activeFilters.types.join(',');
+      }
+      
+      // Add city filter
+      if (activeFilters.city) {
+        params.city = activeFilters.city;
+      }
+      
+      // Add audience filter
+      if (activeFilters.audience && activeFilters.audience.length > 0) {
+        params.audience = activeFilters.audience.join(',');
+      }
+      
+      // Add priority filter
+      if (activeFilters.priority && activeFilters.priority.length > 0) {
+        params.priority = activeFilters.priority.join(',');
+      }
+      
+      // Add risk filter
+      if (activeFilters.risk && activeFilters.risk.length > 0) {
+        params.risk = activeFilters.risk.join(',');
+      }
+      
+      // Add date range - ensure we're sending valid ISO dates
+      if (activeFilters.startDate) {
+        // Check if it's a Date object or string
+        if (activeFilters.startDate instanceof Date) {
+          params.startDate = activeFilters.startDate.toISOString();
+        } else {
+          // If it's already a string, make sure it's a valid date before sending
+          const date = new Date(activeFilters.startDate);
+          if (!isNaN(date.getTime())) {
+            params.startDate = date.toISOString();
+          }
+        }
+      }
+      
+      if (activeFilters.endDate) {
+        // Check if it's a Date object or string
+        if (activeFilters.endDate instanceof Date) {
+          // For end date, set it to the end of the day
+          const endDate = new Date(activeFilters.endDate);
+          endDate.setHours(23, 59, 59, 999);
+          params.endDate = endDate.toISOString();
+        } else {
+          // If it's already a string, make sure it's a valid date before sending
+          const date = new Date(activeFilters.endDate);
+          if (!isNaN(date.getTime())) {
+            date.setHours(23, 59, 59, 999);
+            params.endDate = date.toISOString();
+          }
+        }
+      }
+      
+      // Add sorting
+      if (activeFilters.sortBy) {
+        const [field, order] = activeFilters.sortBy.split(':');
+        params.sortBy = field;
+        params.sortOrder = order;
+      }
+      
+      console.log('Sending params to backend:', params);
       
       const { alerts, totalCount } = await getAllAlertsAdmin(params);
       setAlerts(alerts);
@@ -112,11 +236,17 @@ export default function AlertsManagement() {
     } finally {
       setLoading(false);
     }
-  }, [page, rowsPerPage, statusFilter, searchQuery]);
+  }, [page, rowsPerPage, searchQuery, activeFilters]);
 
   useEffect(() => {
-    fetchAlerts();
-  }, [fetchAlerts]);
+    // This is to prevent an infinite update loop
+    // We need a stable dependency for fetchAlerts
+    const handler = setTimeout(() => {
+      fetchAlerts();
+    }, 0);
+    
+    return () => clearTimeout(handler);
+  }, []);
 
   const handleChangePage = (_event: unknown, newPage: number) => {
     setPage(newPage);
@@ -127,19 +257,42 @@ export default function AlertsManagement() {
     setPage(0);
   };
 
-  const handleStatusFilterChange = (event: SelectChangeEvent) => {
-    setStatusFilter(event.target.value);
+  const handleSearch = (query: string) => {
+    setSearchQuery(query);
     setPage(0);
   };
 
-  const handleSearchChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    setSearchQuery(event.target.value);
+  const handleFilterChange = (filters: FilterRecord) => {
+    // Convert FilterRecord to FilterOptions if necessary
+    const filterOptions: FilterOptions = {
+      ...filters,
+      // Since FilterOptions accepts string | Date | undefined but not null
+      startDate: filters.startDate === null ? undefined : filters.startDate,
+      endDate: filters.endDate === null ? undefined : filters.endDate
+    };
+    
+    setActiveFilters(filterOptions);
     setPage(0);
   };
 
-  const handleDeleteClick = (alert: AlertType) => {
+  const handleClearFilters = () => {
+    setActiveFilters({});
+    setPage(0);
+  };
+
+  // Add this conversion function
+  const convertToFilterRecord = (filters: FilterOptions) => {
+    return {
+      ...filters,
+      startDate: filters.startDate instanceof Date ? filters.startDate : null,
+      endDate: filters.endDate instanceof Date ? filters.endDate : null
+    };
+  };
+
+  // Action handlers
+  const handleViewClick = (alert: AlertType) => {
     setSelectedAlert(alert);
-    setDialogOpen(true);
+    setViewDialogOpen(true);
   };
 
   const handleStatusChangeClick = (alert: AlertType) => {
@@ -148,9 +301,31 @@ export default function AlertsManagement() {
     setStatusDialogOpen(true);
   };
 
+  const handleEditClick = (alert: AlertType) => {
+    // Force a full page navigation instead of client-side navigation
+    window.location.href = `/admin/alerts/edit/${alert._id}`;
+  };
+
+  const handleDeleteClick = (alert: AlertType) => {
+    setSelectedAlert(alert);
+    setDialogOpen(true);
+  };
+
+  const handleArchiveClick = (alert: AlertType) => {
+    setSelectedAlert(alert);
+    setArchiveDialogOpen(true);
+  };
+
+  const handleDuplicateClick = (alert: AlertType) => {
+    setSelectedAlert(alert);
+    setDuplicateDialogOpen(true);
+  };
+
+  // Confirmation handlers
   const handleConfirmDelete = async () => {
     if (!selectedAlert) return;
     
+    setActionLoading(true);
     try {
       await deleteAlert(selectedAlert._id);
       setAlerts(alerts.filter(alert => alert._id !== selectedAlert._id));
@@ -167,7 +342,64 @@ export default function AlertsManagement() {
         severity: 'error'
       });
     } finally {
+      setActionLoading(false);
       setDialogOpen(false);
+      setSelectedAlert(null);
+    }
+  };
+
+  const handleConfirmArchive = async () => {
+    if (!selectedAlert) return;
+    
+    setActionLoading(true);
+    try {
+      const { alert } = await archiveAlert(selectedAlert._id);
+      setAlerts(alerts.map(a => 
+        a._id === selectedAlert._id 
+          ? { ...a, ...alert }
+          : a
+      ));
+      setSnackbar({
+        open: true,
+        message: 'Alert archived successfully',
+        severity: 'success'
+      });
+    } catch (error) {
+      console.error('Error archiving alert:', error);
+      setSnackbar({
+        open: true,
+        message: 'Failed to archive alert',
+        severity: 'error'
+      });
+    } finally {
+      setActionLoading(false);
+      setArchiveDialogOpen(false);
+      setSelectedAlert(null);
+    }
+  };
+
+  const handleConfirmDuplicate = async () => {
+    if (!selectedAlert) return;
+    
+    setActionLoading(true);
+    try {
+      const { alert } = await duplicateAlert(selectedAlert._id);
+      setAlerts([alert, ...alerts]);
+      setSnackbar({
+        open: true,
+        message: 'Alert duplicated successfully',
+        severity: 'success'
+      });
+    } catch (error) {
+      console.error('Error duplicating alert:', error);
+      setSnackbar({
+        open: true,
+        message: 'Failed to duplicate alert',
+        severity: 'error'
+      });
+    } finally {
+      setActionLoading(false);
+      setDuplicateDialogOpen(false);
       setSelectedAlert(null);
     }
   };
@@ -175,6 +407,7 @@ export default function AlertsManagement() {
   const handleConfirmStatusChange = async () => {
     if (!selectedAlert || !newStatus) return;
     
+    setActionLoading(true);
     try {
       await updateAlertStatus(selectedAlert._id, newStatus);
       setAlerts(alerts.map(alert => 
@@ -195,6 +428,7 @@ export default function AlertsManagement() {
         severity: 'error'
       });
     } finally {
+      setActionLoading(false);
       setStatusDialogOpen(false);
       setSelectedAlert(null);
     }
@@ -214,14 +448,33 @@ export default function AlertsManagement() {
         return { bg: '#e8f5e9', color: '#2e7d32' };
       case 'rejected':
         return { bg: '#ffebee', color: '#c62828' };
+      case 'archived':
+        return { bg: '#e0e0e0', color: '#616161' };
+      case 'deleted':
+        return { bg: '#ef9a9a', color: '#b71c1c' };
       default:
         return { bg: '#fff8e1', color: '#f57f17' };
     }
   };
 
   const formatDate = (dateString: string) => {
+    if (!dateString) return 'N/A';
     const date = new Date(dateString);
-    return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    return date.toLocaleDateString('en-US', { 
+      day: 'numeric', 
+      month: 'short', 
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
+
+  // Helper function to format date range
+  const formatDateRange = (startDate?: string, endDate?: string) => {
+    if (!startDate && !endDate) return 'N/A';
+    if (startDate && !endDate) return `From ${formatDate(startDate)}`;
+    if (!startDate && endDate) return `Until ${formatDate(endDate)}`;
+    return `${formatDate(startDate || '')} - ${formatDate(endDate || '')}`;
   };
 
   // Mobile card view for alerts
@@ -268,18 +521,73 @@ export default function AlertsManagement() {
               
               <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, mb: 2 }}>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <Typography variant="body2" color="text.secondary">City:</Typography>
-                  <Typography variant="body2">{alert.city}</Typography>
+                  <Typography variant="body2" color="text.secondary">Category:</Typography>
+                  <Typography variant="body2">{alert.alertCategory || 'General'}</Typography>
                 </Box>
                 
                 <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <Typography variant="body2" color="text.secondary">Created:</Typography>
-                  <Typography variant="body2">{formatDate(alert.createdAt)}</Typography>
+                  <Typography variant="body2" color="text.secondary">Priority:</Typography>
+                  <Typography variant="body2">{alert.priority || 'N/A'}</Typography>
+                </Box>
+                
+                <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <Typography variant="body2" color="text.secondary">Location:</Typography>
+                  <Typography variant="body2">{alert.city || 'Unknown'}</Typography>
+                </Box>
+                
+                <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <Typography variant="body2" color="text.secondary">Timeframe:</Typography>
+                  <Typography variant="body2" sx={{ maxWidth: '170px', textAlign: 'right' }}>
+                    {formatDateRange(alert.expectedStart, alert.expectedEnd)}
+                  </Typography>
+                </Box>
+                
+                <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <Typography variant="body2" color="text.secondary">Last updated:</Typography>
+                  <Typography variant="body2">
+                    {formatDate(alert.updated || alert.updatedAt)}
+                  </Typography>
                 </Box>
               </Box>
               
-              <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1 }}>
-                <Tooltip title={updateStatusTooltip}>
+              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 2 }}>
+                {Array.isArray(alert.targetAudience) && alert.targetAudience.map((audience, idx) => (
+                  <Chip 
+                    key={idx} 
+                    label={audience} 
+                    size="small" 
+                    variant="outlined" 
+                    sx={{ borderRadius: '4px' }}
+                  />
+                ))}
+                
+                {typeof alert.targetAudience === 'string' && alert.targetAudience && (
+                  <Chip 
+                    label={alert.targetAudience} 
+                    size="small" 
+                    variant="outlined" 
+                    sx={{ borderRadius: '4px' }}
+                  />
+                )}
+              </Box>
+              
+              <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap', gap: 1 }}>
+                <Tooltip title="View details">
+                  <IconButton 
+                    size="small" 
+                    onClick={() => handleViewClick(alert)}
+                    sx={{ 
+                      color: theme.palette.primary.main,
+                      border: `1px solid ${theme.palette.primary.main}`,
+                      borderRadius: '4px',
+                      padding: '4px 8px',
+                    }}
+                  >
+                    <VisibilityIcon fontSize="small" />
+                  </IconButton>
+                </Tooltip>
+                
+                <Tooltip title={updateStatusTooltip || "Update status"}>
                   <span>
                     <Button
                       size="small"
@@ -296,37 +604,80 @@ export default function AlertsManagement() {
                     </Button>
                   </span>
                 </Tooltip>
-                <Tooltip title={editAlertTooltip}>
+                
+                <Tooltip title={editAlertTooltip || "Edit alert"}>
                   <span>
-                    <Button
+                    <IconButton
                       size="small"
-                      variant="outlined"
-                      onClick={() => router.push(`/admin/alerts/edit/${alert._id}`)}
+                      color="primary"
+                      onClick={() => handleEditClick(alert)}
                       disabled={!canEditAlert}
                       sx={{ 
-                        borderColor: '#1976d2', 
-                        color: '#1976d2',
-                        '&:hover': { backgroundColor: '#e3f2fd' }
+                        border: `1px solid ${theme.palette.primary.main}`,
+                        borderRadius: '4px',
+                        padding: '4px 8px',
                       }}
                     >
-                      <i className="ri-edit-line" style={{ marginRight: '4px' }} />
-                      Edit
-                    </Button>
+                      <EditIcon fontSize="small" />
+                    </IconButton>
                   </span>
                 </Tooltip>
-                <Tooltip title={deleteAlertTooltip}>
+                
+                <Tooltip title={archiveAlertTooltip || "Archive alert"}>
+                  <span>
+                    <IconButton
+                      size="small"
+                      color="default"
+                      onClick={() => handleArchiveClick(alert)}
+                      disabled={!canArchiveAlert}
+                      sx={{ 
+                        border: `1px solid ${theme.palette.text.secondary}`,
+                        borderRadius: '4px',
+                        padding: '4px 8px',
+                        color: theme.palette.text.secondary
+                      }}
+                    >
+                      <ArchiveIcon fontSize="small" />
+                    </IconButton>
+                  </span>
+                </Tooltip>
+                
+                <Tooltip title={duplicateAlertTooltip || "Duplicate alert"}>
+                  <span>
+                    <IconButton
+                      size="small"
+                      color="info"
+                      onClick={() => handleDuplicateClick(alert)}
+                      disabled={!canDuplicateAlert}
+                      sx={{ 
+                        border: `1px solid ${theme.palette.info.main}`,
+                        borderRadius: '4px',
+                        padding: '4px 8px',
+                      }}
+                    >
+                      <FileCopyIcon fontSize="small" />
+                    </IconButton>
+                  </span>
+                </Tooltip>
+                
+                <Tooltip title={deleteAlertTooltip || "Delete alert"}>
                   <span>
                     <IconButton
                       size="small"
                       color="error"
                       onClick={() => handleDeleteClick(alert)}
                       disabled={!canDeleteAlert}
+                      sx={{ 
+                        border: `1px solid ${theme.palette.error.main}`,
+                        borderRadius: '4px',
+                        padding: '4px 8px',
+                      }}
                     >
-                      <i className="ri-delete-bin-line" />
+                      <DeleteIcon fontSize="small" />
                     </IconButton>
                   </span>
                 </Tooltip>
-              </Box>
+              </Stack>
             </CardContent>
           </Card>
         ))}
@@ -342,9 +693,13 @@ export default function AlertsManagement() {
           <TableHead>
             <TableRow>
               <TableCell sx={{ fontWeight: 'bold' }}>Title</TableCell>
-              <TableCell sx={{ fontWeight: 'bold' }}>City</TableCell>
-              <TableCell sx={{ fontWeight: 'bold' }}>Created On</TableCell>
               <TableCell sx={{ fontWeight: 'bold' }}>Status</TableCell>
+              <TableCell sx={{ fontWeight: 'bold' }}>Timeframe</TableCell>
+              <TableCell sx={{ fontWeight: 'bold' }}>Category</TableCell>
+              <TableCell sx={{ fontWeight: 'bold' }}>Priority/Risk</TableCell>
+              <TableCell sx={{ fontWeight: 'bold' }}>Location</TableCell>
+              <TableCell sx={{ fontWeight: 'bold' }}>Audience</TableCell>
+              <TableCell sx={{ fontWeight: 'bold' }}>Last Updated</TableCell>
               <TableCell sx={{ fontWeight: 'bold' }}>Actions</TableCell>
             </TableRow>
           </TableHead>
@@ -357,8 +712,6 @@ export default function AlertsManagement() {
                       {alert.title || alert.description.substring(0, 30)}
                     </Typography>
                   </TableCell>
-                  <TableCell>{alert.city}</TableCell>
-                  <TableCell>{formatDate(alert.createdAt)}</TableCell>
                   <TableCell>
                     <Chip
                       label={alert.status?.charAt(0).toUpperCase() + (alert.status?.slice(1) || '')}
@@ -370,44 +723,108 @@ export default function AlertsManagement() {
                       }}
                     />
                   </TableCell>
+                  <TableCell sx={{ minWidth: 200 }}>
+                    {formatDateRange(alert.expectedStart, alert.expectedEnd)}
+                  </TableCell>
+                  <TableCell>
+                    {alert.alertCategory || 'General'}
+                  </TableCell>
+                  <TableCell>
+                    <Box>
+                      <Typography variant="body2">
+                        {alert.priority || 'N/A'}
+                      </Typography>
+                      {alert.risk && (
+                        <Typography variant="caption" color="text.secondary">
+                          Risk: {alert.risk}
+                        </Typography>
+                      )}
+                    </Box>
+                  </TableCell>
+                  <TableCell>{alert.city || 'Unknown'}</TableCell>
+                  <TableCell sx={{ minWidth: 150 }}>
+                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                      {Array.isArray(alert.targetAudience) && alert.targetAudience.map((audience, idx) => (
+                        <Chip 
+                          key={idx} 
+                          label={audience} 
+                          size="small" 
+                          variant="outlined" 
+                          sx={{ borderRadius: '4px' }}
+                        />
+                      ))}
+                      
+                      {typeof alert.targetAudience === 'string' && alert.targetAudience && (
+                        <Chip 
+                          label={alert.targetAudience} 
+                          size="small" 
+                          variant="outlined" 
+                          sx={{ borderRadius: '4px' }}
+                        />
+                      )}
+                    </Box>
+                  </TableCell>
+                  <TableCell sx={{ minWidth: 150 }}>
+                    <Typography variant="body2">
+                      {formatDate(alert.updated || alert.updatedAt)}
+                    </Typography>
+                    {alert.updatedBy && (
+                      <Typography variant="caption" color="text.secondary">
+                        by {alert.updatedBy}
+                      </Typography>
+                    )}
+                  </TableCell>
                   <TableCell>
                     <Stack direction="row" spacing={1}>
-                      <Tooltip title={updateStatusTooltip}>
-                        <span>
-                          <Button
-                            size="small"
-                            variant="outlined"
-                            onClick={() => handleStatusChangeClick(alert)}
-                            disabled={!canUpdateStatus}
-                            sx={{ 
-                              borderColor: '#ccc', 
-                              color: '#555',
-                              '&:hover': { borderColor: '#999', backgroundColor: '#f5f5f5' }
-                            }}
-                          >
-                            Update Status
-                          </Button>
-                        </span>
+                      <Tooltip title="View details">
+                        <IconButton 
+                          size="small" 
+                          color="primary"
+                          onClick={() => handleViewClick(alert)}
+                        >
+                          <VisibilityIcon fontSize="small" />
+                        </IconButton>
                       </Tooltip>
-                      <Tooltip title={editAlertTooltip}>
+                      
+                      <Tooltip title={editAlertTooltip || "Edit alert"}>
                         <span>
-                          <Button
+                          <IconButton
                             size="small"
-                            variant="outlined"
-                            onClick={() => router.push(`/admin/alerts/edit/${alert._id}`)}
+                            color="primary"
+                            onClick={() => handleEditClick(alert)}
                             disabled={!canEditAlert}
-                            sx={{ 
-                              borderColor: '#1976d2', 
-                              color: '#1976d2',
-                              '&:hover': { backgroundColor: '#e3f2fd' }
-                            }}
                           >
-                            <i className="ri-edit-line" style={{ marginRight: '4px' }} />
-                            Edit
-                          </Button>
+                            <EditIcon fontSize="small" />
+                          </IconButton>
                         </span>
                       </Tooltip>
-                      <Tooltip title={deleteAlertTooltip}>
+                      
+                      <Tooltip title={archiveAlertTooltip || "Archive alert"}>
+                        <span>
+                          <IconButton
+                            size="small"
+                            onClick={() => handleArchiveClick(alert)}
+                            disabled={!canArchiveAlert}
+                          >
+                            <ArchiveIcon fontSize="small" />
+                          </IconButton>
+                        </span>
+                      </Tooltip>
+                      
+                      <Tooltip title={duplicateAlertTooltip || "Duplicate alert"}>
+                        <span>
+                          <IconButton
+                            size="small"
+                            color="info"
+                            onClick={() => handleDuplicateClick(alert)}
+                            disabled={!canDuplicateAlert}
+                          >
+                            <FileCopyIcon fontSize="small" />
+                          </IconButton>
+                        </span>
+                      </Tooltip>
+                      
+                      <Tooltip title={deleteAlertTooltip || "Delete alert"}>
                         <span>
                           <IconButton
                             size="small"
@@ -415,7 +832,7 @@ export default function AlertsManagement() {
                             onClick={() => handleDeleteClick(alert)}
                             disabled={!canDeleteAlert}
                           >
-                            <i className="ri-delete-bin-line" />
+                            <DeleteIcon fontSize="small" />
                           </IconButton>
                         </span>
                       </Tooltip>
@@ -425,7 +842,7 @@ export default function AlertsManagement() {
               ))
             ) : (
               <TableRow>
-                <TableCell colSpan={5} align="center" sx={{ py: 3 }}>
+                <TableCell colSpan={9} align="center" sx={{ py: 3 }}>
                   <Typography variant="body1" color="text.secondary">
                     No alerts found
                   </Typography>
@@ -465,56 +882,31 @@ export default function AlertsManagement() {
         </Typography>
       </Box>
 
+      {/* Alert Filters Component */}
+      <AlertFilters
+        onFilterChange={handleFilterChange}
+        onSearch={handleSearch}
+        searchQuery={searchQuery}
+        onClearFilters={handleClearFilters}
+        appliedFilters={convertToFilterRecord(activeFilters)}
+      />
+
       <Paper sx={{ p: 3, mb: 3, borderRadius: 2 }} elevation={0}>
-        <Stack 
-          direction={{ xs: 'column', sm: 'row' }} 
-          spacing={2} 
-          sx={{ mb: 3 }}
-          alignItems={{ sm: 'center' }}
-        >
-          <TextField
-            label="Search alerts"
-            variant="outlined"
-            size="small"
-            fullWidth
-            value={searchQuery}
-            onChange={handleSearchChange}
-            sx={{ flex: 2, maxWidth: { sm: 300 } }}
-          />
-          <FormControl size="small" sx={{ width: { xs: '100%', sm: 200 } }}>
-            <InputLabel id="status-filter-label">Filter by Status</InputLabel>
-            <Select
-              labelId="status-filter-label"
-              id="status-filter"
-              value={statusFilter}
-              label="Filter by Status"
-              onChange={handleStatusFilterChange}
-            >
-              <MenuItem value="all">All Statuses</MenuItem>
-              <MenuItem value="pending">Pending</MenuItem>
-              <MenuItem value="approved">Approved</MenuItem>
-              <MenuItem value="rejected">Rejected</MenuItem>
-            </Select>
-          </FormControl>
+        <Box sx={{ mb: 3, display: 'flex', justifyContent: 'flex-end' }}>
           <Tooltip title={createAlertTooltip}>
             <span>
               <Button
                 variant="contained"
                 color="primary"
                 startIcon={<i className="ri-add-line" />}
-                onClick={() => router.push('/admin/alerts/create')}
+                onClick={() => window.location.href = '/admin/alerts/create'}
                 disabled={!canCreateAlert}
-                sx={{ 
-                  ml: { sm: 'auto' },
-                  whiteSpace: 'nowrap',
-                  minWidth: { xs: '100%', sm: 'auto' }
-                }}
               >
                 Create New Alert
               </Button>
             </span>
           </Tooltip>
-        </Stack>
+        </Box>
 
         {loading ? (
           <Box sx={{ display: 'flex', justifyContent: 'center', p: 5 }}>
@@ -540,37 +932,56 @@ export default function AlertsManagement() {
         )}
       </Paper>
 
+      {/* View Alert Dialog */}
+      <AlertViewDialog
+        open={viewDialogOpen}
+        onClose={() => setViewDialogOpen(false)}
+        alertId={selectedAlert?._id || null}
+      />
+
       {/* Delete Confirmation Dialog */}
-      <Dialog
+      <ConfirmationDialog
         open={dialogOpen}
         onClose={() => setDialogOpen(false)}
-      >
-        <DialogTitle>Confirm Deletion</DialogTitle>
-        <DialogContent>
-          <DialogContentText>
-            Are you sure you want to delete this alert? This action cannot be undone.
-          </DialogContentText>
-          {selectedAlert && (
-            <Box sx={{ mt: 2, p: 2, bgcolor: '#f5f5f5', borderRadius: 1 }}>
-              <Typography variant="subtitle2">
-                {selectedAlert.title || selectedAlert.description.substring(0, 30)}
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                {selectedAlert.city}
-              </Typography>
-            </Box>
-          )}
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setDialogOpen(false)}>Cancel</Button>
-          <Button onClick={handleConfirmDelete} color="error">Delete</Button>
-        </DialogActions>
-      </Dialog>
+        onConfirm={handleConfirmDelete}
+        loading={actionLoading}
+        title="Confirm Deletion"
+        message="Are you sure you want to delete this alert? This action cannot be undone."
+        confirmButtonText="Delete"
+        confirmButtonColor="error"
+        alert={selectedAlert}
+      />
+
+      {/* Archive Confirmation Dialog */}
+      <ConfirmationDialog
+        open={archiveDialogOpen}
+        onClose={() => setArchiveDialogOpen(false)}
+        onConfirm={handleConfirmArchive}
+        loading={actionLoading}
+        title="Confirm Archive"
+        message="Are you sure you want to archive this alert? It will be moved to the archive view."
+        confirmButtonText="Archive"
+        confirmButtonColor="warning"
+        alert={selectedAlert}
+      />
+
+      {/* Duplicate Confirmation Dialog */}
+      <ConfirmationDialog
+        open={duplicateDialogOpen}
+        onClose={() => setDuplicateDialogOpen(false)}
+        onConfirm={handleConfirmDuplicate}
+        loading={actionLoading}
+        title="Confirm Duplication"
+        message="Are you sure you want to duplicate this alert? A new alert with the same content will be created."
+        confirmButtonText="Duplicate"
+        confirmButtonColor="info"
+        alert={selectedAlert}
+      />
 
       {/* Status Update Dialog */}
       <Dialog
         open={statusDialogOpen}
-        onClose={() => setStatusDialogOpen(false)}
+        onClose={() => !actionLoading && setStatusDialogOpen(false)}
       >
         <DialogTitle>Update Alert Status</DialogTitle>
         <DialogContent>
@@ -603,8 +1014,15 @@ export default function AlertsManagement() {
           </FormControl>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setStatusDialogOpen(false)}>Cancel</Button>
-          <Button onClick={handleConfirmStatusChange} variant="contained">Update</Button>
+          <Button onClick={() => setStatusDialogOpen(false)} disabled={actionLoading}>Cancel</Button>
+          <Button 
+            onClick={handleConfirmStatusChange} 
+            variant="contained"
+            disabled={actionLoading}
+            startIcon={actionLoading ? <CircularProgress size={20} /> : undefined}
+          >
+            {actionLoading ? 'Updating...' : 'Update'}
+          </Button>
         </DialogActions>
       </Dialog>
 

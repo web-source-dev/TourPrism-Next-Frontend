@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Box, Paper, Typography, Tab, Tabs, Container, CircularProgress, Alert, Button } from '@mui/material';
 import { User } from '@/types';
 import PersonalInfoTab from '@/components/profile/PersonalInfoTab';
@@ -8,7 +8,6 @@ import CompanyInfoTab from '@/components/profile/CompanyInfoTab';
 import AccountSettingsTab from '@/components/profile/AccountSettingsTab';
 import PreferencesTab from '@/components/profile/PreferencesTab';
 import { getUserProfile } from '@/services/api';
-import { useRouter } from 'next/navigation';
 import Layout from '@/components/Layout';
 import { useAuth } from '@/context/AuthContext';
 import CollaboratorTab from '@/components/profile/CollaboratorTab';
@@ -51,10 +50,9 @@ export default function ProfilePage() {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const router = useRouter();
   const { isAuthenticated, isCollaborator, collaboratorRole, user: authUser } = useAuth();
   
-  const fetchUserProfile = async () => {
+  const fetchUserProfile = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
@@ -63,25 +61,25 @@ export default function ProfilePage() {
       
       // Handle the collaborator data structure when a collaborator is logged in
       // When a collaborator logs in, we need to ensure we have all the profile data
-      if (isCollaborator && userData && !userData.firstName) {
+      if (isCollaborator && userData && !userData.user.firstName) {
         console.log('Collaborator data received, processing...', userData);
         // The profile data is incomplete for collaborator, let's make adjustments
         // We need to ensure basic fields exist even if they're empty
         const enhancedUserData = {
           ...userData,
-          firstName: userData.firstName || '',
-          lastName: userData.lastName || '',
-          company: userData.company || { name: '', type: '', MainOperatingRegions: [] },
-          preferences: userData.preferences || {
+          firstName: userData.user.firstName || '',
+          lastName: userData.user.lastName || '',
+          company: userData.user.company || { name: '', type: '', MainOperatingRegions: [] },
+          preferences: userData.user.preferences || {
             Communication: { emailPrefrences: false, whatsappPrefrences: false },
             AlertSummaries: { daily: false, weekly: false, monthly: false }
           },
-          createdAt: userData.createdAt || new Date().toISOString()
+          createdAt: userData.user.createdAt || new Date().toISOString()
         };
         
-        setUser(enhancedUserData);
+        setUser(enhancedUserData as unknown as User);
       } else {
-        setUser(userData);
+        setUser(userData.user);
       }
     } catch (error) {
       console.error('Failed to fetch user profile:', error);
@@ -89,21 +87,16 @@ export default function ProfilePage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [isCollaborator]);
   
   useEffect(() => {
-    if(!isAuthenticated) {
-      router.push('/');
-      return;
-    }
-    
     // If we have authUser and it's a collaborator, we can use some of that data
     if (isCollaborator && authUser) {
       console.log('Collaborator logged in, auth data:', authUser);
     }
     
     fetchUserProfile();
-  }, [isAuthenticated, isCollaborator, authUser]);
+  }, [isAuthenticated, isCollaborator, authUser, fetchUserProfile]);
 
   const handleChange = (event: React.SyntheticEvent, newValue: number) => {
     setValue(newValue);

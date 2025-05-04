@@ -152,8 +152,12 @@ api.interceptors.response.use(
 
 // Add Collaborator interface to extend the User type
 interface Collaborator {
+  _id: string;
   email: string;
   role: 'viewer' | 'manager';
+  status: 'invited' | 'active' | 'restricted' | 'deleted';
+  invitationToken?: string;
+  createdAt?: string;
 }
 
 // Extend the User interface to include collaborator information
@@ -385,6 +389,7 @@ interface FetchAlertsParams {
   page?: number;
   sortBy?: string;
   sortOrder?: 'asc' | 'desc';
+  originOnly?: boolean;
 }
 
 export const fetchAlerts = async (params: FetchAlertsParams = {}): Promise<{ alerts: Alert[], totalCount: number }> => {
@@ -408,6 +413,11 @@ export const fetchAlerts = async (params: FetchAlertsParams = {}): Promise<{ ale
         // Only append distance if coordinates are present and distance is valid
         if (params.distance && Number(params.distance) > 0) {
           queryParams.append('distance', String(Number(params.distance)));
+        }
+        
+        // Add origin-only flag if specified
+        if (params.originOnly) {
+          queryParams.append('originOnly', 'true');
         }
       }
     }
@@ -455,6 +465,71 @@ export const fetchAlerts = async (params: FetchAlertsParams = {}): Promise<{ ale
   }
 };
 
+// Function to fetch archived alerts (alerts whose expectedEnd date has passed)
+export const fetchArchivedAlerts = async (params: FetchAlertsParams = {}): Promise<{ alerts: Alert[], totalCount: number }> => {
+  try {
+    const queryParams = new URLSearchParams();
+    
+    // Location filters
+    if (params.city) {
+      queryParams.append('city', params.city);
+    }
+    
+    if (params.latitude !== undefined && params.longitude !== undefined) {
+      // Validate and ensure coordinates are valid numbers
+      const latitude = Number(params.latitude);
+      const longitude = Number(params.longitude);
+      
+      if (!isNaN(latitude) && !isNaN(longitude)) {
+        queryParams.append('latitude', latitude.toFixed(6));
+        queryParams.append('longitude', longitude.toFixed(6));
+        
+        // Only append distance if coordinates are present and distance is valid
+        if (params.distance && Number(params.distance) > 0) {
+          queryParams.append('distance', String(Number(params.distance)));
+        }
+        
+        // Add origin-only flag if specified
+        if (params.originOnly) {
+          queryParams.append('originOnly', 'true');
+        }
+      }
+    }
+
+    // Incident type filters - handle as array properly
+    if (params.incidentTypes && Array.isArray(params.incidentTypes) && params.incidentTypes.length > 0) {
+      params.incidentTypes.forEach(type => {
+        queryParams.append('incidentTypes[]', type);
+      });
+    }
+
+    // Pagination
+    queryParams.append('limit', String(params.limit || 20));
+    queryParams.append('page', String(params.page || 1));
+
+    // Sorting
+    if (params.sortBy) {
+      queryParams.append('sortBy', params.sortBy);
+    }
+    
+    // Debug log the query string
+    const queryString = queryParams.toString();
+    console.log('API Call to archived alerts queryString:', queryString);
+    
+    const endpoint = queryString ? `/api/archived-alerts?${queryString}` : '/api/archived-alerts';
+    
+    const response: CustomAxiosResponse<{ alerts: Alert[], totalCount: number }> = await api.get(endpoint);
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching archived alerts:', error);
+    const axiosError = error as CustomAxiosError;
+    throw axiosError.response?.data || {
+      message: 'Failed to fetch archived alerts. Please try again later.',
+      error: (error as Error).message
+    };
+  }
+};
+
 export const getNotifications = async (): Promise<Notification[]> => {
   try {
     const response: CustomAxiosResponse<Notification[]> = await api.get('/api/notifications');
@@ -491,8 +566,20 @@ export const markAllAsRead = async (): Promise<{ success: boolean }> => {
   }
 };
 
-// Admin API Functions
-export const getAllUsers = async (params = {}): Promise<{ users: User[], totalCount: number }> => {
+export interface UserFilters extends Record<string, unknown> {
+  role?: string;
+  status?: string;
+  company?: string;
+  search?: string;
+  startDate?: string;
+  endDate?: string;
+  sortBy?: string;
+  sortOrder?: 'asc' | 'desc';
+  page?: number;
+  limit?: number;
+}
+
+export const getAllUsers = async (params: UserFilters = {}): Promise<{ users: User[], totalCount: number }> => {
   try {
     const response = await api.get<{ users: User[], totalCount: number }>('/api/admin/users', { params });
     return response.data;
@@ -504,6 +591,37 @@ export const getAllUsers = async (params = {}): Promise<{ users: User[], totalCo
 export const updateUserRole = async (userId: string, role: string): Promise<{ success: boolean }> => {
   try {
     const response = await api.put<{ success: boolean }>(`/api/admin/users/${userId}/role`, { role });
+    return response.data;
+  } catch (error) {
+    throw getErrorMessage(error as CustomAxiosError);
+  }
+};
+
+export const updateUserStatus = async (userId: string, status: string): Promise<{ success: boolean }> => {
+  try {
+    const response = await api.put<{ success: boolean }>(`/api/admin/users/${userId}/status`, { status });
+    return response.data;
+  } catch (error) {
+    throw getErrorMessage(error as CustomAxiosError);
+  }
+};
+
+export const getUserProfile = async (): Promise<{ user: User }> => {
+  try {
+    // Don't use the admin endpoint for getting the current user's profile
+    // Instead use the /profile endpoint which is designed for this
+    const response = await api.get<User>('/profile');
+    // The profile endpoint returns the user object directly, not wrapped in { user }
+    // So we need to match the expected return format
+    return { user: response.data };
+  } catch (error) {
+    throw getErrorMessage(error as CustomAxiosError);
+  }
+};
+
+export const deleteUser = async (userId: string): Promise<{ success: boolean }> => {
+  try {
+    const response = await api.delete<{ success: boolean }>(`/api/admin/users/${userId}`);
     return response.data;
   } catch (error) {
     throw getErrorMessage(error as CustomAxiosError);
@@ -540,6 +658,33 @@ export const deleteAlert = async (alertId: string): Promise<{ success: boolean }
 export const updateAlert = async (alertId: string, alertData: Partial<Alert>): Promise<{ success: boolean; alert: Alert }> => {
   try {
     const response = await api.put<{ success: boolean; alert: Alert }>(`/api/admin/alerts/${alertId}`, alertData);
+    return response.data;
+  } catch (error) {
+    throw getErrorMessage(error as CustomAxiosError);
+  }
+};
+
+export const archiveAlert = async (alertId: string): Promise<{ success: boolean; alert: Alert }> => {
+  try {
+    const response = await api.put<{ success: boolean; alert: Alert }>(`/api/admin/alerts/${alertId}/archive`, {});
+    return response.data;
+  } catch (error) {
+    throw getErrorMessage(error as CustomAxiosError);
+  }
+};
+
+export const duplicateAlert = async (alertId: string): Promise<{ success: boolean; alert: Alert }> => {
+  try {
+    const response = await api.post<{ success: boolean; alert: Alert }>(`/api/admin/alerts/${alertId}/duplicate`, {});
+    return response.data;
+  } catch (error) {
+    throw getErrorMessage(error as CustomAxiosError);
+  }
+};
+
+export const viewAlertDetails = async (alertId: string): Promise<Alert> => {
+  try {
+    const response = await api.get<Alert>(`/api/admin/alerts/${alertId}/details`);
     return response.data;
   } catch (error) {
     throw getErrorMessage(error as CustomAxiosError);
@@ -594,44 +739,6 @@ export const getDashboardStats = async (): Promise<DashboardStats> => {
   }
 };
 
-// User Profile Related API Functions
-export const getUserProfile = async (): Promise<User> => {
-  try {
-    const response = await api.get<User>('/auth/user/profile');
-    const userData = response.data;
-    
-    // Check if this is a collaborator response with minimal data
-    if (userData.isCollaborator && !userData.firstName) {
-      console.log('Received collaborator data structure, fetching full profile data');
-      
-      // When a collaborator is logged in, we need to make an additional call to get the full profile
-      try {
-        // Use the Profile endpoint directly which has collaborator permissions
-        const fullProfileResponse = await api.get<User>('/profile');
-        const fullProfileData = fullProfileResponse.data;
-        
-        console.log('Fetched full profile data for collaborator view:', fullProfileData);
-        
-        // Return the enhanced user profile with collaborator context
-        return {
-          ...fullProfileData,
-          // Preserve collaborator information from original response
-          isCollaborator: userData.isCollaborator,
-          collaborator: userData.collaborator
-        };
-      } catch (profileError) {
-        console.error('Error fetching full profile as collaborator:', profileError);
-        // Still return the basic collaborator data if full profile fetch fails
-        return userData;
-      }
-    }
-    
-    return userData;
-  } catch (error) {
-    throw getErrorMessage(error as CustomAxiosError);
-  }
-};
-
 export const updatePersonalInfo = async (data: { 
   firstName: string; 
   lastName: string; 
@@ -651,7 +758,12 @@ export const updatePersonalInfo = async (data: {
 export const updateCompanyInfo = async (data: {
   companyName?: string;
   companyType?: string;
-  mainOperatingRegions?: string[];
+  mainOperatingRegions?: Array<{
+    name: string;
+    latitude: number | null;
+    longitude: number | null;
+    placeId: string | null;
+  }>;
 }): Promise<User> => {
   try {
     console.log('API: Sending company info update with data:', JSON.stringify(data));
@@ -711,6 +823,86 @@ export const getCompanySuggestions = async (query: string): Promise<string[]> =>
   } catch (error) {
     console.error('Error fetching company suggestions:', error);
     return [];
+  }
+};
+
+// Get collaborators
+export const getCollaborators = async (): Promise<{ collaborators: Collaborator[] }> => {
+  try {
+    const response = await api.get<{ collaborators: Collaborator[] }>('/profile/collaborators');
+    return response.data;
+  } catch (error) {
+    throw new Error(getErrorMessage(error as CustomAxiosError));
+  }
+};
+
+// Invite a collaborator
+export const inviteCollaborator = async (data: { email: string; name?: string; role: 'viewer' | 'manager' }): Promise<{ message: string; collaborator?: Collaborator }> => {
+  try {
+    const response = await api.post<{ message: string; collaborator?: Collaborator }>('/profile/collaborators/invite', data);
+    return response.data;
+  } catch (error) {
+    throw new Error(getErrorMessage(error as CustomAxiosError));
+  }
+};
+
+// Resend invitation
+export const resendCollaboratorInvitation = async (collaboratorId: string): Promise<{ message: string }> => {
+  try {
+    const response = await api.post<{ message: string }>(`/profile/collaborators/${collaboratorId}/resend`);
+    return response.data;
+  } catch (error) {
+    throw new Error(getErrorMessage(error as CustomAxiosError));
+  }
+};
+
+// Update collaborator role
+export const updateCollaboratorRole = async (collaboratorId: string, role: 'viewer' | 'manager'): Promise<{ message: string; collaborator: Collaborator }> => {
+  try {
+    const response = await api.put<{ message: string; collaborator: Collaborator }>(`/profile/collaborators/${collaboratorId}/role`, { role });
+    return response.data;
+  } catch (error) {
+    throw new Error(getErrorMessage(error as CustomAxiosError));
+  }
+};
+
+// Update collaborator status
+export const updateCollaboratorStatus = async (collaboratorId: string, status: 'active' | 'restricted'): Promise<{ message: string; collaborator: Collaborator }> => {
+  try {
+    const response = await api.put<{ message: string; collaborator: Collaborator }>(`/profile/collaborators/${collaboratorId}/status`, { status });
+    return response.data;
+  } catch (error) {
+    throw new Error(getErrorMessage(error as CustomAxiosError));
+  }
+};
+
+// Delete a collaborator
+export const deleteCollaborator = async (collaboratorId: string): Promise<{ message: string }> => {
+  try {
+    const response = await api.delete<{ message: string }>(`/profile/collaborators/${collaboratorId}`);
+    return response.data;
+  } catch (error) {
+    throw new Error(getErrorMessage(error as CustomAxiosError));
+  }
+};
+
+// Verify invitation token
+export const verifyInvitationToken = async (token: string, email: string): Promise<{ valid: boolean; ownerName: string; ownerEmail: string; companyName: string; collaboratorEmail: string; role: 'viewer' | 'manager' }> => {
+  try {
+    const response = await api.get<{ valid: boolean; ownerName: string; ownerEmail: string; companyName: string; collaboratorEmail: string; role: 'viewer' | 'manager' }>(`/profile/collaborators/verify-invitation?token=${token}&email=${encodeURIComponent(email)}`);
+    return response.data;
+  } catch (error) {
+    throw new Error(getErrorMessage(error as CustomAxiosError));
+  }
+};
+
+// Accept invitation
+export const acceptInvitation = async (data: { token: string; email: string; password: string }): Promise<{ message: string; token: string; user: unknown }> => {
+  try {
+    const response = await api.post<{ message: string; token: string; user: unknown }>('/profile/collaborators/accept-invitation', data);
+    return response.data;
+  } catch (error) {
+    throw new Error(getErrorMessage(error as CustomAxiosError));
   }
 };
 

@@ -1,98 +1,80 @@
 'use client';
 
 import React, { useEffect, useState, useCallback } from 'react';
-import { 
-  Box, 
-  Typography, 
-  Paper, 
-  Table, 
-  TableBody, 
-  TableCell, 
-  TableContainer, 
-  TableHead, 
-  TableRow,
+import {
+  Box,
+  Typography,
+  Paper,
   TablePagination,
-  Button,
-  TextField,
-  MenuItem,
-  Chip,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogContentText,
-  DialogTitle,
   CircularProgress,
-  FormControl,
-  InputLabel,
-  Select,
-  Stack,
   Snackbar,
   Alert,
-  SelectChangeEvent,
-  Card,
-  CardContent,
   useMediaQuery,
   useTheme,
-  Tooltip
 } from '@mui/material';
 import AdminLayout from '@/components/AdminLayout';
-import { getAllUsers, updateUserRole } from '@/services/api';
+import {
+  getAllUsers,
+  updateUserRole,
+  updateUserStatus,
+  deleteUser,
+  UserFilters as UserFiltersType
+} from '@/services/api';
 import { User } from '@/types';
 import { useAuth } from '@/context/AuthContext';
 
-// Extend User type for additional admin-related fields
-interface ExtendedUser extends User {
-  followedAlertsCount?: number;
-  role: string;
-}
+// Import custom components
+import UserFiltersComponent from '@/components/admin/users/UserFilters';
+import UserTable from '@/components/admin/users/UserTable';
+import UserCard from '@/components/admin/users/UserCard';
+import ProfileModal from '@/components/admin/users/modals/ProfileModal';
+import ChangeRoleModal from '@/components/admin/users/modals/ChangeRoleModal';
+import RestrictUserModal from '@/components/admin/users/modals/RestrictUserModal';
+import DeleteUserModal from '@/components/admin/users/modals/DeleteUserModal';
 
 export default function UsersManagement() {
-  const [users, setUsers] = useState<ExtendedUser[]>([]);
+  const [users, setUsers] = useState<User[]>([]);
   const [totalCount, setTotalCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(0);
-  const [rowsPerPage, setRowsPerPage] = useState(10);
-  const [roleFilter, setRoleFilter] = useState<string>('all');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedUser, setSelectedUser] = useState<ExtendedUser | null>(null);
-  const [roleDialogOpen, setRoleDialogOpen] = useState(false);
-  const [newRole, setNewRole] = useState('');
-  const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' as 'success' | 'error' });
+  const [rowsPerPage, setRowsPerPage] = useState(20);
+  const [filters, setFilters] = useState<UserFiltersType>({});
+  const [sortBy, setSortBy] = useState<string>('createdAt');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+  const [snackbar, setSnackbar] = useState({
+    open: false,
+    message: '',
+    severity: 'success' as 'success' | 'error'
+  });
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const { isAdmin } = useAuth();
 
-  // Permission check for changing user roles - only admin can change roles
-  const canChangeUserRole = isAdmin;
-  
-  // Permission tooltips
-  const changeRoleTooltip = !canChangeUserRole 
-    ? "Only administrators can change user roles" 
-    : "";
+  // Modal states
+  const [profileModalOpen, setProfileModalOpen] = useState<boolean>(false);
+  const [roleModalOpen, setRoleModalOpen] = useState<boolean>(false);
+  const [restrictModalOpen, setRestrictModalOpen] = useState<boolean>(false);
+  const [deleteModalOpen, setDeleteModalOpen] = useState<boolean>(false);
+  const [selectedUser, setSelectedUser] = useState<User | null>(null);
+  const [modalAction, setModalAction] = useState<'restrict' | 'enable'>('restrict');
+  const [actionLoading, setActionLoading] = useState<boolean>(false);
+
+  // Permission check for changing user roles/status - only admin can do this
+  const canManageUsers = isAdmin;
 
   const fetchUsers = useCallback(async () => {
     setLoading(true);
     try {
-      const params: Record<string, string | number> = {
+      const params: UserFiltersType = {
         page: page + 1,
-        limit: rowsPerPage
+        limit: rowsPerPage,
+        sortBy,
+        sortOrder,
+        ...filters
       };
-      
-      if (roleFilter !== 'all') {
-        params.role = roleFilter;
-      }
-      
-      if (searchQuery) {
-        params.search = searchQuery;
-      }
-      
+
       const { users: fetchedUsers, totalCount } = await getAllUsers(params);
-      // Convert User[] to ExtendedUser[] with role defaults
-      const extendedUsers: ExtendedUser[] = fetchedUsers.map(user => ({
-        ...user,
-        role: user.role || 'user' // Set default role if missing
-      }));
-      setUsers(extendedUsers);
+      setUsers(fetchedUsers);
       setTotalCount(totalCount);
     } catch (error) {
       console.error('Error fetching users:', error);
@@ -104,7 +86,7 @@ export default function UsersManagement() {
     } finally {
       setLoading(false);
     }
-  }, [page, rowsPerPage, roleFilter, searchQuery]);
+  }, [page, rowsPerPage, sortBy, sortOrder, filters]);
 
   useEffect(() => {
     fetchUsers();
@@ -119,37 +101,65 @@ export default function UsersManagement() {
     setPage(0);
   };
 
-  const handleRoleFilterChange = (event: SelectChangeEvent<string>) => {
-    setRoleFilter(event.target.value);
+  const handleFilterChange = (newFilters: UserFiltersType) => {
+    setFilters(newFilters);
     setPage(0);
   };
 
-  const handleSearchChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    setSearchQuery(event.target.value);
+  const handleSortChange = (newSortBy: string, newSortOrder: 'asc' | 'desc') => {
+    setSortBy(newSortBy);
+    setSortOrder(newSortOrder);
     setPage(0);
   };
 
-  const handleRoleChangeClick = (user: ExtendedUser) => {
+  const handleCloseSnackbar = () => {
+    setSnackbar({ ...snackbar, open: false });
+  };
+
+  // User action handlers
+  const handleViewProfile = (user: User) => {
     setSelectedUser(user);
-    setNewRole(user.role || 'user');
-    setRoleDialogOpen(true);
+    setProfileModalOpen(true);
   };
 
-  const handleConfirmRoleChange = async () => {
-    if (!selectedUser || !newRole) return;
+  const handleChangeRole = (user: User) => {
+    setSelectedUser(user);
+    setRoleModalOpen(true);
+  };
+
+  const handleRestrictUser = (user: User) => {
+    setSelectedUser(user);
+    // Check user's current status to determine the action
+    setModalAction(user.status === 'restricted' || user.status === 'deleted' ? 'enable' : 'restrict');
+    setRestrictModalOpen(true);
+  };
+
+  const handleDeleteUser = (user: User) => {
+    setSelectedUser(user);
+    setDeleteModalOpen(true);
+  };
+
+  // Confirm action handlers
+  const confirmRoleChange = async (newRole: string) => {
+    if (!selectedUser) return;
     
+    setActionLoading(true);
     try {
       await updateUserRole(selectedUser._id, newRole);
-      setUsers(users.map(user => 
-        user._id === selectedUser._id 
-          ? { ...user, role: newRole } 
-          : user
-      ));
+      // Update user in the list
+      setUsers(prevUsers => 
+        prevUsers.map(user => 
+          user._id === selectedUser._id 
+            ? { ...user, role: newRole } 
+            : user
+        )
+      );
       setSnackbar({
         open: true,
         message: `User role updated to ${newRole}`,
         severity: 'success'
       });
+      setRoleModalOpen(false);
     } catch (error) {
       console.error('Error updating user role:', error);
       setSnackbar({
@@ -158,191 +168,79 @@ export default function UsersManagement() {
         severity: 'error'
       });
     } finally {
-      setRoleDialogOpen(false);
-      setSelectedUser(null);
+      setActionLoading(false);
     }
   };
 
-  const handleCloseSnackbar = () => {
-    setSnackbar({ ...snackbar, open: false });
-  };
-
-  const getRoleColor = (role: string) => {
-    switch (role) {
-      case 'admin':
-        return { bg: '#e3f2fd', color: '#1565c0' };
-      default:
-        return { bg: '#f5f5f5', color: '#616161' };
-    }
-  };
-
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString();
-  };
-
-  // Mobile card view for users
-  const renderUserCards = () => {
-    if (users.length === 0) {
-      return (
-        <Typography variant="body1" sx={{ textAlign: 'center', p: 3, color: 'text.secondary' }}>
-          No users found
-        </Typography>
+  const confirmRestrictUser = async () => {
+    if (!selectedUser) return;
+    
+    // Allow transitioning between active, restricted, and deleted states
+    const newStatus = modalAction === 'restrict' ? 'restricted' : 'active';
+    
+    setActionLoading(true);
+    try {
+      await updateUserStatus(selectedUser._id, newStatus);
+      // Update user in the list
+      setUsers(prevUsers => 
+        prevUsers.map(user => 
+          user._id === selectedUser._id 
+            ? { ...user, status: newStatus } 
+            : user
+        )
       );
+      setSnackbar({
+        open: true,
+        message: modalAction === 'restrict' 
+          ? 'User has been restricted' 
+          : selectedUser.status === 'deleted'
+          ? 'User account has been restored'
+          : 'User access has been restored',
+        severity: 'success'
+      });
+      setRestrictModalOpen(false);
+    } catch (error) {
+      console.error('Error updating user status:', error);
+      setSnackbar({
+        open: true,
+        message: 'Failed to update user status',
+        severity: 'error'
+      });
+    } finally {
+      setActionLoading(false);
     }
-
-    return (
-      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-        {users.map(user => (
-          <Card 
-            key={user._id} 
-            elevation={0} 
-            sx={{ 
-              border: '1px solid #e0e0e0', 
-              borderRadius: 2,
-              transition: 'transform 0.2s, box-shadow 0.2s',
-              '&:hover': {
-                transform: 'translateY(-2px)',
-                boxShadow: '0 4px 8px rgba(0,0,0,0.08)'
-              }
-            }}
-          >
-            <CardContent sx={{ p: 2 }}>
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1 }}>
-                <Typography variant="subtitle1" sx={{ fontWeight: 'bold' }}>
-                  {user.email}
-                </Typography>
-                <Chip
-                  label={user.role.charAt(0).toUpperCase() + user.role.slice(1)}
-                  size="small"
-                  sx={{
-                    bgcolor: getRoleColor(user.role).bg,
-                    color: getRoleColor(user.role).color,
-                    fontWeight: 'medium'
-                  }}
-                />
-              </Box>
-              
-              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, mb: 2 }}>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <Typography variant="body2" color="text.secondary">Name:</Typography>
-                  <Typography variant="body2">{user.name || 'Not Set'}</Typography>
-                </Box>
-                
-                <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <Typography variant="body2" color="text.secondary">Joined:</Typography>
-                  <Typography variant="body2">{formatDate(user.createdAt)}</Typography>
-                </Box>
-                
-                <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <Typography variant="body2" color="text.secondary">Status:</Typography>
-                  <Typography variant="body2">
-                    {user.isVerified ? "Verified" : "Unverified"}
-                  </Typography>
-                </Box>
-              </Box>
-              
-              <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
-                <Tooltip title={changeRoleTooltip}>
-                  <span>
-                    <Button
-                      size="small"
-                      variant="outlined"
-                      onClick={() => handleRoleChangeClick(user)}
-                      disabled={!canChangeUserRole}
-                      sx={{ 
-                        borderColor: '#ccc', 
-                        color: '#555',
-                        '&:hover': { borderColor: '#999', backgroundColor: '#f5f5f5' }
-                      }}
-                    >
-                      Change Role
-                    </Button>
-                  </span>
-                </Tooltip>
-              </Box>
-            </CardContent>
-          </Card>
-        ))}
-      </Box>
-    );
   };
 
-  // Desktop table view for users
-  const renderUserTable = () => {
-    return (
-      <TableContainer>
-        <Table sx={{ minWidth: 650 }}>
-          <TableHead>
-            <TableRow>
-              <TableCell sx={{ fontWeight: 'bold' }}>Email</TableCell>
-              <TableCell sx={{ fontWeight: 'bold' }}>Name</TableCell>
-              <TableCell sx={{ fontWeight: 'bold' }}>Joined</TableCell>
-              <TableCell sx={{ fontWeight: 'bold' }}>Status</TableCell>
-              <TableCell sx={{ fontWeight: 'bold' }}>Role</TableCell>
-              <TableCell sx={{ fontWeight: 'bold' }}>Actions</TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {users.length > 0 ? (
-              users.map((user) => (
-                <TableRow key={user._id} hover>
-                  <TableCell>{user.email}</TableCell>
-                  <TableCell>{user.name || 'Not Set'}</TableCell>
-                  <TableCell>{formatDate(user.createdAt)}</TableCell>
-                  <TableCell>
-                    <Chip 
-                      label={user.isVerified ? "Verified" : "Unverified"} 
-                      size="small" 
-                      color={user.isVerified ? "success" : "default"}
-                      variant="outlined"
-                    />
-                  </TableCell>
-                  <TableCell>
-                    <Chip
-                      label={user.role.charAt(0).toUpperCase() + user.role.slice(1)}
-                      size="small"
-                      sx={{
-                        bgcolor: getRoleColor(user.role).bg,
-                        color: getRoleColor(user.role).color,
-                        fontWeight: 'medium'
-                      }}
-                    />
-                  </TableCell>
-                  <TableCell>
-                    <Tooltip title={changeRoleTooltip}>
-                      <span>
-                        <Button
-                          size="small"
-                          variant="outlined"
-                          onClick={() => handleRoleChangeClick(user)}
-                          disabled={!canChangeUserRole}
-                          sx={{ 
-                            borderColor: '#ccc', 
-                            color: '#555',
-                            '&:hover': { borderColor: '#999', backgroundColor: '#f5f5f5' }
-                          }}
-                        >
-                          Change Role
-                        </Button>
-                      </span>
-                    </Tooltip>
-                  </TableCell>
-                </TableRow>
-              ))
-            ) : (
-              <TableRow>
-                <TableCell colSpan={6} align="center" sx={{ py: 3 }}>
-                  <Typography variant="body1" color="text.secondary">
-                    No users found
-                  </Typography>
-                </TableCell>
-              </TableRow>
-            )}
-          </TableBody>
-        </Table>
-      </TableContainer>
-    );
+  const confirmDeleteUser = async () => {
+    if (!selectedUser) return;
+    
+    setActionLoading(true);
+    try {
+      await deleteUser(selectedUser._id);
+      // Update user in the list
+      setUsers(prevUsers => 
+        prevUsers.map(user => 
+          user._id === selectedUser._id 
+            ? { ...user, status: 'deleted' } 
+            : user
+        )
+      );
+      setSnackbar({
+        open: true,
+        message: 'User has been deleted',
+        severity: 'success'
+      });
+      setDeleteModalOpen(false);
+    } catch (error) {
+      console.error('Error deleting user:', error);
+      setSnackbar({
+        open: true,
+        message: 'Failed to delete user',
+        severity: 'error'
+      });
+    } finally {
+      setActionLoading(false);
+    }
   };
 
   return (
@@ -352,42 +250,17 @@ export default function UsersManagement() {
           User Management
         </Typography>
         <Typography variant="body1" color="text.secondary">
-          View, filter and manage all users
+          View, filter, and manage all users
         </Typography>
       </Box>
 
-      <Paper sx={{ p: 3, mb: 3, borderRadius: 2 }} elevation={0}>
-        <Stack 
-          direction={{ xs: 'column', sm: 'row' }} 
-          spacing={2} 
-          sx={{ mb: 3 }}
-          alignItems={{ sm: 'center' }}
-        >
-          <TextField
-            label="Search users"
-            variant="outlined"
-            size="small"
-            fullWidth
-            value={searchQuery}
-            onChange={handleSearchChange}
-            sx={{ flex: 2, maxWidth: { sm: 300 } }}
-          />
-          <FormControl size="small" sx={{ width: { xs: '100%', sm: 200 } }}>
-            <InputLabel id="role-filter-label">Filter by Role</InputLabel>
-            <Select
-              labelId="role-filter-label"
-              id="role-filter"
-              value={roleFilter}
-              label="Filter by Role"
-              onChange={handleRoleFilterChange}
-            >
-              <MenuItem value="all">All Roles</MenuItem>
-              <MenuItem value="user">User</MenuItem>
-                <MenuItem value="admin">Admin</MenuItem>
-            </Select>
-          </FormControl>
-        </Stack>
+      {/* User filter controls */}
+      <UserFiltersComponent
+        onFilterChange={handleFilterChange}
+        onSortChange={handleSortChange}
+      />
 
+      <Paper sx={{ p: 3, mb: 3, borderRadius: 2 }} elevation={0}>
         {loading ? (
           <Box sx={{ display: 'flex', justifyContent: 'center', p: 5 }}>
             <CircularProgress />
@@ -395,10 +268,38 @@ export default function UsersManagement() {
         ) : (
           <>
             {/* Switch between mobile card view and desktop table view */}
-            {isMobile ? renderUserCards() : renderUserTable()}
+            {isMobile ? (
+              <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 2 }}>
+                {users.map(user => (
+                  <UserCard
+                    key={user._id}
+                    user={user}
+                    onViewProfile={handleViewProfile}
+                    onChangeRole={canManageUsers ? handleChangeRole : () => {}}
+                    onRestrictUser={canManageUsers ? handleRestrictUser : () => {}}
+                    onDeleteUser={canManageUsers ? handleDeleteUser : () => {}}
+                  />
+                ))}
+                {users.length === 0 && (
+                  <Box sx={{ gridColumn: '1 / -1', p: 3, textAlign: 'center' }}>
+                    <Typography variant="body1" color="text.secondary">
+                      No users found
+                    </Typography>
+                  </Box>
+                )}
+              </Box>
+            ) : (
+              <UserTable
+                users={users}
+                onViewProfile={handleViewProfile}
+                onChangeRole={canManageUsers ? handleChangeRole : () => {}}
+                onRestrictUser={canManageUsers ? handleRestrictUser : () => {}}
+                onDeleteUser={canManageUsers ? handleDeleteUser : () => {}}
+              />
+            )}
             
             <TablePagination
-              rowsPerPageOptions={[5, 10, 25, 50]}
+              rowsPerPageOptions={[5, 10, 20, 50]}
               component="div"
               count={totalCount}
               rowsPerPage={rowsPerPage}
@@ -410,45 +311,37 @@ export default function UsersManagement() {
         )}
       </Paper>
 
-      {/* Role Update Dialog */}
-      <Dialog
-        open={roleDialogOpen}
-        onClose={() => setRoleDialogOpen(false)}
-      >
-        <DialogTitle>Update User Role</DialogTitle>
-        <DialogContent>
-          <DialogContentText sx={{ mb: 3 }}>
-            Choose a new role for this user.
-          </DialogContentText>
-          {selectedUser && (
-            <Box sx={{ mb: 3, p: 2, bgcolor: '#f5f5f5', borderRadius: 1 }}>
-              <Typography variant="subtitle2">
-                {selectedUser.email}
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                Current role: {selectedUser.role}
-              </Typography>
-            </Box>
-          )}
-          <FormControl fullWidth>
-            <InputLabel id="new-role-label">Role</InputLabel>
-            <Select
-              labelId="new-role-label"
-              id="new-role"
-              value={newRole}
-              label="Role"
-              onChange={(e) => setNewRole(e.target.value as string)}
-            >
-              <MenuItem value="user">User</MenuItem>
-              <MenuItem value="admin">Admin</MenuItem>
-            </Select>
-          </FormControl>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setRoleDialogOpen(false)}>Cancel</Button>
-          <Button onClick={handleConfirmRoleChange} variant="contained">Update</Button>
-        </DialogActions>
-      </Dialog>
+      {/* Modal components */}
+      <ProfileModal
+        open={profileModalOpen}
+        onClose={() => setProfileModalOpen(false)}
+        user={selectedUser}
+      />
+
+      <ChangeRoleModal
+        open={roleModalOpen}
+        onClose={() => setRoleModalOpen(false)}
+        user={selectedUser}
+        onConfirm={confirmRoleChange}
+        loading={actionLoading}
+      />
+
+      <RestrictUserModal
+        open={restrictModalOpen}
+        onClose={() => setRestrictModalOpen(false)}
+        user={selectedUser}
+        onConfirm={confirmRestrictUser}
+        loading={actionLoading}
+        action={modalAction}
+      />
+
+      <DeleteUserModal
+        open={deleteModalOpen}
+        onClose={() => setDeleteModalOpen(false)}
+        user={selectedUser}
+        onConfirm={confirmDeleteUser}
+        loading={actionLoading}
+      />
 
       {/* Snackbar for notifications */}
       <Snackbar
@@ -457,8 +350,8 @@ export default function UsersManagement() {
         onClose={handleCloseSnackbar}
         anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
       >
-        <Alert 
-          onClose={handleCloseSnackbar} 
+        <Alert
+          onClose={handleCloseSnackbar}
           severity={snackbar.severity}
         >
           {snackbar.message}

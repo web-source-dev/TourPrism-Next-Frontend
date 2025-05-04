@@ -63,8 +63,34 @@ export default function CompanyInfoTab({ user, onUpdate }: CompanyInfoTabProps) 
     user.company?.type ? user.company.type.split(', ').filter(Boolean) : []
   );
   
-  const [operatingRegions, setOperatingRegions] = useState<string[]>(
-    user.company?.MainOperatingRegions || []
+  // Update operatingRegions to hold objects with coordinates
+  const [operatingRegions, setOperatingRegions] = useState<Array<{
+    name: string;
+    latitude: number | null;
+    longitude: number | null;
+    placeId: string | null;
+  }>>(
+    // Convert from legacy format if needed
+    Array.isArray(user.company?.MainOperatingRegions) 
+      ? user.company.MainOperatingRegions.map(region => {
+          // Check if the region is already in the new format
+          if (typeof region === 'object' && region !== null) {
+            return {
+              name: region.name || '',
+              latitude: region.latitude || null,
+              longitude: region.longitude || null,
+              placeId: region.placeId || null
+            };
+          }
+          // Otherwise convert from string (legacy format)
+          return {
+            name: String(region),
+            latitude: null,
+            longitude: null,
+            placeId: null
+          };
+        })
+      : []
   );
   
   // UI state
@@ -85,12 +111,37 @@ export default function CompanyInfoTab({ user, onUpdate }: CompanyInfoTabProps) 
   
   // Initialize Google Places Autocomplete service
   const [placesService, setPlacesService] = useState<google.maps.places.AutocompleteService | null>(null);
+  // Add Places service for geocoding
+  const [geocoder, setGeocoder] = useState<google.maps.Geocoder | null>(null);
 
   // Update form fields when user prop changes
   useEffect(() => {
     setCompanyName(user.company?.name || '');
     setCompanyTypes(user.company?.type ? user.company.type.split(', ').filter(Boolean) : []);
-    setOperatingRegions(user.company?.MainOperatingRegions || []);
+    
+    // Handle updated operating regions format
+    if (Array.isArray(user.company?.MainOperatingRegions)) {
+      setOperatingRegions(
+        user.company.MainOperatingRegions.map(region => {
+          if (typeof region === 'object' && region !== null) {
+            return {
+              name: region.name || '',
+              latitude: region.latitude || null,
+              longitude: region.longitude || null,
+              placeId: region.placeId || null
+            };
+          }
+          return {
+            name: String(region),
+            latitude: null, 
+            longitude: null,
+            placeId: null
+          };
+        })
+      );
+    } else {
+      setOperatingRegions([]);
+    }
   }, [user]);
   
   useEffect(() => {
@@ -99,8 +150,12 @@ export default function CompanyInfoTab({ user, onUpdate }: CompanyInfoTabProps) 
       try {
         if (window.google && window.google.maps && window.google.maps.places) {
           console.log('Initializing Google Places service');
-          const service = new window.google.maps.places.AutocompleteService();
-          setPlacesService(service);
+          const autocompleteService = new window.google.maps.places.AutocompleteService();
+          setPlacesService(autocompleteService);
+          
+          // Initialize geocoder
+          const geocoderService = new window.google.maps.Geocoder();
+          setGeocoder(geocoderService);
         } else {
           console.error('Google Maps Places API not available');
         }
@@ -163,6 +218,82 @@ export default function CompanyInfoTab({ user, onUpdate }: CompanyInfoTabProps) 
     }
   }, [regionSearch, placesService]);
   
+  // Add a helper function to geocode a region name to coordinates
+  const geocodeRegion = async (regionName: string): Promise<{
+    latitude: number | null;
+    longitude: number | null;
+    placeId: string | null;
+  }> => {
+    if (!geocoder || !regionName.trim()) {
+      return { latitude: null, longitude: null, placeId: null };
+    }
+
+    try {
+      const result = await new Promise<google.maps.GeocoderResult[]>((resolve, reject) => {
+        geocoder.geocode({ address: regionName }, (results, status) => {
+          if (status === google.maps.GeocoderStatus.OK && results && results.length > 0) {
+            resolve(results);
+          } else {
+            reject(new Error(`Geocoding failed: ${status}`));
+          }
+        });
+      });
+
+      if (result && result.length > 0) {
+        const location = result[0].geometry.location;
+        return {
+          latitude: location.lat(),
+          longitude: location.lng(),
+          placeId: result[0].place_id || null
+        };
+      }
+    } catch (error) {
+      console.error('Error geocoding region:', error);
+    }
+
+    return { latitude: null, longitude: null, placeId: null };
+  };
+
+  // Update handleAddRegion to get coordinates for the region
+  const handleAddRegion = async () => {
+    if (isViewOnly) return;
+    if (regionSearch && !operatingRegions.some(region => region.name === regionSearch)) {
+      // Start with just the name
+      const newRegion: {
+        name: string;
+        latitude: number | null;
+        longitude: number | null;
+        placeId: string | null;
+      } = {
+        name: regionSearch,
+        latitude: null,
+        longitude: null,
+        placeId: null
+      };
+
+      // Try to get coordinates
+      if (geocoder) {
+        try {
+          setIsSubmitting(true); // Show loading state while geocoding
+          const coordinates = await geocodeRegion(regionSearch);
+          newRegion.latitude = coordinates.latitude;
+          newRegion.longitude = coordinates.longitude;
+          newRegion.placeId = coordinates.placeId;
+          
+          console.log(`Found coordinates for ${regionSearch}:`, coordinates);
+        } catch (error) {
+          console.error('Failed to geocode region:', error);
+        } finally {
+          setIsSubmitting(false);
+        }
+      }
+
+      setOperatingRegions([...operatingRegions, newRegion]);
+      setRegionSearch('');
+    }
+  };
+
+  // Update submission function to handle the new format
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
@@ -182,11 +313,13 @@ export default function CompanyInfoTab({ user, onUpdate }: CompanyInfoTabProps) 
       
       // Log current state before submitting
       console.log('Current company name before submit:', companyName);
+      console.log('Operating regions before submit:', operatingRegions);
       
       const updateData = {
         companyName: companyName.trim(),
         companyType: companyTypes.join(', '),
-        mainOperatingRegions: operatingRegions,
+        // Send the full region objects with coordinates
+        mainOperatingRegions: operatingRegions
       };
       
       console.log('Updating company info with data:', updateData);
@@ -213,21 +346,24 @@ export default function CompanyInfoTab({ user, onUpdate }: CompanyInfoTabProps) 
     setCompanyTypes(companyTypes.filter(type => type !== typeToRemove));
   };
   
-  // Add a region to the selected regions
-  const handleAddRegion = () => {
-    if (isViewOnly) return;
-    if (regionSearch && !operatingRegions.includes(regionSearch)) {
-      setOperatingRegions([...operatingRegions, regionSearch]);
-      setRegionSearch('');
-    }
-  };
-  
   // Remove a region from the selected regions
-  const handleDeleteRegion = (region: string) => {
+  const handleDeleteRegion = (regionName: string) => {
     if (isViewOnly) return;
-    setOperatingRegions(operatingRegions.filter((r) => r !== region));
+    setOperatingRegions(operatingRegions.filter((region) => region.name !== regionName));
   };
   
+  // Add a function to check if a region has valid coordinates
+  const hasValidCoordinates = (region: {
+    latitude: number | null;
+    longitude: number | null;
+    placeId?: string | null;
+  }) => {
+    return typeof region.latitude === 'number' && 
+           typeof region.longitude === 'number' && 
+           region.latitude !== null && 
+           region.longitude !== null;
+  };
+
   return (
     <Paper elevation={0} sx={{ p: 2 }}>
       <Box component="form" noValidate>
@@ -421,10 +557,10 @@ export default function CompanyInfoTab({ user, onUpdate }: CompanyInfoTabProps) 
                       }}
                       onClick={() => {
                         if (isViewOnly) return;
-                        if (suggestion && !operatingRegions.includes(suggestion)) {
-                          setOperatingRegions([...operatingRegions, suggestion]);
-                          setRegionSearch('');
-                          setRegionSuggestions([]);
+                        if (suggestion && !operatingRegions.some(region => region.name === suggestion)) {
+                          // Handle adding with geocoding in handleAddRegion function
+                          setRegionSearch(suggestion);
+                          handleAddRegion();
                         }
                       }}
                     >
@@ -445,15 +581,19 @@ export default function CompanyInfoTab({ user, onUpdate }: CompanyInfoTabProps) 
               </Typography>
             )}
             
-            {/* Selected Regions */}
+            {/* Selected Regions with coordinate indicator */}
             <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mt: 2 }}>
               {operatingRegions.map((region) => (
                 <Chip
-                  key={region}
-                  label={region}
-                  onDelete={isViewOnly ? undefined : () => handleDeleteRegion(region)}
-                  color="primary"
+                  key={region.name}
+                  label={region.name}
+                  onDelete={isViewOnly ? undefined : () => handleDeleteRegion(region.name)}
+                  color={hasValidCoordinates(region) ? "success" : "primary"}
                   variant="outlined"
+                  icon={hasValidCoordinates(region) ? <InfoIcon fontSize="small" /> : undefined}
+                  title={hasValidCoordinates(region) 
+                    ? `Coordinates: ${region.latitude}, ${region.longitude}` 
+                    : "No coordinates available"}
                 />
               ))}
               {operatingRegions.length === 0 && (
@@ -462,6 +602,16 @@ export default function CompanyInfoTab({ user, onUpdate }: CompanyInfoTabProps) 
                 </Typography>
               )}
             </Box>
+            
+            {/* Coordinates indicator legend */}
+            {operatingRegions.length > 0 && (
+              <Box sx={{ mt: 1 }}>
+                <Typography variant="caption" color="text.secondary">
+                  <InfoIcon fontSize="small" sx={{ color: 'success.main', verticalAlign: 'middle', mr: 0.5 }} />
+                  Regions with coordinates will show alerts in your feed
+                </Typography>
+              </Box>
+            )}
           </Box>
         </Stack>
         

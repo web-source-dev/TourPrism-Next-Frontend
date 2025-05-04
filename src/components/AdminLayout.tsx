@@ -17,7 +17,7 @@ import {
   CssBaseline, 
   Container 
 } from '@mui/material';
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname } from 'next/navigation';
 import { useAuth } from '../context/AuthContext';
 
 
@@ -31,7 +31,6 @@ const drawerWidth = 280;
 const AdminLayout = ({ children }: AdminLayoutProps) => {
   const [mobileOpen, setMobileOpen] = useState(false);
   const pathname = usePathname();
-  const router = useRouter();
   const { logout} = useAuth();
 
   const handleDrawerToggle = () => {
@@ -47,7 +46,7 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
 
   const handleMenuItemClick = (path: string) => {
     setMobileOpen(false);
-    router.push(path);
+    window.location.href = path;
   };
 
   const drawer = (

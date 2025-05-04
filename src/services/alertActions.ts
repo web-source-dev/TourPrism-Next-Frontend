@@ -6,6 +6,7 @@ interface AlertActionResponse {
   likes?: number;
   liked?: boolean;
   flagged?: boolean;
+  flagCount?: number;
 }
 
 export const followAlert = async (alertId: string) => {
@@ -36,7 +37,8 @@ export const flagAlert = async (alertId: string) => {
   try {
     const response = await api.post<AlertActionResponse>(`/api/alerts/${alertId}/flag`);
     return {
-      flagged: response.data.flagged
+      flagged: response.data.flagged,
+      flagCount: response.data.flagCount || 0
     };
   } catch (error) {
     throw error;

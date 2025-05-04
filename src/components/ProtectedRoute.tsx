@@ -14,7 +14,14 @@ const publicRoutes = [
   '/feed',
   '/about',
   '/pricing',
-  '/ambassadors'
+  '/ambassadors',
+  '/action-hub',
+  '/insights',
+  '/subscription',
+  '/feature',
+  '/resources',
+  '/not-found',
+  '/archive'
 ];
 
 interface ProtectedRouteProps {

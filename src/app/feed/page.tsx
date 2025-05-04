@@ -21,9 +21,9 @@ import {
 import { useRouter } from 'next/navigation';
 import Layout from '@/components/Layout';
 import FilterDrawer from '@/components/FilterDrawer';
-import { fetchAlerts } from '@/services/api';
-import { followAlert } from '@/services/alertActions';
-import { Alert as AlertType, FilterOptions } from '@/types';
+import { fetchAlerts, getUserProfile } from '@/services/api';
+import { followAlert, flagAlert } from '@/services/alertActions';
+import { Alert as AlertType, FilterOptions, User } from '@/types';
 import { useAuth } from '@/context/AuthContext';
 import Image from 'next/image';
 import { io, Socket } from 'socket.io-client';
@@ -94,6 +94,34 @@ const getCategoryIcon = (category: string) => {
   }
 };
 
+// Function to format date in "Month Day, Time" format
+const formatDateForDisplay = (dateString: string) => {
+  if (!dateString) return "";
+  const date = new Date(dateString);
+  return date.toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true
+  });
+};
+
+// Add this before the fetchOperatingRegionAlerts function as a shared helper function
+// Helper function to sort alerts by the selected sort criteria
+const sortAlertsByFilter = (alerts: AlertType[], sortBy: string) => {
+  return [...alerts].sort((a, b) => {
+    if (sortBy === 'newest') {
+      return new Date(b.createdAt || b.updatedAt).getTime() - new Date(a.createdAt || a.updatedAt).getTime();
+    } else if (sortBy === 'oldest') {
+      return new Date(a.createdAt || a.updatedAt).getTime() - new Date(b.createdAt || b.updatedAt).getTime();
+    } else {
+      // Default to sorting by most follows
+      return (b.numberOfFollows || 0) - (a.numberOfFollows || 0);
+    }
+  });
+};
+
 export default function Feed() {
   const router = useRouter();
   const { isAuthenticated } = useAuth();
@@ -111,6 +139,9 @@ export default function Feed() {
   const [loginDialogOpen, setLoginDialogOpen] = useState(false);
   const [lowAccuracyWarning, setLowAccuracyWarning] = useState(false);
   const [locationAccuracy, setLocationAccuracy] = useState<number | null>(null);
+  const [userProfile, setUserProfile] = useState<User | null>(null);
+  const [profileLoaded, setProfileLoaded] = useState(false);
+  const [operatingRegionAlerts, setOperatingRegionAlerts] = useState<AlertType[]>([]);
   const [snackbar, setSnackbar] = useState({
     open: false,
     message: '',
@@ -125,6 +156,228 @@ export default function Feed() {
 
   // Socket.io reference
   const socketRef = useRef<Socket | null>(null);
+
+  // Fetch user profile if authenticated
+  useEffect(() => {
+    const fetchUserProfile = async () => {
+      if (isAuthenticated) {
+        try {
+          const { user } = await getUserProfile();
+          setUserProfile(user);
+        } catch (error) {
+          console.error('Error fetching user profile:', error);
+        } finally {
+          setProfileLoaded(true);
+        }
+      } else {
+        setProfileLoaded(true);
+      }
+    };
+
+    fetchUserProfile();
+  }, [isAuthenticated]);
+
+  // Function to fetch alerts based on operating regions
+  const fetchOperatingRegionAlerts = useCallback(async () => {
+    // Use optional chaining with nullish coalescing to handle possibly undefined array
+    const operatingRegions = userProfile?.company?.MainOperatingRegions ?? [];
+    if (operatingRegions.length === 0) return [];
+    
+    setLoading(true);
+    let combinedAlerts: AlertType[] = [];
+    
+    try {
+      // For each operating region, fetch alerts
+      for (const region of operatingRegions) {
+        const params: Record<string, unknown> = {
+          page: 1,
+          limit: 10,
+          sortBy: filters.sortBy,
+          latitude: region.latitude,
+          longitude: region.longitude,
+          distance: filters.distance || 50
+        };
+        
+        if (filters.timeRange > 0) {
+          const now = new Date();
+          const futureDate = new Date();
+          futureDate.setDate(futureDate.getDate() + filters.timeRange);
+          
+          params.startDate = now.toISOString();
+          params.endDate = futureDate.toISOString();
+        }
+        
+        if (filters.incidentTypes && filters.incidentTypes.length > 0) {
+          params.incidentTypes = filters.incidentTypes;
+        }
+        
+        console.log(`Fetching alerts for operating region ${region.name} with params:`, params);
+        const response = await fetchAlerts(params);
+        combinedAlerts = [...combinedAlerts, ...response.alerts];
+      }
+      
+      // Remove duplicates
+      combinedAlerts = Array.from(
+        new Map(combinedAlerts.map(alert => [alert._id, alert])).values()
+      );
+      
+      // Sort alerts with priority for followed alerts and then by filter criteria
+      combinedAlerts.sort((a, b) => {
+        // First priority: followed alerts go to the top
+        if (a.isFollowing && !b.isFollowing) return -1;
+        if (!a.isFollowing && b.isFollowing) return 1;
+        
+        // Second priority: maintain the sort order within each group using the shared sorting function
+        return sortAlertsByFilter([a, b], filters.sortBy)[0] === a ? -1 : 1;
+      });
+      
+      setOperatingRegionAlerts(combinedAlerts);
+      return combinedAlerts;
+    } catch (error) {
+      console.error('Error fetching operating region alerts:', error);
+      return [];
+    } finally {
+      setLoading(false);
+    }
+  }, [userProfile, filters]);
+
+  // Define the fetchLocationAlerts function with useCallback to avoid recreation on each render
+  const fetchLocationAlerts = useCallback(async (cityName: string = "Edinburgh", coordinates: { latitude: number; longitude: number } | null = null) => {
+    setLoading(true);
+    try {
+      // Check if we have operating regions
+      const operatingRegions = userProfile?.company?.MainOperatingRegions ?? [];
+      const hasOperatingRegions = isAuthenticated && operatingRegions.length > 0;
+      
+      // Skip default Edinburgh location if we have operating regions and the current location is Edinburgh
+      const isDefaultEdinburgh = 
+        cityName === "Edinburgh" && 
+        coordinates?.latitude === 55.9533 && 
+        coordinates?.longitude === -3.1883;
+      
+      const skipDefaultLocation = hasOperatingRegions && isDefaultEdinburgh;
+      
+      // First check if we need to fetch operating region alerts
+      let operatingRegionsResults: AlertType[] = [];
+      if (hasOperatingRegions) {
+        operatingRegionsResults = await fetchOperatingRegionAlerts();
+      }
+      
+      // Only fetch location-based alerts if we're not skipping the default location
+      let locationBasedAlerts: AlertType[] = [];
+      if (!skipDefaultLocation) {
+        const params: Record<string, unknown> = {
+          page: 1,
+          limit: isAuthenticated ? 10 : 15,
+          sortBy: filters.sortBy,
+        };
+        if (filters.timeRange > 0) {
+          const now = new Date();
+          const futureDate = new Date();
+          futureDate.setDate(futureDate.getDate() + filters.timeRange);
+
+          params.startDate = now.toISOString();
+          params.endDate = futureDate.toISOString();
+        }
+
+        if (filters.incidentTypes && filters.incidentTypes.length > 0) {
+          params.incidentTypes = filters.incidentTypes;
+        }
+
+        if (coordinates) {
+          params.latitude = coordinates.latitude;
+          params.longitude = coordinates.longitude;
+          if (filters.distance && filters.distance > 0) {
+            params.distance = filters.distance;
+          }
+        } else if (cityName) {
+          params.city = cityName;
+        }
+
+        console.log('Fetching regular alerts with params:', params);
+        const response = await fetchAlerts(params);
+
+        locationBasedAlerts = Array.from(
+          new Map(response.alerts.map(alert => [alert._id, alert])).values()
+        );
+
+        if (locationBasedAlerts.length < response.alerts.length) {
+          console.warn(`Filtered out ${response.alerts.length - locationBasedAlerts.length} duplicate alert(s) in initial load`);
+        }
+      }
+      
+      // STEP 1: Organize alerts into their respective categories
+      // Get followed alerts from both sources
+      const followedAlerts = [
+        ...operatingRegionsResults.filter(alert => alert.isFollowing),
+        ...locationBasedAlerts.filter(alert => alert.isFollowing)
+      ];
+      
+      // Get non-followed operating region alerts
+      const nonFollowedOperatingRegionAlerts = operatingRegionsResults.filter(alert => !alert.isFollowing);
+      
+      // Get normal location alerts (not followed, not from operating regions)
+      const normalAlerts = locationBasedAlerts.filter(alert => !alert.isFollowing);
+      
+      // STEP 2: Sort each category internally according to the filter criteria
+      const sortedFollowedAlerts = sortAlertsByFilter(followedAlerts, filters.sortBy);
+      const sortedOperatingRegionAlerts = sortAlertsByFilter(nonFollowedOperatingRegionAlerts, filters.sortBy);
+      const sortedNormalAlerts = sortAlertsByFilter(normalAlerts, filters.sortBy);
+      
+      // STEP 3: Combine all categories in the correct order while removing duplicates
+      const sortedAllAlerts: AlertType[] = [];
+      const addedIds = new Set<string>();
+      
+      // Add followed alerts first (highest priority)
+      sortedFollowedAlerts.forEach(alert => {
+        if (!addedIds.has(alert._id)) {
+          sortedAllAlerts.push(alert);
+          addedIds.add(alert._id);
+        }
+      });
+      
+      // Add operating region alerts second (medium priority)
+      sortedOperatingRegionAlerts.forEach(alert => {
+        if (!addedIds.has(alert._id)) {
+          sortedAllAlerts.push(alert);
+          addedIds.add(alert._id);
+        }
+      });
+      
+      // Add normal alerts last (lowest priority)
+      sortedNormalAlerts.forEach(alert => {
+        if (!addedIds.has(alert._id)) {
+          sortedAllAlerts.push(alert);
+          addedIds.add(alert._id);
+        }
+      });
+      
+      // Apply the limit for non-authenticated users
+      if (!isAuthenticated) {
+        setAlerts(sortedAllAlerts.slice(0, 15));
+      } else {
+        setAlerts(sortedAllAlerts);
+      }
+
+      // Set total count to include both sets for pagination
+      const totalRegularAlerts = skipDefaultLocation ? 0 : locationBasedAlerts.length;
+      setTotalCount(operatingRegionsResults.length + totalRegularAlerts);
+      setHasMore(isAuthenticated && sortedAllAlerts.length < (operatingRegionsResults.length + totalRegularAlerts));
+      setPage(1);
+    } catch (error) {
+      console.error('Error fetching alerts:', error);
+      setSnackbar({
+        open: true,
+        message: 'Failed to fetch alerts',
+        severity: 'error'
+      });
+      setAlerts([]);
+      setTotalCount(0);
+      setHasMore(false);
+    } finally {
+      setLoading(false);
+    }
+  }, [isAuthenticated, filters, userProfile, fetchOperatingRegionAlerts, sortAlertsByFilter]);
 
   // Socket.io connection setup
   useEffect(() => {
@@ -144,9 +397,22 @@ export default function Feed() {
     // Alert events
     socketRef.current.on('alert:created', (data) => {
       console.log('New alert created:', data);
-      if (city && coords) {
+      
+      // Check if we need to refresh operating region alerts
+      const operatingRegions = userProfile?.company?.MainOperatingRegions ?? [];
+      const hasOperatingRegions = isAuthenticated && operatingRegions.length > 0;
+      
+      if (hasOperatingRegions) {
+        // Refresh operating region alerts
+        fetchOperatingRegionAlerts().then(() => {
+          if (city && coords) {
+            fetchLocationAlerts(city, coords);
+          }
+        });
+      } else if (city && coords) {
         fetchLocationAlerts(city, coords);
       }
+      
       setSnackbar({
         open: true,
         message: 'A new alert has been added',
@@ -154,15 +420,36 @@ export default function Feed() {
       });
     });
 
+    // Similar updates for other socket events that change alerts
     socketRef.current.on('alert:updated', (data) => {
       console.log('Alert updated:', data);
-      setAlerts(prevAlerts =>
-        prevAlerts.map(alert =>
-          alert._id === data.alertId
-            ? { ...alert, ...data.alert }
-            : alert
-        )
-      );
+      
+      // Check if this alert is in our operating region alerts
+      const isInOperatingRegions = operatingRegionAlerts.some(alert => alert._id === data.alertId);
+      
+      if (isInOperatingRegions) {
+        // Refresh operating region alerts
+        fetchOperatingRegionAlerts().then(() => {
+          // Update the current alert in the main alerts list
+          setAlerts(prevAlerts =>
+            prevAlerts.map(alert =>
+              alert._id === data.alertId
+                ? { ...alert, ...data.alert }
+                : alert
+            )
+          );
+        });
+      } else {
+        // Just update this alert in the main list
+        setAlerts(prevAlerts =>
+          prevAlerts.map(alert =>
+            alert._id === data.alertId
+              ? { ...alert, ...data.alert }
+              : alert
+          )
+        );
+      }
+      
       setSnackbar({
         open: true,
         message: 'An alert has been updated',
@@ -170,11 +457,49 @@ export default function Feed() {
       });
     });
 
+    socketRef.current.on('alerts:bulk-created', (data) => {
+      console.log('Bulk alerts created:', data);
+      
+      // Check if we need to refresh operating region alerts
+      const operatingRegions = userProfile?.company?.MainOperatingRegions ?? [];
+      const hasOperatingRegions = isAuthenticated && operatingRegions.length > 0;
+      
+      if (hasOperatingRegions) {
+        // Refresh operating region alerts
+        fetchOperatingRegionAlerts().then(() => {
+          if (city && coords) {
+            fetchLocationAlerts(city, coords);
+          }
+        });
+      } else if (city && coords) {
+        fetchLocationAlerts(city, coords);
+      }
+      
+      setSnackbar({
+        open: true,
+        message: `${data.count} new alerts have been added`,
+        severity: 'info'
+      });
+    });
+
+    // Add these event handlers back after the 'alert:updated' handler
     socketRef.current.on('alert:deleted', (data) => {
       console.log('Alert deleted:', data);
-      setAlerts(prevAlerts =>
-        prevAlerts.filter(alert => alert._id !== data.alertId)
-      );
+      
+      // Check if this alert is in our operating region alerts
+      const isInOperatingRegions = operatingRegionAlerts.some(alert => alert._id === data.alertId);
+      
+      if (isInOperatingRegions) {
+        // Refresh operating region alerts
+        fetchOperatingRegionAlerts().then(() => {
+          // Remove the alert from the main list
+          setAlerts(prevAlerts => prevAlerts.filter(alert => alert._id !== data.alertId));
+        });
+      } else {
+        // Just remove from main list
+        setAlerts(prevAlerts => prevAlerts.filter(alert => alert._id !== data.alertId));
+      }
+      
       setSnackbar({
         open: true,
         message: 'An alert has been removed',
@@ -195,19 +520,55 @@ export default function Feed() {
             alert
         )
       );
+      
+      // Also update operating region alerts if this is in that list
+      const isInOperatingRegions = operatingRegionAlerts.some(alert => alert._id === data.alertId);
+      if (isInOperatingRegions) {
+        setOperatingRegionAlerts(prevAlerts =>
+          prevAlerts.map(alert =>
+            alert._id === data.alertId ?
+              {
+                ...alert,
+                numberOfFollows: data.numberOfFollows,
+                isFollowing: data.following
+              } :
+              alert
+          )
+        );
+      }
     });
 
-    socketRef.current.on('alerts:bulk-created', (data) => {
-      console.log('Bulk alerts created:', data);
-      if (city && coords) {
-        fetchLocationAlerts(city, coords);
+    // Add socket event handler for flag alerts
+    socketRef.current.on('alert:flagged', (data) => {
+      console.log('Alert flag status changed:', data);
+      setAlerts(prevAlerts =>
+        prevAlerts.map(alert =>
+          alert._id === data.alertId ?
+            {
+              ...alert,
+              flagged: data.flagged
+            } :
+            alert
+        )
+      );
+      
+      // Also update operating region alerts if this is in that list
+      const isInOperatingRegions = operatingRegionAlerts.some(alert => alert._id === data.alertId);
+      if (isInOperatingRegions) {
+        setOperatingRegionAlerts(prevAlerts =>
+          prevAlerts.map(alert =>
+            alert._id === data.alertId ?
+              {
+                ...alert,
+                flagged: data.flagged
+              } :
+              alert
+          )
+        );
       }
-      setSnackbar({
-        open: true,
-        message: `${data.count} new alerts have been added`,
-        severity: 'info'
-      });
     });
+
+    // Other socket event handlers...
 
     // Cleanup on component unmount
     return () => {
@@ -216,101 +577,47 @@ export default function Feed() {
         socketRef.current = null;
       }
     };
-  }, [city, coords]);
+  }, [city, coords, fetchLocationAlerts, isAuthenticated, userProfile, operatingRegionAlerts, fetchOperatingRegionAlerts]);
 
-  // Define the fetchLocationAlerts function with useCallback to avoid recreation on each render
-  const fetchLocationAlerts = useCallback(async (cityName: string = "Edinburgh", coordinates: { latitude: number; longitude: number } | null = null) => {
-    setLoading(true);
-    try {
-      const params: Record<string, unknown> = {
-        page: 1,
-        limit: isAuthenticated ? 10 : 15, // Already requesting 15 for non-authenticated users
-        sortBy: filters.sortBy,
-      };
-      if (filters.timeRange > 0) {
-        const now = new Date();
-        const futureDate = new Date();
-        futureDate.setDate(futureDate.getDate() + filters.timeRange);
 
-        params.startDate = now.toISOString();
-        params.endDate = futureDate.toISOString();
-      }
+  const handleLocationSuccess = useCallback(async (position: GeolocationPosition, highAccuracy = true) => {
+    const { latitude, longitude } = position.coords;
+    const accuracy = position.coords.accuracy;
 
-      if (filters.incidentTypes && filters.incidentTypes.length > 0) {
-        params.incidentTypes = filters.incidentTypes;
-      }
+    // Store the location accuracy for potential warnings
+    setLocationAccuracy(accuracy);
 
-      if (coordinates) {
-        params.latitude = coordinates.latitude;
-        params.longitude = coordinates.longitude;
-        if (filters.distance && filters.distance > 0) {
-          params.distance = filters.distance;
-        }
-      } else if (cityName) {
-        params.city = cityName;
-      }
-
-      console.log('Fetching alerts with params:', params);
-      const response = await fetchAlerts(params);
-
-      const uniqueAlerts = Array.from(
-        new Map(response.alerts.map(alert => [alert._id, alert])).values()
-      );
-
-      if (uniqueAlerts.length < response.alerts.length) {
-        console.warn(`Filtered out ${response.alerts.length - uniqueAlerts.length} duplicate alert(s) in initial load`);
-      }
-
-      // Sort alerts so that followed alerts are at the top while maintaining sort order within groups
-      const sortedAlerts = [...uniqueAlerts].sort((a, b) => {
-        // First priority: followed alerts go to the top
-        if (a.isFollowing && !b.isFollowing) return -1;
-        if (!a.isFollowing && b.isFollowing) return 1;
-
-        // Second priority: maintain the original sort order within each group
-        // If sortBy is 'newest', most recent first
-        if (filters.sortBy === 'newest') {
-          return new Date(b.createdAt || b.updatedAt).getTime() - new Date(a.createdAt || a.updatedAt).getTime();
-        }
-        // If sortBy is 'oldest', oldest first
-        else if (filters.sortBy === 'oldest') {
-          return new Date(a.createdAt || a.updatedAt).getTime() - new Date(b.createdAt || b.updatedAt).getTime();
-        }
-        // If sortBy is 'relevant', most followed first
-        else {
-          return (b.numberOfFollows || 0) - (a.numberOfFollows || 0);
-        }
-      });
-
-      if (!isAuthenticated) {
-        setAlerts(sortedAlerts.slice(0, 15));
-      } else {
-        setAlerts(sortedAlerts);
-      }
-
-      setTotalCount(response.totalCount);
-      setHasMore(isAuthenticated && sortedAlerts.length < response.totalCount);
-      setPage(1);
-    } catch (error) {
-      console.error('Error fetching alerts:', error);
-      setSnackbar({
-        open: true,
-        message: 'Failed to fetch alerts',
-        severity: 'error'
-      });
-      setAlerts([]);
-      setTotalCount(0);
-      setHasMore(false);
-    } finally {
-      setLoading(false);
+    // Show low accuracy warning if accuracy is worse than 100 meters
+    const hasLowAccuracy = accuracy > 100;
+    if (!highAccuracy || hasLowAccuracy) {
+      setLowAccuracyWarning(true);
     }
-  }, [isAuthenticated, filters]);
+
+    try {
+      const cityName = await getCityFromCoordinates(latitude, longitude);
+      localStorage.setItem('selectedCity', cityName);
+      localStorage.setItem('selectedLat', latitude.toString());
+      localStorage.setItem('selectedLng', longitude.toString());
+      localStorage.setItem('locationAccuracy', accuracy.toString());
+
+      setCity(cityName);
+      setCoords({ latitude, longitude });
+      setLocationConfirmed(true);
+
+      fetchLocationAlerts(cityName, { latitude, longitude });
+
+    } catch (error) {
+      setLocationError('Failed to get your city name. Please try again or select a city manually.');
+      console.error('Error in reverse geocoding:', error);
+    }
+  }, [fetchLocationAlerts]); // Add fetchLocationAlerts as a dependency
 
   const handleUseMyLocation = useCallback(async () => {
     setLocationLoading(true);
     setLocationError(null);
 
     try {
+      localStorage.removeItem('isDefaultLocation'); // Clear default location flag
       const position = await getHighAccuracyLocation(true);
       await handleLocationSuccess(position, true);
     } catch (error) {
@@ -326,7 +633,7 @@ export default function Feed() {
     } finally {
       setLocationLoading(false);
     }
-  }, []);
+  }, [handleLocationSuccess]); // Added handleLocationSuccess to dependencies
 
 
   const handleSelectEdinburgh = useCallback(() => {
@@ -335,6 +642,7 @@ export default function Feed() {
     localStorage.setItem('selectedCity', 'Edinburgh');
     localStorage.setItem('selectedLat', edinburghCoords.latitude.toString());
     localStorage.setItem('selectedLng', edinburghCoords.longitude.toString());
+    localStorage.setItem('isDefaultLocation', 'true'); // Mark as default location
 
     setCity('Edinburgh');
     setCoords(edinburghCoords);
@@ -363,10 +671,10 @@ export default function Feed() {
   }, [handleSelectEdinburgh]);
 
   useEffect(() => {
-    if (locationConfirmed && city && coords) {
+    if (locationConfirmed && city && coords && profileLoaded) {
       fetchLocationAlerts(city, coords);
     }
-  }, [city, coords, locationConfirmed, isAuthenticated, fetchLocationAlerts]);
+  }, [city, coords, locationConfirmed, isAuthenticated, fetchLocationAlerts, profileLoaded]);
 
   const handleFollowUpdate = async (alertId: string) => {
     if (!isAuthenticated) {
@@ -398,6 +706,41 @@ export default function Feed() {
       setSnackbar({
         open: true,
         message: 'Failed to follow the alert',
+        severity: 'error'
+      });
+    }
+  };
+
+  const handleFlagAlert = async (alertId: string) => {
+    if (!isAuthenticated) {
+      setLoginDialogOpen(true);
+      return;
+    }
+
+    try {
+      const response = await flagAlert(alertId);
+      setAlerts(prevAlerts =>
+        prevAlerts.map(alert =>
+          alert._id === alertId ?
+            {
+              ...alert,
+              flagged: response.flagged,
+              flagCount: response.flagCount
+            } :
+            alert
+        )
+      );
+
+      setSnackbar({
+        open: true,
+        message: response.flagged ? 'Alert has been flagged' : 'Flag has been removed from this alert',
+        severity: 'success'
+      });
+    } catch (error) {
+      console.error('Error flagging alert:', error);
+      setSnackbar({
+        open: true,
+        message: 'Failed to flag the alert',
         severity: 'error'
       });
     }
@@ -452,37 +795,6 @@ export default function Feed() {
     });
   };
 
-  const handleLocationSuccess = async (position: GeolocationPosition, highAccuracy = true) => {
-    const { latitude, longitude } = position.coords;
-    const accuracy = position.coords.accuracy;
-
-    // Store the location accuracy for potential warnings
-    setLocationAccuracy(accuracy);
-
-    // Show low accuracy warning if accuracy is worse than 100 meters
-    const hasLowAccuracy = accuracy > 100;
-    if (!highAccuracy || hasLowAccuracy) {
-      setLowAccuracyWarning(true);
-    }
-
-    try {
-      const cityName = await getCityFromCoordinates(latitude, longitude);
-      localStorage.setItem('selectedCity', cityName);
-      localStorage.setItem('selectedLat', latitude.toString());
-      localStorage.setItem('selectedLng', longitude.toString());
-      localStorage.setItem('locationAccuracy', accuracy.toString());
-
-      setCity(cityName);
-      setCoords({ latitude, longitude });
-      setLocationConfirmed(true);
-
-      fetchLocationAlerts(cityName, { latitude, longitude });
-
-    } catch (error) {
-      setLocationError('Failed to get your city name. Please try again or select a city manually.');
-      console.error('Error in reverse geocoding:', error);
-    }
-  };
 
   const handleLocationError = (error: GeolocationPositionError) => {
     console.error('Geolocation error:', error);
@@ -547,42 +859,78 @@ export default function Feed() {
     setLoading(true);
 
     try {
-      const params: Record<string, unknown> = {
-        page: nextPage,
-        limit: 10,
-        sortBy: filters.sortBy,
-      };
-      if (filters.timeRange > 0) {
-        const now = new Date();
-        const futureDate = new Date();
-        futureDate.setDate(futureDate.getDate() + filters.timeRange);
+      // Check if we have operating regions
+      const operatingRegions = userProfile?.company?.MainOperatingRegions ?? [];
+      const hasOperatingRegions = isAuthenticated && operatingRegions.length > 0;
+      
+      // Skip default Edinburgh location if we have operating regions and the current location is Edinburgh
+      const isDefaultEdinburgh = 
+        city === "Edinburgh" && 
+        coords?.latitude === 55.9533 && 
+        coords?.longitude === -3.1883;
+      
+      const skipDefaultLocation = hasOperatingRegions && isDefaultEdinburgh;
 
-        params.startDate = now.toISOString();
-        params.endDate = futureDate.toISOString();
-      }
-      if (filters.incidentTypes && filters.incidentTypes.length > 0) {
-        params.incidentTypes = filters.incidentTypes;
-      }
-      if (coords) {
-        params.latitude = coords.latitude;
-        params.longitude = coords.longitude;
-        if (filters.distance && filters.distance > 0) {
-          params.distance = filters.distance;
+      // When loading more, we should only fetch additional location-based alerts
+      // Operating region alerts are already loaded
+      if (!skipDefaultLocation) {
+        const params: Record<string, unknown> = {
+          page: nextPage,
+          limit: 10,
+          sortBy: filters.sortBy,
+        };
+        
+        if (filters.timeRange > 0) {
+          const now = new Date();
+          const futureDate = new Date();
+          futureDate.setDate(futureDate.getDate() + filters.timeRange);
+
+          params.startDate = now.toISOString();
+          params.endDate = futureDate.toISOString();
         }
-      } else if (city) {
-        params.city = city;
-      }
+        
+        if (filters.incidentTypes && filters.incidentTypes.length > 0) {
+          params.incidentTypes = filters.incidentTypes;
+        }
+        
+        if (coords) {
+          params.latitude = coords.latitude;
+          params.longitude = coords.longitude;
+          if (filters.distance && filters.distance > 0) {
+            params.distance = filters.distance;
+          }
+        } else if (city) {
+          params.city = city;
+        }
 
-      const response = await fetchAlerts(params);
-      const alertMap = new Map(alerts.map(alert => [alert._id, alert]));
-      const newUniqueAlerts = response.alerts.filter(alert => !alertMap.has(alert._id));
-      if (newUniqueAlerts.length < response.alerts.length) {
-        console.warn(`Filtered out ${response.alerts.length - newUniqueAlerts.length} duplicate alert(s)`);
-      }
+        // We've already loaded operating region alerts in the first page
+        // Now just load regular location-based alerts for pagination
+        const response = await fetchAlerts(params);
+        
+        // Create a map of all alerts we already have
+        const alertMap = new Map(alerts.map(alert => [alert._id, alert]));
+        
+        // Filter out alerts we already have
+        const newUniqueAlerts = response.alerts.filter(alert => !alertMap.has(alert._id));
+        
+        if (newUniqueAlerts.length < response.alerts.length) {
+          console.warn(`Filtered out ${response.alerts.length - newUniqueAlerts.length} duplicate alert(s)`);
+        }
 
-      setAlerts(prevAlerts => [...prevAlerts, ...newUniqueAlerts]);
-      setHasMore(alerts.length + newUniqueAlerts.length < response.totalCount);
-      setPage(nextPage);
+        // Add new alerts to our existing list
+        setAlerts(prevAlerts => [...prevAlerts, ...newUniqueAlerts]);
+        
+        // Calculate hasMore accounting for operating region alerts and already loaded alerts
+        const operatingRegionCount = hasOperatingRegions ? operatingRegionAlerts.length : 0;
+        const totalAlertsLoaded = alerts.length + newUniqueAlerts.length;
+        const totalExpected = operatingRegionCount + response.totalCount;
+        
+        setHasMore(totalAlertsLoaded < totalExpected);
+        setPage(nextPage);
+      } else {
+        // If we're skipping the default location, there's nothing more to load
+        setHasMore(false);
+      }
     } catch (error) {
       console.error('Error loading more alerts:', error);
       setSnackbar({
@@ -684,6 +1032,7 @@ export default function Feed() {
     }
   };
 
+
   if (!locationConfirmed) {
     return (
       <Layout>
@@ -761,7 +1110,6 @@ export default function Feed() {
   return (
     <Layout onFilterOpen={() => isAuthenticated ? setIsFilterDrawerOpen(true) : setLoginDialogOpen(true)}>
       <Container maxWidth="xl">
-
         {/* Low Accuracy Warning Dialog */}
         <Dialog
           open={lowAccuracyWarning}
@@ -876,7 +1224,19 @@ export default function Feed() {
         ) : (
           <>
             {alerts.map((alert: AlertType, index: number) => (
-              <Paper key={`alert-${alert._id}-${index}`} sx={{ py: 0.5, bgcolor: '#f5f5f5', borderRadius: 2, boxShadow: 'none' }}>
+              <Paper 
+                key={`alert-${alert._id}-${index}`} 
+                sx={{ 
+                  py: 0.5, 
+                  bgcolor: '#f5f5f5', 
+                  borderRadius: 2, 
+                  boxShadow: 'none',
+                  position: 'relative',
+                  borderLeft: 'none',
+                  pl: 0
+                }}
+              >
+                
                 {/* Alert Header */}
                 <Typography variant="subtitle1" sx={{ fontWeight: 500, fontSize: { xs: '14px', md: '16px' } }}>
                   {alert.title || ""}
@@ -905,30 +1265,35 @@ export default function Feed() {
                     </svg>
 
                     {alert.expectedEnd ? (
-                      /* Live countdown timer */
-                      <Countdown
-                        date={new Date(alert.expectedEnd || '')}
-                        renderer={props => {
-                          // Check if date is in the past
-                          if (props.completed) {
-                            // For expired events, use the "Xd ago" format
-                            const now = new Date();
-                            const endDate = new Date(alert.expectedEnd || '');
-                            const diffMs = now.getTime() - endDate.getTime();
-                            
-                            // Convert ms difference to days, hours, minutes, seconds
-                            const diffSecs = Math.floor(diffMs / 1000);
-                            const days = -Math.floor(diffSecs / (24 * 60 * 60));
-                            const hours = -Math.floor((diffSecs % (24 * 60 * 60)) / (60 * 60));
-                            const minutes = -Math.floor((diffSecs % (60 * 60)) / 60);
-                            const seconds = -Math.floor(diffSecs % 60);
-                            
-                            return <span>{formatRemainingTime({ days, hours, minutes, seconds })}</span>;
-                          } else {
-                            return <span>{formatRemainingTime(props)}</span>;
-                          }
-                        }}
-                      />
+                      alert.expectedStart ? (
+                        // Display both expected start and end dates
+                        <span>{formatDateForDisplay(alert.expectedStart)} - {formatDateForDisplay(alert.expectedEnd)}</span>
+                      ) : (
+                        /* Live countdown timer for end date only */
+                        <Countdown
+                          date={new Date(alert.expectedEnd || '')}
+                          renderer={props => {
+                            // Check if date is in the past
+                            if (props.completed) {
+                              // For expired events, use the "Xd ago" format
+                              const now = new Date();
+                              const endDate = new Date(alert.expectedEnd || '');
+                              const diffMs = now.getTime() - endDate.getTime();
+                              
+                              // Convert ms difference to days, hours, minutes, seconds
+                              const diffSecs = Math.floor(diffMs / 1000);
+                              const days = -Math.floor(diffSecs / (24 * 60 * 60));
+                              const hours = -Math.floor((diffSecs % (24 * 60 * 60)) / (60 * 60));
+                              const minutes = -Math.floor((diffSecs % (60 * 60)) / 60);
+                              const seconds = -Math.floor(diffSecs % 60);
+                              
+                              return <span>{formatRemainingTime({ days, hours, minutes, seconds })}</span>;
+                            } else {
+                              return <span>{formatRemainingTime(props)}</span>;
+                            }
+                          }}
+                        />
+                      )
                     ) : (
                       <span>{alert.createdAt ? formatTime(alert.createdAt) : ""}</span>
                     )}
@@ -995,6 +1360,34 @@ export default function Feed() {
                     )}
                     <Typography variant="body2" sx={{ fontSize: { xs: '12px', md: '14px' } }}>
                       {alert.isFollowing ? 'Following' : 'Follow Updates'}
+                    </Typography>
+                  </Box>
+                  
+                  {/* Flag Button */}
+                  <i className="ri-circle-fill" style={{ fontSize: '5px', color: '#777' }}></i>
+                  <Box
+                    onClick={() => handleFlagAlert(alert._id)}
+                    sx={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 0.5,
+                      cursor: 'pointer',
+                      color: alert.flagged ? 'error.main' : 'text.secondary',
+                      fontWeight: alert.flagged ? 500 : 400,
+                      '&:hover': { color: 'error.main' }
+                    }}
+                  >
+                    {alert.flagged ? (
+                      <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path fillRule="evenodd" clipRule="evenodd" d="M1.75 1.75C1.75 1.33579 2.08579 1 2.5 1C2.91421 1 3.25 1.33579 3.25 1.75V12.25C3.25 12.6642 2.91421 13 2.5 13C2.08579 13 1.75 12.6642 1.75 12.25V1.75ZM3.25 2.5C3.25 2.08579 3.58579 1.75 4 1.75H11.2757C11.8627 1.75 12.1934 2.44905 11.8119 2.89107L8.6362 6.5L11.8119 10.1089C12.1934 10.551 11.8627 11.25 11.2757 11.25H4C3.58579 11.25 3.25 10.9142 3.25 10.5V2.5Z" fill="#d32f2f"/>
+                      </svg>
+                    ) : (
+                      <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path fillRule="evenodd" clipRule="evenodd" d="M1.75 1.75C1.75 1.33579 2.08579 1 2.5 1C2.91421 1 3.25 1.33579 3.25 1.75V12.25C3.25 12.6642 2.91421 13 2.5 13C2.08579 13 1.75 12.6642 1.75 12.25V1.75ZM3.25 2.5C3.25 2.08579 3.58579 1.75 4 1.75H11.2757C11.8627 1.75 12.1934 2.44905 11.8119 2.89107L8.6362 6.5L11.8119 10.1089C12.1934 10.551 11.8627 11.25 11.2757 11.25H4C3.58579 11.25 3.25 10.9142 3.25 10.5V2.5ZM4.75 3.25V9.75H9.72431L7.1381 6.83911C6.92356 6.59443 6.92356 6.40557 7.1381 6.16089L9.72431 3.25H4.75Z" fill="#616161"/>
+                      </svg>
+                    )}
+                    <Typography variant="body2" sx={{ fontSize: { xs: '12px', md: '14px' } }}>
+                      {alert.flagged ? 'Flagged' : 'Flag'}
                     </Typography>
                   </Box>
                 </Box>
