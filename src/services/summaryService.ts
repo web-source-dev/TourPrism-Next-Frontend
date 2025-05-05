@@ -70,6 +70,7 @@ export interface GenerateSummaryResponse {
     htmlContent: string;
     pdfUrl?: string;
     savedSummaryId?: string;
+    _id?:string;
   };
 }
 
@@ -87,22 +88,37 @@ export interface ForecastResponse {
   success: boolean;
   forecast: {
     title: string;
+    description?: string;
     timeRange: {
       startDate: string;
       endDate: string;
     };
     location?: string;
+    locations?: SummaryLocation[];
     alertCategory?: string;
     impact?: string;
     alerts: unknown[];
     htmlContent: string;
+    pdfUrl?: string;
+    userRegions?: {
+      name: string;
+      latitude?: number;
+      longitude?: number;
+    }[];
   };
 }
 
 // Service functions
 export const generateSummary = async (data: GenerateSummaryRequest): Promise<GenerateSummaryResponse> => {
   try {
-    const response = await api.post<GenerateSummaryResponse>('/api/summaries/generate', data);
+    // Ensure generatePDF is always true for forecasts, but only auto-save when explicitly requested
+    const requestData = {
+      ...data,
+      generatePDF: true, // Always generate PDF
+      autoSave: data.autoSave === true // Only save when explicitly true
+    };
+    
+    const response = await api.post<GenerateSummaryResponse>('/api/summaries/generate', requestData);
     return response.data;
   } catch (error) {
     console.error('Error generating summary:', error);
@@ -201,5 +217,42 @@ export const scheduleSummary = async (data: {
   } catch (error) {
     console.error('Error scheduling summary:', error);
     throw error;
+  }
+};
+
+// Update the downloadPdf function to handle backend URLs properly
+export const downloadPdf = async (pdfUrl: string, filename: string = 'forecast.pdf'): Promise<boolean> => {
+  try {
+    // Make sure we have a complete URL
+    const fullPdfUrl = pdfUrl.startsWith('http') 
+      ? pdfUrl 
+      : `${process.env.NEXT_PUBLIC_BACKEND_URL || ''}${pdfUrl}`;
+    
+    // Create a temporary anchor element to trigger the download
+    const link = document.createElement('a');
+    link.href = fullPdfUrl;
+    link.setAttribute('download', filename);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    return true;
+  } catch (error) {
+    console.error('Error downloading PDF:', error);
+    return false;
+  }
+};
+
+// Add a function to generate PDF on-demand if not available
+export const generatePdfOnDemand = async (summaryId: string): Promise<string | null> => {
+  try {
+    // Special endpoint to specifically generate a PDF for an existing summary
+    const response = await api.post<{success: boolean; pdfUrl: string}>(`/api/summaries/${summaryId}/generate-pdf`);
+    if (response.data.success && response.data.pdfUrl) {
+      return response.data.pdfUrl;
+    }
+    return null;
+  } catch (error) {
+    console.error('Error generating PDF on demand:', error);
+    return null;
   }
 };

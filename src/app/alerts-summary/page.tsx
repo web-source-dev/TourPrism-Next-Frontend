@@ -45,7 +45,10 @@ import {
   deleteSummary, 
   getSummaryById,
   Summary,
-  SummaryLocation 
+  SummaryLocation,
+  downloadPdf,
+  generatePdfOnDemand,
+  getUpcomingForecasts,
 } from '@/services/summaryService';
 import Layout from '@/components/Layout';
 
@@ -84,6 +87,10 @@ export default function DisruptionForecast() {
   const [startDate, setStartDate] = useState<Date | null>(new Date());
   const [endDate, setEndDate] = useState<Date | null>(addDays(new Date(), 7));
   const [impact, setImpact] = useState('');
+  
+  // Weekly forecast date range (for display)
+  const [weeklyStartDate, setWeeklyStartDate] = useState(new Date());
+  const [weeklyEndDate, setWeeklyEndDate] = useState(addDays(new Date(), 7));
   
   // Google Maps API script loading
   const { isLoaded } = useLoadScript({
@@ -145,6 +152,7 @@ export default function DisruptionForecast() {
       const data = {
         title: `Disruption Forecast for ${location?.city || 'Selected Location'}`,
         description: `Custom forecast for ${format(startDate || new Date(), 'dd MMM yyyy')} to ${format(endDate || new Date(), 'dd MMM yyyy')}`,
+        summaryType: 'forecast' as const, // Use type assertion
         startDate: startDate ? startDate.toISOString() : undefined,
         endDate: endDate ? endDate.toISOString() : undefined,
         locations,
@@ -152,31 +160,21 @@ export default function DisruptionForecast() {
         alertCategory, // Add the category explicitly 
         includeDuplicates: false,
         generatePDF: true,
-        autoSave: false, // Set to false to prevent automatic saving
+        autoSave: true, // Don't auto-save - let user decide if they want to save
         impact: impact || undefined,
       };
 
       const response = await generateSummary(data);
       
       if (response.success) {
-        // If autoSave is true, we'll have a savedSummaryId to navigate to
         if (response.summary.savedSummaryId) {
+          // Navigate to the saved summary if we have an ID
           router.push(`/alerts-summary/${response.summary.savedSummaryId}`);
+        } else if (response.summary.pdfUrl) {
+          // Create a temporary ID for viewing this unsaved summary
+          router.push(`/alerts-summary/${response.summary.savedSummaryId || 'custom-forecast'}?pdf=${encodeURIComponent(response.summary.pdfUrl)}`);
         } else {
-          // If we have alerts but no savedSummaryId (because autoSave is false),
-          // we need to save the summary first
-          const saveData = {
-            ...data,
-            autoSave: false // Set to true to save the summary
-          };
-          
-          const saveResponse = await generateSummary(saveData);
-          
-          if (saveResponse.success && saveResponse.summary.savedSummaryId) {
-            router.push(`/alerts-summary/${saveResponse.summary.savedSummaryId}`);
-          } else {
-            setError('Failed to save the forecast. Please try again.');
-          }
+          setError('Failed to generate forecast. Please try again with different parameters.');
         }
       } else {
         setError('Failed to generate forecast. Please try again with different parameters.');
@@ -199,37 +197,65 @@ export default function DisruptionForecast() {
       setLoading(true);
       setError('');
       
-      // Generate a weekly forecast without requiring a specific ID
-      // This avoids the ObjectId casting error
-      const today = new Date();
-      const nextWeek = addDays(today, 7);
+      // Get the forecast with proper MainOperatingRegions
+      const response = await getUpcomingForecasts(7);
       
-      // Prepare data for generating a summary
-      const data = {
-        title: `Weekly Disruption Forecast`,
-        description: `Forecast for ${format(today, 'dd MMM yyyy')} to ${format(nextWeek, 'dd MMM yyyy')}`,
-        startDate: today.toISOString(),
-        endDate: nextWeek.toISOString(),
-        generatePDF: true,
-        autoSave: false
-      };
-
-      const response = await generateSummary(data);
-      
-      if (response.success && response.summary.pdfUrl) {
-        // Create a temporary anchor element to trigger the download
-        const link = document.createElement('a');
-        link.href = response.summary.pdfUrl;
-        link.setAttribute('download', `Weekly_Forecast_${format(today, 'yyyy-MM-dd')}.pdf`);
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
+      if (response.success && response.forecast?.pdfUrl) {
+        // Download the PDF using the URL from the forecast
+        await downloadPdf(
+          response.forecast.pdfUrl,
+          `Weekly_Forecast_${format(new Date(), 'yyyy-MM-dd')}.pdf`
+        );
       } else {
-        setError('PDF not available for this forecast. Please try regenerating the forecast.');
+        setError('Failed to generate the weekly forecast PDF. Please try again.');
       }
     } catch (error) {
       console.error('Error generating weekly forecast:', error);
       setError('Failed to generate weekly forecast. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSaveWeeklyForecast = async () => {
+    try {
+      setLoading(true);
+      setError('');
+      
+      // Get the forecast with proper MainOperatingRegions
+      const forecastResponse = await getUpcomingForecasts(7);
+      
+      if (!forecastResponse.success || !forecastResponse.forecast) {
+        setError('Failed to generate weekly forecast. Please try again.');
+        return;
+      }
+
+      // Now save the forecast with the data we got, including MainOperatingRegions
+      const data = {
+        title: forecastResponse.forecast.title,
+        description: forecastResponse.forecast.description || `Weekly forecast for ${format(new Date(), 'dd MMM yyyy')}`,
+        summaryType: 'forecast' as const,
+        startDate: forecastResponse.forecast.timeRange.startDate,
+        endDate: forecastResponse.forecast.timeRange.endDate,
+        generatePDF: true,
+        autoSave: true,
+        locations: forecastResponse.forecast.userRegions || [], // Use userRegions for locations
+        alertCategory: forecastResponse.forecast.alertCategory,
+        impact: forecastResponse.forecast.impact,
+        includedAlerts: forecastResponse.forecast.alerts || [] // Include the alerts from the forecast
+      };
+
+      const response = await generateSummary(data);
+      
+      if (response.success && response.summary.savedSummaryId) {
+        // Navigate to the saved forecast view
+        router.push(`/alerts-summary/${response.summary.savedSummaryId}`);
+      } else {
+        setError('Failed to save the weekly forecast. Please try again.');
+      }
+    } catch (error) {
+      console.error('Error saving weekly forecast:', error);
+      setError('Failed to save weekly forecast. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -247,16 +273,28 @@ export default function DisruptionForecast() {
       // Get the summary details to access the PDF URL
       const response = await getSummaryById(id);
       
-      if (response.success && response.summary.pdfUrl) {
-        // Create a temporary anchor element to trigger the download
-        const link = document.createElement('a');
-        link.href = response.summary.pdfUrl;
-        link.setAttribute('download', `${response.summary.title.replace(/\s+/g, '_')}.pdf`);
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
+      if (response.success) {
+        if (response.summary.pdfUrl) {
+          // Use the downloadPdf utility
+          await downloadPdf(
+            response.summary.pdfUrl,
+            `${response.summary.title.replace(/\s+/g, '_')}.pdf`
+          );
+        } else {
+          // No PDF available, generate one
+          const pdfUrl = await generatePdfOnDemand(id);
+          
+          if (pdfUrl) {
+            await downloadPdf(
+              pdfUrl,
+              `${response.summary.title.replace(/\s+/g, '_')}.pdf`
+            );
+          } else {
+            setError('Failed to generate PDF. Please try again.');
+          }
+        }
       } else {
-        setError('PDF not available for this forecast. Please try regenerating the forecast.');
+        setError('Failed to retrieve forecast details. Please try again.');
       }
     } catch (error) {
       console.error('Error downloading forecast:', error);
@@ -288,6 +326,28 @@ export default function DisruptionForecast() {
     }
   };
 
+  const handleShareWeeklyForecast = async () => {
+    try {
+      // Create the share URL for the weekly forecast
+      const shareUrl = `${window.location.origin}/alerts-summary/weekly`;
+      
+      // Use the Web Share API if available
+      if (navigator.share) {
+        await navigator.share({
+          title: 'TourPrism Weekly Disruption Forecast',
+          text: 'Check out this weekly disruption forecast from TourPrism',
+          url: shareUrl
+        });
+      } else {
+        // Fallback to copying to clipboard
+        await navigator.clipboard.writeText(shareUrl);
+        alert('Weekly forecast link copied to clipboard!');
+      }
+    } catch (error) {
+      console.error('Error sharing weekly forecast:', error);
+    }
+  };
+
   return (
     <Layout isFooter={false}>
     <LocalizationProvider dateAdapter={AdapterDateFns}>
@@ -315,7 +375,7 @@ export default function DisruptionForecast() {
             </Typography>
             
             <Typography variant="body2" color="text.secondary" gutterBottom>
-              08 Apr – 15 Apr, 2025
+              {format(weeklyStartDate, 'dd MMM')} – {format(weeklyEndDate, 'dd MMM yyyy')}
             </Typography>
 
             <Box sx={{ mt: 2, mb: 2 }}>
@@ -334,7 +394,7 @@ export default function DisruptionForecast() {
             </Box>
 
             <Typography variant="body1" fontWeight="medium" sx={{ mb: 2 }}>
-              Multiple Critical Alerts for Edinburgh
+              Multiple Critical Alerts for this week.
             </Typography>
 
             <Button 
@@ -378,12 +438,12 @@ export default function DisruptionForecast() {
                 <DownloadIcon fontSize="small" />
               </Tooltip>
             </Box>
-            <Box sx={{ borderLeft: '1px solid #f0f0f0', borderRight: '1px solid #f0f0f0' }}>
+            <Box sx={{ borderLeft: '1px solid #f0f0f0', borderRight: '1px solid #f0f0f0' }} onClick={() => handleShareWeeklyForecast()}>
               <Tooltip title="Share Report">
-                <ArrowForwardIcon fontSize="small" onClick={() => alert('Share functionality for weekly forecast is not available yet.')} />
+                <ArrowForwardIcon fontSize="small" />
               </Tooltip>
             </Box>
-            <Box>
+            <Box onClick={() => handleSaveWeeklyForecast()}>
               <Tooltip title="Save Report">
                 <BookmarkBorderIcon fontSize="small" />
               </Tooltip>
