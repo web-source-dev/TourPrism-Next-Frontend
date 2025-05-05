@@ -9,7 +9,6 @@ import {
   Button, 
   CircularProgress, 
   Chip,
-  Divider
 } from '@mui/material';
 import { useRouter } from 'next/navigation';
 import { getFollowedAlerts } from '@/services/action-hub';
@@ -112,7 +111,7 @@ const ActionHubList: React.FC = () => {
             Action Hub
           </Typography>
           <Typography variant="body2" color="text.secondary">
-            Manage the alerts you're following
+            Manage the alerts you&apos;re following
           </Typography>
         </Box>
         <Box>

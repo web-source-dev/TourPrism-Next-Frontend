@@ -7,23 +7,16 @@ import {
   Button, 
   CircularProgress, 
   IconButton,
-  Paper,
   TextField,
   List,
   ListItem,
   ListItemText,
   Chip,
-  Card,
-  CardContent,
-  Stack,
-  Pagination,
   FormControl,
   Select,
   MenuItem,
   SelectChangeEvent,
-  ListItemSecondaryAction,
   Tooltip,
-  Badge
 } from '@mui/material';
 import { useRouter } from 'next/navigation';
 import { 
@@ -31,8 +24,6 @@ import {
   markAlertStatus, 
   flagAlert, 
   followAlert,
-  setActiveTab, 
-  addNote, 
   addGuests, 
   notifyGuests,
   notifyTeam,
@@ -44,18 +35,14 @@ import {
   Flag, 
   FlagOutlined, 
   Email,
-  NoteAdd,
   NotificationsActive,
   NotificationsNone,
   Send,
-  PersonAdd,
-  CheckCircle,
   Refresh,
   Done,
   Warning
 } from '@mui/icons-material';
 import { format } from 'date-fns';
-import { useAuth } from '@/context/AuthContext';
 import { getTimeAgo } from '@/utils/getTimeAgo';
 
 interface ActionHubDetailProps {
@@ -68,29 +55,24 @@ const ActionHubDetail: React.FC<ActionHubDetailProps> = ({ alertId }) => {
   const [error, setError] = useState<string | null>(null);
   const [isExpanded, setIsExpanded] = useState<boolean>(false);
   const [activeTab, setActiveTabState] = useState<'notify_guests' | 'add_notes'>('notify_guests');
-  const [noteContent, setNoteContent] = useState<string>('');
   const [guestEmail, setGuestEmail] = useState<string>('');
   const [guestName, setGuestName] = useState<string>('');
   const [instructions, setInstructions] = useState<string>('');
   const [recipientType, setRecipientType] = useState<string>('guests');
   const [actionLogs, setActionLogs] = useState<ActionLog[]>([]);
   const [logsLoading, setLogsLoading] = useState<boolean>(false);
-  const [logsPage, setLogsPage] = useState<number>(1);
-  const logsPerPage = 10;
   
   // New state for tracking notification status
   const [notifiedGuestsCount, setNotifiedGuestsCount] = useState<number>(0);
   const [totalGuestsCount, setTotalGuestsCount] = useState<number>(0);
   const [notifiedTeamCount, setNotifiedTeamCount] = useState<number>(0);
-  const [totalTeamCount, setTotalTeamCount] = useState<number>(0);
   const [sendingNotification, setSendingNotification] = useState<boolean>(false);
   const [notificationSuccessCount, setNotificationSuccessCount] = useState<number>(0);
   const [notificationFailCount, setNotificationFailCount] = useState<number>(0);
   const [selectedGuestIds, setSelectedGuestIds] = useState<string[]>([]);
   
-  console.log(alert);
+  console.log(activeTab);
   const router = useRouter();
-  const { isAdmin, isManager } = useAuth();
 
   useEffect(() => {
     const fetchAlert = async () => {
@@ -122,7 +104,6 @@ const ActionHubDetail: React.FC<ActionHubDetailProps> = ({ alertId }) => {
         }
         
         if (data.teamMembers && data.teamMembers.length > 0) {
-          setTotalTeamCount(data.teamMembers.length);
           // Note: Currently, we don't track which team members have been notified
           // This will be handled through the action logs
           const teamNotificationLogs = data.actionLogs?.filter(
@@ -131,7 +112,6 @@ const ActionHubDetail: React.FC<ActionHubDetailProps> = ({ alertId }) => {
           );
           setNotifiedTeamCount(teamNotificationLogs && teamNotificationLogs.length > 0 ? 1 : 0);
         } else {
-          setTotalTeamCount(0);
           setNotifiedTeamCount(0);
         }
         
@@ -235,41 +215,6 @@ const ActionHubDetail: React.FC<ActionHubDetailProps> = ({ alertId }) => {
       // In a real app, show an error message
     }
   };
-
-  const handleViewMore = () => {
-    setIsExpanded(true);
-  };
-  
-  const handleTabChange = async (newTab: 'notify_guests' | 'add_notes') => {
-    if (!alert) return;
-    
-    try {
-      setActiveTabState(newTab);
-      await setActiveTab(alert.actionHubId, newTab);
-    } catch (err) {
-      console.error('Error changing tab:', err);
-    }
-  };
-  
-  const handleAddNote = async () => {
-    if (!alert || !noteContent.trim()) return;
-    
-    try {
-      await addNote(alert.actionHubId, noteContent);
-      
-      // Refresh the alert to get the updated notes
-      const updatedAlert = await getFlaggedAlertById(alertId);
-      setAlert(updatedAlert);
-      
-      // Clear input
-      setNoteContent('');
-      
-      // Refresh action logs
-      await fetchActionLogs(alert.actionHubId);
-    } catch (err) {
-      console.error('Error adding note:', err);
-    }
-  };
   
   const handleAddGuest = async () => {
     if (!alert || !guestEmail.trim()) return;
@@ -356,24 +301,6 @@ const ActionHubDetail: React.FC<ActionHubDetailProps> = ({ alertId }) => {
     }
   };
 
-  const handleNotifyTeam = async () => {
-    if (!alert) return;
-    
-    try {
-      // Use the default message
-      const message = `Team notification regarding ${alert.title || 'Alert'}: Please review and act accordingly.`;
-      
-      await notifyTeam(alert.actionHubId, message);
-      
-      // Refresh action logs
-      await fetchActionLogs(alert.actionHubId);
-      
-      // Show success message (in a real app, you might want to add a snackbar or toast here)
-      console.log("Team members have been notified successfully!");
-    } catch (err) {
-      console.error('Error notifying team members:', err);
-    }
-  };
 
   const handleRecipientChange = (event: SelectChangeEvent) => {
     setRecipientType(event.target.value as string);
@@ -556,17 +483,6 @@ const ActionHubDetail: React.FC<ActionHubDetailProps> = ({ alertId }) => {
     }
   };
 
-  // Function to handle logs pagination
-  const handleLogsPageChange = (event: React.ChangeEvent<unknown>, value: number) => {
-    setLogsPage(value);
-  };
-
-  // Get current logs for pagination
-  const getCurrentLogs = () => {
-    const indexOfLastLog = logsPage * logsPerPage;
-    const indexOfFirstLog = indexOfLastLog - logsPerPage;
-    return actionLogs.slice(indexOfFirstLog, indexOfLastLog);
-  };
 
   if (loading) {
     return (

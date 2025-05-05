@@ -35,21 +35,21 @@ const MobileTab = styled(Tab)(({ theme }) => ({
 }));
 
 // Styled badges for different statuses
-const NewBadge = styled(Badge)(({ theme }) => ({
+const NewBadge = styled(Badge)(() => ({
   '& .MuiBadge-badge': {
     backgroundColor: '#2196f3', // Blue
     color: 'white'
   }
 }));
 
-const InProgressBadge = styled(Badge)(({ theme }) => ({
+const InProgressBadge = styled(Badge)(() => ({
   '& .MuiBadge-badge': {
     backgroundColor: '#ff9800', // Amber
     color: 'white'
   }
 }));
 
-const HandledBadge = styled(Badge)(({ theme }) => ({
+const HandledBadge = styled(Badge)(() => ({
   '& .MuiBadge-badge': {
     backgroundColor: '#4caf50', // Green
     color: 'white'
