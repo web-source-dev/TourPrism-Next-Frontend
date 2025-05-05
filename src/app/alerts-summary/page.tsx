@@ -23,6 +23,9 @@ import {
 } from '@mui/material';
 import { 
   Delete as DeleteIcon,
+  Download as DownloadIcon,
+  BookmarkBorder as BookmarkBorderIcon,
+  ArrowForward as ArrowForwardIcon,
 } from '@mui/icons-material';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
@@ -40,6 +43,7 @@ import {
   generateSummary, 
   getSavedSummaries, 
   deleteSummary, 
+  getSummaryById,
   Summary,
   SummaryLocation 
 } from '@/services/summaryService';
@@ -148,15 +152,32 @@ export default function DisruptionForecast() {
         alertCategory, // Add the category explicitly 
         includeDuplicates: false,
         generatePDF: true,
-        autoSave: true,
+        autoSave: false, // Set to false to prevent automatic saving
         impact: impact || undefined,
       };
 
       const response = await generateSummary(data);
       
-      if (response.success && response.summary.savedSummaryId) {
-        // Navigate to the detailed view
-        router.push(`/alerts-summary/${response.summary.savedSummaryId}`);
+      if (response.success) {
+        // If autoSave is true, we'll have a savedSummaryId to navigate to
+        if (response.summary.savedSummaryId) {
+          router.push(`/alerts-summary/${response.summary.savedSummaryId}`);
+        } else {
+          // If we have alerts but no savedSummaryId (because autoSave is false),
+          // we need to save the summary first
+          const saveData = {
+            ...data,
+            autoSave: false // Set to true to save the summary
+          };
+          
+          const saveResponse = await generateSummary(saveData);
+          
+          if (saveResponse.success && saveResponse.summary.savedSummaryId) {
+            router.push(`/alerts-summary/${saveResponse.summary.savedSummaryId}`);
+          } else {
+            setError('Failed to save the forecast. Please try again.');
+          }
+        }
       } else {
         setError('Failed to generate forecast. Please try again with different parameters.');
       }
@@ -173,8 +194,98 @@ export default function DisruptionForecast() {
     router.push('/alerts-summary/weekly');
   };
 
+  const handleGenerateWeeklyForecast = async () => {
+    try {
+      setLoading(true);
+      setError('');
+      
+      // Generate a weekly forecast without requiring a specific ID
+      // This avoids the ObjectId casting error
+      const today = new Date();
+      const nextWeek = addDays(today, 7);
+      
+      // Prepare data for generating a summary
+      const data = {
+        title: `Weekly Disruption Forecast`,
+        description: `Forecast for ${format(today, 'dd MMM yyyy')} to ${format(nextWeek, 'dd MMM yyyy')}`,
+        startDate: today.toISOString(),
+        endDate: nextWeek.toISOString(),
+        generatePDF: true,
+        autoSave: false
+      };
+
+      const response = await generateSummary(data);
+      
+      if (response.success && response.summary.pdfUrl) {
+        // Create a temporary anchor element to trigger the download
+        const link = document.createElement('a');
+        link.href = response.summary.pdfUrl;
+        link.setAttribute('download', `Weekly_Forecast_${format(today, 'yyyy-MM-dd')}.pdf`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      } else {
+        setError('PDF not available for this forecast. Please try regenerating the forecast.');
+      }
+    } catch (error) {
+      console.error('Error generating weekly forecast:', error);
+      setError('Failed to generate weekly forecast. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleViewSavedForecast = (id: string) => {
     router.push(`/alerts-summary/${id}`);
+  };
+
+  const handleDownloadForecast = async (id: string) => {
+    try {
+      setLoading(true);
+      setError('');
+      
+      // Get the summary details to access the PDF URL
+      const response = await getSummaryById(id);
+      
+      if (response.success && response.summary.pdfUrl) {
+        // Create a temporary anchor element to trigger the download
+        const link = document.createElement('a');
+        link.href = response.summary.pdfUrl;
+        link.setAttribute('download', `${response.summary.title.replace(/\s+/g, '_')}.pdf`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      } else {
+        setError('PDF not available for this forecast. Please try regenerating the forecast.');
+      }
+    } catch (error) {
+      console.error('Error downloading forecast:', error);
+      setError('Failed to download forecast. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleShareForecast = async (id: string) => {
+    try {
+      // Create the share URL for the forecast
+      const shareUrl = `${window.location.origin}/alerts-summary/${id}`;
+      
+      // Use the Web Share API if available
+      if (navigator.share) {
+        await navigator.share({
+          title: 'TourPrism Disruption Forecast',
+          text: 'Check out this disruption forecast from TourPrism',
+          url: shareUrl
+        });
+      } else {
+        // Fallback to copying to clipboard
+        await navigator.clipboard.writeText(shareUrl);
+        alert('Link copied to clipboard!');
+      }
+    } catch (error) {
+      console.error('Error sharing forecast:', error);
+    }
   };
 
   return (
@@ -189,56 +300,115 @@ export default function DisruptionForecast() {
 
         {/* Weekly Forecast Section */}
         <Paper 
-          elevation={3} 
+          elevation={1} 
           sx={{ 
-            p: 3, 
+            p: 0, 
             mb: 4, 
-            borderRadius: 2,
-            border: activeSection === 'weekly' ? '2px solid #3f51b5' : 'none'
+            borderRadius: 4,
+            overflow: 'hidden',
+            border: activeSection === 'weekly' ? '1px solid #e0e0e0' : 'none'
           }}
         >
-          <Typography variant="h6" fontWeight="bold" gutterBottom>
-            Your Weekly Disruption Forecast
-          </Typography>
-          
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-            A quick forecast of disruptions that could impact your business this week.
-          </Typography>
+          <Box sx={{ p: 3 }}>
+            <Typography variant="h6" fontWeight="bold" gutterBottom>
+              This Week's Forecast
+            </Typography>
+            
+            <Typography variant="body2" color="text.secondary" gutterBottom>
+              08 Apr – 15 Apr, 2025
+            </Typography>
 
-          <Button 
-            variant="contained" 
-            size="large"
-            fullWidth 
-            onClick={handleViewWeeklyForecast}
-            sx={{ 
-              py: 1.5, 
-              backgroundColor: '#000',
+            <Box sx={{ mt: 2, mb: 2 }}>
+              <Chip 
+                label="HIGH RISK" 
+                size="medium"
+                sx={{ 
+                  borderRadius: 4, 
+                  px: 2, 
+                  backgroundColor: '#f5f5f5',
+                  color: '#666',
+                  fontWeight: 'medium',
+                  height: 36
+                }}
+              />
+            </Box>
+
+            <Typography variant="body1" fontWeight="medium" sx={{ mb: 2 }}>
+              Multiple Critical Alerts for Edinburgh
+            </Typography>
+
+            <Button 
+              variant="contained" 
+              fullWidth 
+              onClick={handleViewWeeklyForecast}
+              sx={{ 
+                py: 1.5, 
+                backgroundColor: '#f5f5f5',
+                color: '#000',
+                boxShadow: 'none',
+                borderRadius: 2,
+                '&:hover': {
+                  backgroundColor: '#e0e0e0',
+                  boxShadow: 'none'
+                }
+              }}
+            >
+              View Full Report
+            </Button>
+          </Box>
+
+          <Box sx={{ 
+            display: 'flex', 
+            borderTop: '1px solid #f0f0f0',
+            '& > *': {
+              flex: 1,
+              display: 'flex',
+              justifyContent: 'center',
+              alignItems: 'center',
+              py: 1.5,
+              color: '#666',
+              cursor: 'pointer',
               '&:hover': {
-                backgroundColor: '#333',
+                color: '#333'
               }
-            }}
-          >
-            View Forecast
-          </Button>
+            }
+          }}>
+            <Box onClick={() => handleGenerateWeeklyForecast()}>
+              <Tooltip title="Download Report">
+                <DownloadIcon fontSize="small" />
+              </Tooltip>
+            </Box>
+            <Box sx={{ borderLeft: '1px solid #f0f0f0', borderRight: '1px solid #f0f0f0' }}>
+              <Tooltip title="Share Report">
+                <ArrowForwardIcon fontSize="small" onClick={() => alert('Share functionality for weekly forecast is not available yet.')} />
+              </Tooltip>
+            </Box>
+            <Box>
+              <Tooltip title="Save Report">
+                <BookmarkBorderIcon fontSize="small" />
+              </Tooltip>
+            </Box>
+          </Box>
         </Paper>
 
         {/* Custom Forecast Section */}
         <Paper 
-          elevation={3} 
+          elevation={1} 
           sx={{ 
             p: 3, 
             mb: 4, 
-            borderRadius: 2,
-            border: activeSection === 'custom' ? '2px solid #3f51b5' : 'none' 
+            borderRadius: 4,
+            overflow: 'hidden',
+            border: activeSection === 'custom' ? '1px solid #e0e0e0' : 'none' 
           }}
           onClick={() => setActiveSection('custom')}
         >
           <Typography variant="h6" fontWeight="bold" gutterBottom>
-            Customize Your Disruption Forecast
+            Create Custom Forecast
           </Typography>
           
           <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-            Filter upcoming disruptions to create a custom forecast for your business.
+            Create custom disruption forecasts
           </Typography>
 
           <Box sx={{ width: '100%', mb: 3 }}>
@@ -359,65 +529,68 @@ export default function DisruptionForecast() {
 
         {/* Saved Forecasts Section */}
         {savedForecasts.length > 0 && (
-          <Paper elevation={3} sx={{ p: 3, borderRadius: 2 }}>
+          <Paper elevation={1} sx={{ p: 3, borderRadius: 4, overflow: 'hidden' }}>
             <Typography variant="h6" fontWeight="bold" gutterBottom>
-              Your Saved Forecasts
+              Saved Reports
             </Typography>
             
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-              Access or manage your previously generated disruption forecasts.
-            </Typography>
-
             <Stack spacing={2}>
               {savedForecasts.map((forecast) => (
                 <Card 
                   key={forecast._id} 
                   variant="outlined"
                   sx={{ 
-                    cursor: 'pointer',
-                    '&:hover': { boxShadow: 2 }
+                    borderRadius: 4,
+                    overflow: 'hidden',
+                    border: '1px solid #f0f0f0',
+                    boxShadow: 'none',
+                    mb: 2
                   }}
                 >
-                  <CardContent sx={{ pb: '16px !important' }}>
-                    <Stack 
-                      direction="row" 
-                      alignItems="center" 
-                      spacing={1}
-                      justifyContent="space-between"
-                    >
-                      <Box 
-                        sx={{ flex: '0 0 66.666%' }} 
-                        onClick={() => handleViewSavedForecast(forecast._id)}
-                      >
-                        <Typography variant="subtitle1" fontWeight="medium">
-                          {forecast.title}
-                        </Typography>
-                        <Typography variant="body2" color="text.secondary">
-                          Saved on {format(parseISO(forecast.createdAt), 'd MMM yyyy')}
-                        </Typography>
-                      </Box>
-                      
-                      <Box sx={{ flex: '0 0 25%', textAlign: 'right' }}>
-                        <Chip 
-                          label={`${Math.round((new TextEncoder().encode(forecast.htmlContent || "").length / 1024))} KB`}
-                          size="small" 
-                          sx={{ mr: 1 }}
-                        />
-                      </Box>
-                      
-                      <Box sx={{ flex: '0 0 8.333%', textAlign: 'right' }}>
-                        <Tooltip title="Delete forecast">
-                          <IconButton 
-                            size="small" 
-                            color="error"
-                            onClick={() => handleDeleteForecast(forecast._id)}
-                          >
-                            <DeleteIcon fontSize="small" />
-                          </IconButton>
-                        </Tooltip>
-                      </Box>
-                    </Stack>
-                  </CardContent>
+                  <Box sx={{ p: 3 }} onClick={() => handleViewSavedForecast(forecast._id)}>
+                    <Typography variant="subtitle1" fontWeight="medium">
+                      {forecast.title}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                      {format(parseISO(forecast.createdAt), 'MMM d, yyyy')}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      Saved {format(parseISO(forecast.createdAt), 'MMM d, yyyy')}
+                    </Typography>
+                  </Box>
+                  
+                  <Box sx={{ 
+                    display: 'flex', 
+                    borderTop: '1px solid #f0f0f0',
+                    '& > *': {
+                      flex: 1,
+                      display: 'flex',
+                      justifyContent: 'center',
+                      alignItems: 'center',
+                      py: 1.5,
+                      color: '#666',
+                      cursor: 'pointer',
+                      '&:hover': {
+                        color: '#333'
+                      }
+                    }
+                  }}>
+                    <Box onClick={() => handleDownloadForecast(forecast._id)}>
+                      <Tooltip title="Download Report">
+                        <DownloadIcon fontSize="small" />
+                      </Tooltip>
+                    </Box>
+                    <Box sx={{ borderLeft: '1px solid #f0f0f0', borderRight: '1px solid #f0f0f0' }}>
+                      <Tooltip title="Share Report">
+                        <ArrowForwardIcon fontSize="small" onClick={() => handleShareForecast(forecast._id)} />
+                      </Tooltip>
+                    </Box>
+                    <Box onClick={() => handleDeleteForecast(forecast._id)}>
+                      <Tooltip title="Delete Report">
+                        <DeleteIcon fontSize="small" />
+                      </Tooltip>
+                    </Box>
+                  </Box>
                 </Card>
               ))}
             </Stack>

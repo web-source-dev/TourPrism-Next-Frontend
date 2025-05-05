@@ -29,7 +29,8 @@ import { format, parseISO } from 'date-fns';
 import { 
   getSummaryById,
   Summary,
-  getUpcomingForecasts
+  getUpcomingForecasts,
+  generateSummary
 } from '@/services/summaryService';
 import Layout from '@/components/Layout';
 interface AlertItem {
@@ -114,6 +115,7 @@ export default function ForecastDetail() {
         },
         includedAlerts: response.forecast.alerts || [],
         htmlContent: response.forecast.htmlContent,
+        pdfUrl: response.forecast?.pdfUrl, // Include PDF URL if available
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
@@ -129,26 +131,55 @@ export default function ForecastDetail() {
   };
 
   const handleSave = async () => {
-    // To be implemented - save the current forecast
+    // Only proceed if not already saved
+    if (saved) return;
+    
     try {
       setLoading(true);
-      // Would call an API to save the current forecast
-      // For now, just simulate success
-      setTimeout(() => {
+      
+      // Create a summary object to save
+      const summaryToSave = {
+        title: forecast?.title,
+        description: forecast?.description || 'Manually saved forecast',
+        summaryType: 'forecast',
+        startDate: forecast?.timeRange.startDate,
+        endDate: forecast?.timeRange?.endDate,
+        alertTypes: forecast?.parameters.alertCategory ? [forecast?.parameters.alertCategory] : [],
+        impact: forecast?.parameters.impact,
+        includeDuplicates: false,
+        generatePDF: true,
+        autoSave: false // Set to false so forecasts are only saved when users manually click save
+      };
+      
+      // Call the API to save the forecast
+      const response = await generateSummary(summaryToSave);
+      
+      if (response.success) {
         setSaved(true);
-        setLoading(false);
-      }, 1000);
+        // If the response includes a PDF URL, update the forecast object
+        if (response.summary.pdfUrl && !forecast?.pdfUrl && forecast) {
+          setForecast({
+            ...forecast,
+            pdfUrl: response.summary.pdfUrl
+          } as Summary);
+        }
+      } else {
+        setError('Failed to save the forecast.');
+      }
     } catch (error) {
       console.error('Error saving forecast:', error);
       setError('Failed to save the forecast.');
+    } finally {
       setLoading(false);
     }
   };
 
+
   const handleDownload = () => {
     // Would implement downloading the forecast as PDF
     if (forecast?.pdfUrl) {
-      window.open(forecast.pdfUrl, '_blank');
+      const fullPdfUrl = `${process.env.NEXT_PUBLIC_BACKEND_URL}${forecast.pdfUrl}`;
+      window.open(fullPdfUrl, '_blank');
     } else {
       alert('PDF not available for this forecast.');
     }
@@ -251,7 +282,8 @@ export default function ForecastDetail() {
         </Typography>
       </Box>
 
-      <Paper elevation={3} sx={{ p: 3, borderRadius: 2, mb: 4 }}>
+      <Paper elevation={1} sx={{ p: 0, borderRadius: 4, overflow: 'hidden', mb: 4, border: '1px solid #f0f0f0' }}>
+        <Box sx={{ p: 3 }}>
         {/* Summary Header */}
         <Stack spacing={2} sx={{ mb: 2 }}>
           <Stack direction="row" spacing={2}>
@@ -372,34 +404,33 @@ export default function ForecastDetail() {
           </Box>
         )}
 
-        <Divider sx={{ my: 2 }} />
-
-        {/* Action Buttons */}
-        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
-          <Box sx={{ width: { xs: '100%', sm: '50%' } }}>
-            <Button
-              variant="outlined"
-              fullWidth
-              startIcon={saved ? <BookmarkIcon /> : <BookmarkBorderIcon />}
-              onClick={handleSave}
-              disabled={saved}
-              sx={{ p: 1 }}
-            >
-              {saved ? 'Saved' : 'Save This Forecast'}
-            </Button>
+        </Box>
+        
+        <Box sx={{ 
+          display: 'flex', 
+          borderTop: '1px solid #f0f0f0',
+          '& > *': {
+            flex: 1,
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            py: 1.5,
+            color: '#666'
+          }
+        }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <DownloadIcon onClick={handleDownload} fontSize="small" sx={{ mr: 1 }} />
+            <Typography variant="body2">Download</Typography>
           </Box>
-          <Box sx={{ width: { xs: '100%', sm: '50%' } }}>
-            <Button
-              variant="outlined"
-              fullWidth
-              startIcon={<DownloadIcon />}
-              onClick={handleDownload}
-              sx={{ p: 1 }}
-            >
-              Download PDF
-            </Button>
+          <Box sx={{ borderLeft: '1px solid #f0f0f0', borderRight: '1px solid #f0f0f0', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <ArrowForwardIcon fontSize="small" sx={{ mr: 1 }} />
+            <Typography variant="body2">Share</Typography>
           </Box>
-        </Stack>
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={handleSave}>
+            {saved ? <BookmarkIcon fontSize="small" sx={{ mr: 1 }} /> : <BookmarkBorderIcon fontSize="small" sx={{ mr: 1 }} />}
+            <Typography variant="body2">Save</Typography>
+          </Box>
+        </Box>
       </Paper>
 
       {/* Additional Alerts Section */}
@@ -470,4 +501,4 @@ export default function ForecastDetail() {
     </Box>
     </Layout>
   );
-} 
+}
