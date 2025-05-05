@@ -14,12 +14,10 @@ import {
   TextField,
   CircularProgress,
   Alert,
-  IconButton,
   Stack,
   Tooltip,
   Chip,
   Card,
-  CardContent,
 } from '@mui/material';
 import { 
   Delete as DeleteIcon,
@@ -89,9 +87,9 @@ export default function DisruptionForecast() {
   const [impact, setImpact] = useState('');
   
   // Weekly forecast date range (for display)
-  const [weeklyStartDate, setWeeklyStartDate] = useState(new Date());
-  const [weeklyEndDate, setWeeklyEndDate] = useState(addDays(new Date(), 7));
-  
+
+  const weeklyStartDate = new Date()
+  const weeklyEndDate = addDays(new Date(), 7)
   // Google Maps API script loading
   const { isLoaded } = useLoadScript({
     googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || '',
@@ -371,30 +369,15 @@ export default function DisruptionForecast() {
         >
           <Box sx={{ p: 3 }}>
             <Typography variant="h6" fontWeight="bold" gutterBottom>
-              This Week's Forecast
+              This Week&apos;s Forecast
             </Typography>
             
             <Typography variant="body2" color="text.secondary" gutterBottom>
               {format(weeklyStartDate, 'dd MMM')} – {format(weeklyEndDate, 'dd MMM yyyy')}
             </Typography>
 
-            <Box sx={{ mt: 2, mb: 2 }}>
-              <Chip 
-                label="HIGH RISK" 
-                size="medium"
-                sx={{ 
-                  borderRadius: 4, 
-                  px: 2, 
-                  backgroundColor: '#f5f5f5',
-                  color: '#666',
-                  fontWeight: 'medium',
-                  height: 36
-                }}
-              />
-            </Box>
-
             <Typography variant="body1" fontWeight="medium" sx={{ mb: 2 }}>
-              Multiple Critical Alerts for this week.
+              Multiple Alerts for this Week.
             </Typography>
 
             <Button 

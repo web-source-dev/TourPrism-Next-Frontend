@@ -10,13 +10,11 @@ import Layout from '@/components/Layout';
 export default function WeeklyForecast() {
   const router = useRouter();
   const [error, setError] = useState('');
-  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const generateWeeklyForecast = async () => {
       try {
         // Set loading state
-        setLoading(true);
         
         // Get the forecast with proper MainOperatingRegions
         const response = await getUpcomingForecasts(7);
@@ -56,12 +54,10 @@ export default function WeeklyForecast() {
         } else {
           // If there's an issue, set an error message
           setError('Failed to generate weekly forecast. Please try again later.');
-          setLoading(false);
         }
       } catch (error) {
         console.error('Error generating weekly forecast:', error);
         setError('An unexpected error occurred. Please try again later.');
-        setLoading(false);
       }
     };
 
@@ -70,7 +66,6 @@ export default function WeeklyForecast() {
 
   const handleRetry = () => {
     setError('');
-    setLoading(true);
     router.push('/alerts-summary'); // Go back to main page to try again
   };
 

@@ -246,7 +246,7 @@ export default function ForecastDetail() {
       // Call the API to save the forecast
       const response = await generateSummary({
         ...summaryToSave,
-        summaryType: 'forecast' as 'forecast' // Explicitly assert the type
+        summaryType: 'forecast' as const // Explicitly assert the type
       });
       
       if (response.success) {
