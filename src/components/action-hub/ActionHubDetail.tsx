@@ -16,18 +16,26 @@ import {
   Card,
   CardContent,
   Stack,
-  Pagination
+  Pagination,
+  FormControl,
+  Select,
+  MenuItem,
+  SelectChangeEvent,
+  ListItemSecondaryAction,
+  Tooltip,
+  Badge
 } from '@mui/material';
 import { useRouter } from 'next/navigation';
 import { 
   getFlaggedAlertById, 
-  resolveAlertFlags, 
+  markAlertStatus, 
   flagAlert, 
+  followAlert,
   setActiveTab, 
   addNote, 
-  addTeamMessage, 
   addGuests, 
   notifyGuests,
+  notifyTeam,
   getActionLogs
 } from '@/services/action-hub';
 import { ActionHubItem, ActionLog } from '@/types';
@@ -36,18 +44,19 @@ import {
   Flag, 
   FlagOutlined, 
   Email,
-  Message,
   NoteAdd,
-  Edit,
   NotificationsActive,
   NotificationsNone,
   Send,
   PersonAdd,
-  Save
+  CheckCircle,
+  Refresh,
+  Done,
+  Warning
 } from '@mui/icons-material';
 import { format } from 'date-fns';
 import { useAuth } from '@/context/AuthContext';
-import { followAlert } from '@/services/alertActions';
+import { getTimeAgo } from '@/utils/getTimeAgo';
 
 interface ActionHubDetailProps {
   alertId: string;
@@ -58,15 +67,26 @@ const ActionHubDetail: React.FC<ActionHubDetailProps> = ({ alertId }) => {
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [isExpanded, setIsExpanded] = useState<boolean>(false);
-  const [activeTab, setActiveTabState] = useState<'notify_guests' | 'message_team' | 'add_notes'>('notify_guests');
+  const [activeTab, setActiveTabState] = useState<'notify_guests' | 'add_notes'>('notify_guests');
   const [noteContent, setNoteContent] = useState<string>('');
-  const [messageContent, setMessageContent] = useState<string>('');
   const [guestEmail, setGuestEmail] = useState<string>('');
   const [guestName, setGuestName] = useState<string>('');
+  const [instructions, setInstructions] = useState<string>('');
+  const [recipientType, setRecipientType] = useState<string>('guests');
   const [actionLogs, setActionLogs] = useState<ActionLog[]>([]);
   const [logsLoading, setLogsLoading] = useState<boolean>(false);
   const [logsPage, setLogsPage] = useState<number>(1);
   const logsPerPage = 10;
+  
+  // New state for tracking notification status
+  const [notifiedGuestsCount, setNotifiedGuestsCount] = useState<number>(0);
+  const [totalGuestsCount, setTotalGuestsCount] = useState<number>(0);
+  const [notifiedTeamCount, setNotifiedTeamCount] = useState<number>(0);
+  const [totalTeamCount, setTotalTeamCount] = useState<number>(0);
+  const [sendingNotification, setSendingNotification] = useState<boolean>(false);
+  const [notificationSuccessCount, setNotificationSuccessCount] = useState<number>(0);
+  const [notificationFailCount, setNotificationFailCount] = useState<number>(0);
+  const [selectedGuestIds, setSelectedGuestIds] = useState<string[]>([]);
   
   console.log(alert);
   const router = useRouter();
@@ -81,7 +101,38 @@ const ActionHubDetail: React.FC<ActionHubDetailProps> = ({ alertId }) => {
         
         // Set the active tab from the retrieved data
         if (data.currentActiveTab) {
-          setActiveTabState(data.currentActiveTab);
+          // If the backend sends 'message_team' we should default to 'notify_guests'
+          // since message_team is no longer supported
+          if (data.currentActiveTab === 'notify_guests' || data.currentActiveTab === 'add_notes') {
+            setActiveTabState(data.currentActiveTab);
+          } else {
+            setActiveTabState('notify_guests');
+          }
+        }
+        
+        // Calculate notification stats
+        if (data.guests && data.guests.length > 0) {
+          const totalGuests = data.guests.length;
+          const notifiedGuests = data.guests.filter(guest => guest.notificationSent).length;
+          setTotalGuestsCount(totalGuests);
+          setNotifiedGuestsCount(notifiedGuests);
+        } else {
+          setTotalGuestsCount(0);
+          setNotifiedGuestsCount(0);
+        }
+        
+        if (data.teamMembers && data.teamMembers.length > 0) {
+          setTotalTeamCount(data.teamMembers.length);
+          // Note: Currently, we don't track which team members have been notified
+          // This will be handled through the action logs
+          const teamNotificationLogs = data.actionLogs?.filter(
+            log => log.actionType === 'notify_guests' && 
+                   log.actionDetails?.includes('team members')
+          );
+          setNotifiedTeamCount(teamNotificationLogs && teamNotificationLogs.length > 0 ? 1 : 0);
+        } else {
+          setTotalTeamCount(0);
+          setNotifiedTeamCount(0);
         }
         
         setError(null);
@@ -137,24 +188,51 @@ const ActionHubDetail: React.FC<ActionHubDetailProps> = ({ alertId }) => {
     
     try {
       const result = await followAlert(alert._id);
+      
+      // Update the alert state
       setAlert(prev => prev ? { 
         ...prev, 
         isFollowing: result.following,
         numberOfFollows: result.numberOfFollows
       } : null);
+      
+      // Provide feedback
+      console.log(result.following ? 
+        `You're now following this alert. Total followers: ${result.numberOfFollows}` : 
+        `You've unfollowed this alert. Total followers: ${result.numberOfFollows}`);
+      
+      // Refresh action logs to show the follow/unfollow action
+      await fetchActionLogs(alert.actionHubId);
     } catch (err) {
       console.error('Error toggling follow status:', err);
     }
   };
 
-  const handleResolve = async () => {
+  const handleStatusChange = async (status: 'new' | 'in_progress' | 'handled') => {
     if (!alert) return;
     
     try {
-      await resolveAlertFlags(alert.actionHubId);
-      router.push('/action-hub');
+      await markAlertStatus(alert.actionHubId, status);
+      
+      // Provide feedback
+      console.log(`Alert marked as ${status}`);
+      
+      // Refresh the alert
+      const updatedAlert = await getFlaggedAlertById(alertId);
+      setAlert(updatedAlert);
+      
+      // Refresh action logs
+      await fetchActionLogs(alert.actionHubId);
+      
+      if (status === 'handled') {
+        // In a real app, you might want to:
+        // 1. Show a success toast/snackbar
+        // 2. Navigate back to the list view after a delay
+        // router.push('/action-hub');
+      }
     } catch (err) {
-      console.error('Error resolving flags:', err);
+      console.error(`Error changing status to ${status}:`, err);
+      // In a real app, show an error message
     }
   };
 
@@ -162,7 +240,7 @@ const ActionHubDetail: React.FC<ActionHubDetailProps> = ({ alertId }) => {
     setIsExpanded(true);
   };
   
-  const handleTabChange = async (newTab: 'notify_guests' | 'message_team' | 'add_notes') => {
+  const handleTabChange = async (newTab: 'notify_guests' | 'add_notes') => {
     if (!alert) return;
     
     try {
@@ -193,30 +271,11 @@ const ActionHubDetail: React.FC<ActionHubDetailProps> = ({ alertId }) => {
     }
   };
   
-  const handleSendTeamMessage = async () => {
-    if (!alert || !messageContent.trim()) return;
-    
-    try {
-      await addTeamMessage(alert.actionHubId, messageContent);
-      
-      // Refresh the alert to get the updated messages
-      const updatedAlert = await getFlaggedAlertById(alertId);
-      setAlert(updatedAlert);
-      
-      // Clear input
-      setMessageContent('');
-      
-      // Refresh action logs
-      await fetchActionLogs(alert.actionHubId);
-    } catch (err) {
-      console.error('Error sending team message:', err);
-    }
-  };
-  
   const handleAddGuest = async () => {
     if (!alert || !guestEmail.trim()) return;
     
     try {
+      // Add the guest
       await addGuests(alert.actionHubId, [{ 
         email: guestEmail.trim(),
         name: guestName.trim() || undefined
@@ -232,8 +291,14 @@ const ActionHubDetail: React.FC<ActionHubDetailProps> = ({ alertId }) => {
       
       // Refresh action logs
       await fetchActionLogs(alert.actionHubId);
+      
+      // Add a console log as feedback
+      console.log(`Guest ${guestEmail.trim()} added successfully`);
+      
+      // In a real application, you would show a toast/snackbar notification here
     } catch (err) {
       console.error('Error adding guest:', err);
+      // In a real application, you would show an error notification here
     }
   };
   
@@ -241,19 +306,253 @@ const ActionHubDetail: React.FC<ActionHubDetailProps> = ({ alertId }) => {
     if (!alert) return;
     
     try {
-      // Use the default message
-      const message = `Important information regarding your stay: ${alert.title || 'Alert notification'}`;
+      setSendingNotification(true);
       
-      await notifyGuests(alert.actionHubId, message);
+      // Get unnotified guests
+      const unnotifiedGuests = alert.guests?.filter(g => !g.notificationSent) || [];
+      
+      if (unnotifiedGuests.length === 0) {
+        console.log('No unnotified guests to notify');
+        setSendingNotification(false);
+        return;
+      }
+      
+      // Get IDs of unnotified guests
+      const unnotifiedGuestIds = unnotifiedGuests.map(g => g._id);
+      
+      // Use the default message or current instructions
+      const message = instructions.trim() 
+        ? instructions 
+        : `Important information regarding your stay: ${alert.title || 'Alert notification'}`;
+      
+      // Notify only unnotified guests
+      const result = await notifyGuests(alert.actionHubId, message, unnotifiedGuestIds);
+      
+      // Set success and failure counts
+      if (result.emailResults) {
+        const successCount = result.emailResults.filter(r => r.success).length;
+        const failCount = result.emailResults.filter(r => !r.success).length;
+        setNotificationSuccessCount(successCount);
+        setNotificationFailCount(failCount);
+      }
       
       // Refresh the alert to get the updated guest notification status
       const updatedAlert = await getFlaggedAlertById(alertId);
       setAlert(updatedAlert);
       
+      // Calculate updated notification stats
+      if (updatedAlert.guests && updatedAlert.guests.length > 0) {
+        const notifiedGuests = updatedAlert.guests.filter(guest => guest.notificationSent).length;
+        setTotalGuestsCount(updatedAlert.guests.length);
+        setNotifiedGuestsCount(notifiedGuests);
+      }
+      
       // Refresh action logs
       await fetchActionLogs(alert.actionHubId);
     } catch (err) {
       console.error('Error notifying guests:', err);
+    } finally {
+      setSendingNotification(false);
+    }
+  };
+
+  const handleNotifyTeam = async () => {
+    if (!alert) return;
+    
+    try {
+      // Use the default message
+      const message = `Team notification regarding ${alert.title || 'Alert'}: Please review and act accordingly.`;
+      
+      await notifyTeam(alert.actionHubId, message);
+      
+      // Refresh action logs
+      await fetchActionLogs(alert.actionHubId);
+      
+      // Show success message (in a real app, you might want to add a snackbar or toast here)
+      console.log("Team members have been notified successfully!");
+    } catch (err) {
+      console.error('Error notifying team members:', err);
+    }
+  };
+
+  const handleRecipientChange = (event: SelectChangeEvent) => {
+    setRecipientType(event.target.value as string);
+    // Reset notification stats and selected guests when switching tabs
+    setNotificationSuccessCount(0);
+    setNotificationFailCount(0);
+    setSelectedGuestIds([]);
+  };
+
+  // Handle resend to selected guests
+  const handleResendToGuests = async (guestIds: string[]) => {
+    if (!alert || guestIds.length === 0) return;
+    
+    try {
+      setSendingNotification(true);
+      
+      // Use the default message or the current instructions
+      const message = instructions.trim() 
+        ? instructions 
+        : `Important information regarding your stay: ${alert.title || 'Alert notification'}`;
+      
+      // Call API to resend to specific guest IDs
+      const result = await notifyGuests(alert.actionHubId, message, guestIds);
+      
+      // Update notification counts
+      const updatedAlert = await getFlaggedAlertById(alertId);
+      setAlert(updatedAlert);
+      
+      // Calculate updated notification stats
+      if (updatedAlert.guests && updatedAlert.guests.length > 0) {
+        const notifiedGuests = updatedAlert.guests.filter(guest => guest.notificationSent).length;
+        setNotifiedGuestsCount(notifiedGuests);
+      }
+      
+      // Set success and failure counts
+      if (result.emailResults) {
+        const successCount = result.emailResults.filter(r => r.success).length;
+        const failCount = result.emailResults.filter(r => !r.success).length;
+        setNotificationSuccessCount(successCount);
+        setNotificationFailCount(failCount);
+      }
+      
+      // Refresh action logs
+      await fetchActionLogs(alert.actionHubId);
+      
+      // Clear selected guests
+      setSelectedGuestIds([]);
+      
+    } catch (err) {
+      console.error('Error resending to guests:', err);
+    } finally {
+      setSendingNotification(false);
+    }
+  };
+  
+  // Handle resend to all team members
+  const handleResendToTeam = async () => {
+    if (!alert) return;
+    
+    try {
+      setSendingNotification(true);
+      
+      // Use the default message or the current instructions
+      const message = instructions.trim() 
+        ? instructions 
+        : `Team notification regarding ${alert.title || 'Alert'}: Please review and act accordingly.`;
+      
+      // Call API to resend to team
+      const result = await notifyTeam(alert.actionHubId, message);
+      
+      // Set notification count
+      setNotifiedTeamCount(1);
+      
+      // Set success and failure counts
+      if (result.emailResults) {
+        const successCount = result.emailResults.filter(r => r.success).length;
+        const failCount = result.emailResults.filter(r => !r.success).length;
+        setNotificationSuccessCount(successCount);
+        setNotificationFailCount(failCount);
+      }
+      
+      // Refresh action logs
+      await fetchActionLogs(alert.actionHubId);
+      
+    } catch (err) {
+      console.error('Error resending to team:', err);
+    } finally {
+      setSendingNotification(false);
+    }
+  };
+
+  const handleForwardAlert = async () => {
+    if (!alert) return;
+    
+    try {
+      setSendingNotification(true);
+      const message = `${alert.title || 'Alert notification'}: ${instructions || 'Please review this alert'}`;
+      
+      if (recipientType === 'guests') {
+        // Check if we have any guests to notify
+        if (!alert.guests || alert.guests.length === 0) {
+          // No guests added yet
+          if (guestEmail.trim()) {
+            // If there's a guest email in the input field, add it first
+            await handleAddGuest();
+            // After adding the guest, fetch the updated alert data
+            const updatedAlert = await getFlaggedAlertById(alertId);
+            setAlert(updatedAlert);
+          } else {
+            console.log('No guests to notify');
+            setSendingNotification(false);
+            return; // Don't proceed if no guests
+          }
+        }
+        
+        // Get only unnotified guests
+        const unnotifiedGuests = alert.guests?.filter(g => !g.notificationSent);
+        const unnotifiedGuestIds = unnotifiedGuests?.map(g => g._id) || [];
+        
+        if (unnotifiedGuests && unnotifiedGuests.length > 0) {
+          const result = await notifyGuests(alert.actionHubId, message, unnotifiedGuestIds);
+          console.log(`Notified ${unnotifiedGuests.length} guests`);
+          
+          // Set success and failure counts
+          if (result.emailResults) {
+            const successCount = result.emailResults.filter(r => r.success).length;
+            const failCount = result.emailResults.filter(r => !r.success).length;
+            setNotificationSuccessCount(successCount);
+            setNotificationFailCount(failCount);
+          }
+        } else {
+          console.log('All guests already notified');
+          setSendingNotification(false);
+          return; // Don't proceed if all guests already notified
+        }
+      } else if (recipientType === 'team') {
+        // Check if there are team members to notify
+        if (!alert.teamMembers || alert.teamMembers.length === 0) {
+          console.log('No team members to notify');
+          setSendingNotification(false);
+          return; // Don't proceed if no team members
+        }
+        
+        const result = await notifyTeam(alert.actionHubId, message);
+        console.log(`Notified ${alert.teamMembers.length} team members`);
+        
+        // Set success and failure counts
+        if (result.emailResults) {
+          const successCount = result.emailResults.filter(r => r.success).length;
+          const failCount = result.emailResults.filter(r => !r.success).length;
+          setNotificationSuccessCount(successCount);
+          setNotificationFailCount(failCount);
+        }
+        
+        // Set team as notified
+        setNotifiedTeamCount(1);
+      }
+      
+      // Refresh the alert to get the updated status
+      const updatedAlert = await getFlaggedAlertById(alertId);
+      setAlert(updatedAlert);
+      
+      // Update notification counts
+      if (updatedAlert.guests && updatedAlert.guests.length > 0) {
+        const notifiedGuests = updatedAlert.guests.filter(guest => guest.notificationSent).length;
+        setTotalGuestsCount(updatedAlert.guests.length);
+        setNotifiedGuestsCount(notifiedGuests);
+      }
+      
+      // Refresh action logs
+      await fetchActionLogs(alert.actionHubId);
+      
+      // Clear instructions
+      setInstructions('');
+      
+    } catch (err) {
+      console.error('Error forwarding alert:', err);
+    } finally {
+      setSendingNotification(false);
     }
   };
 
@@ -404,7 +703,7 @@ const ActionHubDetail: React.FC<ActionHubDetailProps> = ({ alertId }) => {
 
   // Default view with action hub functionality - Mobile design
   return (
-    <Box sx={{ backgroundColor: '#fff', height: '100vh' }}>
+    <Box sx={{ backgroundColor: '#fff', height: '100%', pb: 4 }}>
       {/* Header */}
       <Box sx={{ 
         display: 'flex', 
@@ -417,376 +716,391 @@ const ActionHubDetail: React.FC<ActionHubDetailProps> = ({ alertId }) => {
         </IconButton>
       </Box>
 
-      {/* Content */}
-      <Box sx={{ px: 2, py: 1 }}>
-        {/* Title and Location */}
-        <Typography variant="h6" fontWeight="bold" sx={{ mt: 1, mb: 0.5 }}>
+      {/* Time and Title */}
+      <Box sx={{ px: 3, pt: 2 }}>
+        <Typography variant="body2" color="text.secondary">
+          {alert ? getTimeAgo(alert.createdAt) : ''}
+        </Typography>
+        
+        <Typography variant="h6" fontWeight="bold" sx={{ mt: 1, mb: 2 }}>
           {alert.title || 'Untitled Alert'}
         </Typography>
-        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-          {alert.city || 'Unknown location'}
+        
+        <Typography variant="body2" sx={{ mb: 3 }}>
+          {alert.description || 'No description available'}
+        </Typography>
+      </Box>
+
+      {/* Details */}
+      <Box sx={{ px: 3, pb: 2 }}>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+          <Typography variant="body2" fontWeight="bold">Location</Typography>
+          <Typography variant="body2">{alert.city || 'Unknown location'}</Typography>
+        </Box>
+        
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+          <Typography variant="body2" fontWeight="bold">Start Date</Typography>
+          <Typography variant="body2">
+            {alert.expectedStart ? format(new Date(alert.expectedStart), 'dd MMM h:mma') : '—'}
+          </Typography>
+        </Box>
+        
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+          <Typography variant="body2" fontWeight="bold">End Date</Typography>
+          <Typography variant="body2">
+            {alert.expectedEnd ? format(new Date(alert.expectedEnd), 'dd MMM h:mma') : '—'}
+          </Typography>
+        </Box>
+        
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 3 }}>
+          <Typography variant="body2" fontWeight="bold">Impact Level</Typography>
+          <Typography variant="body2">{alert.impact || 'Not specified'}</Typography>
+        </Box>
+      </Box>
+
+      {/* Forward Alert Section */}
+      <Box sx={{ px: 3, py: 2 }}>
+        <Typography variant="subtitle1" fontWeight="bold" sx={{ mb: 2 }}>
+          FORWARD TO
         </Typography>
         
-        {/* Description with View More */}
-        <Typography variant="body2" sx={{ mb: 2, lineHeight: 1.5 }}>
-          {alert.description ? (
-            alert.description.length > 100 ? (
-              <>
-                {alert.description.substring(0, 100)}...
-                <Button 
-                  variant="text" 
-                  size="small" 
-                  onClick={handleViewMore}
-                  sx={{ 
-                    p: 0, 
-                    ml: 0.5,
-                    color: 'error.main',
-                    textDecoration: 'underline',
-                    textTransform: 'none',
-                    fontWeight: 'normal',
-                    minWidth: 'auto'
-                  }}
-                >
-                  View more
-                </Button>
-              </>
-            ) : (
-              <>
-                {alert.description}
-                <Button 
-                  variant="text" 
-                  size="small" 
-                  onClick={handleViewMore}
-                  sx={{ 
-                    p: 0, 
-                    ml: 0.5,
-                    color: 'error.main',
-                    textDecoration: 'underline',
-                    textTransform: 'none',
-                    fontWeight: 'normal',
-                    minWidth: 'auto'
-                  }}
-                >
-                  View more
-                </Button>
-              </>
-            )
-          ) : (
-            'No description provided'
-          )}
-        </Typography>
+        <FormControl fullWidth variant="outlined" size="small" sx={{ mb: 2 }}>
+          <Select
+            value={recipientType}
+            onChange={handleRecipientChange}
+            displayEmpty
+          >
+            <MenuItem value="guests">Guests</MenuItem>
+            <MenuItem value="team">Team Members</MenuItem>
+          </Select>
+        </FormControl>
         
-        {/* Action Buttons */}
-        <Stack direction="column" spacing={2} sx={{ mt: 3 }}>
-          <Card 
-            variant="outlined" 
-            sx={{ 
-              borderRadius: 2,
-              boxShadow: 'none'
-            }}
-            onClick={() => handleTabChange('notify_guests')}
-          >
-            <CardContent sx={{ 
-              display: 'flex', 
-              alignItems: 'center', 
-              p: 2, 
-              '&:last-child': { pb: 2 },
-              cursor: 'pointer'
-            }}>
-              <Email sx={{ mr: 2, color: 'primary.main' }} />
-              <Typography variant="body1">Notify Guests</Typography>
-            </CardContent>
-          </Card>
-          
-          <Card 
-            variant="outlined" 
-            sx={{ 
-              borderRadius: 2,
-              boxShadow: 'none'
-            }}
-            onClick={() => handleTabChange('message_team')}
-          >
-            <CardContent sx={{ 
-              display: 'flex', 
-              alignItems: 'center', 
-              p: 2, 
-              '&:last-child': { pb: 2 },
-              cursor: 'pointer'
-            }}>
-              <Message sx={{ mr: 2, color: 'primary.main' }} />
-              <Typography variant="body1">Message Team</Typography>
-            </CardContent>
-          </Card>
-          
-          <Card 
-            variant="outlined" 
-            sx={{ 
-              borderRadius: 2,
-              boxShadow: 'none'
-            }}
-            onClick={() => handleTabChange('add_notes')}
-          >
-            <CardContent sx={{ 
-              display: 'flex', 
-              alignItems: 'center', 
-              p: 2, 
-              '&:last-child': { pb: 2 },
-              cursor: 'pointer'
-            }}>
-              <NoteAdd sx={{ mr: 2, color: 'primary.main' }} />
-              <Typography variant="body1">Add Notes</Typography>
-            </CardContent>
-          </Card>
-        </Stack>
-        
-        {/* Active Tab Content */}
-        {activeTab === 'notify_guests' && (
-          <Box sx={{ mt: 3 }}>
-            <Box sx={{ mb: 3 }}>
-              <TextField
-                label="Guest Email"
-                value={guestEmail}
-                onChange={(e) => setGuestEmail(e.target.value)}
-                fullWidth
-                margin="dense"
-                size="small"
-              />
-              <TextField
-                label="Guest Name (optional)"
-                value={guestName}
-                onChange={(e) => setGuestName(e.target.value)}
-                fullWidth
-                margin="dense"
-                size="small"
-              />
-              <Button
-                variant="outlined"
-                startIcon={<PersonAdd />}
-                onClick={handleAddGuest}
-                sx={{ mt: 1 }}
-              >
-                Add Guest
-              </Button>
-            </Box>
+        {recipientType === 'guests' && (
+          <Box sx={{ mb: 3 }}>
+            <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1 }}>
+              Add Guest Details:
+            </Typography>
             
-            {alert.guests && alert.guests.length > 0 ? (
-              <Box>
-                <List dense>
+            <TextField
+              label="Guest Email"
+              value={guestEmail}
+              onChange={(e) => setGuestEmail(e.target.value)}
+              fullWidth
+              margin="dense"
+              size="small"
+              sx={{ mb: 1 }}
+            />
+            
+            <TextField
+              label="Guest Name (optional)"
+              value={guestName}
+              onChange={(e) => setGuestName(e.target.value)}
+              fullWidth
+              margin="dense"
+              size="small"
+              sx={{ mb: 1 }}
+            />
+            
+            <Button
+              variant="outlined"
+              size="small"
+              sx={{ mt: 1 }}
+              onClick={handleAddGuest}
+              disabled={!guestEmail.trim()}
+            >
+              Add Guest
+            </Button>
+            
+            {/* Show list of added guests */}
+            {alert.guests && alert.guests.length > 0 && (
+              <Box sx={{ mt: 2 }}>
+                <Typography variant="subtitle2" color="text.secondary">
+                  Guest List ({alert.guests.length}):
+                  {notifiedGuestsCount > 0 && (
+                    <Typography component="span" sx={{ ml: 1, color: 'success.main', fontSize: '0.8rem' }}>
+                      {notifiedGuestsCount} notified
+                    </Typography>
+                  )}
+                </Typography>
+                
+                <List dense sx={{ maxHeight: '150px', overflow: 'auto' }}>
                   {alert.guests.map((guest, index) => (
                     <ListItem 
-                      key={index}
+                      key={index} 
+                      sx={{ 
+                        py: 0.5,
+                        bgcolor: selectedGuestIds.includes(guest._id) ? 'rgba(0, 0, 0, 0.04)' : 'transparent'
+                      }}
                       secondaryAction={
-                        guest.notificationSent ? (
-                          <Chip size="small" label="Notified" color="success" />
-                        ) : null
+                        <Box>
+                          {guest.notificationSent ? (
+                            <Tooltip title={`Notified on ${new Date(guest.sentTimestamp || '').toLocaleString()}`}>
+                              <Done color="success" fontSize="small" />
+                            </Tooltip>
+                          ) : (
+                            <Tooltip title="Not notified yet">
+                              <Email color="disabled" fontSize="small" />
+                            </Tooltip>
+                          )}
+                        </Box>
                       }
+                      onClick={() => {
+                        // Toggle selection of this guest for resending
+                        setSelectedGuestIds(prev => 
+                          prev.includes(guest._id) 
+                            ? prev.filter(id => id !== guest._id) 
+                            : [...prev, guest._id]
+                        );
+                      }}
                     >
-                      <ListItemText
-                        primary={guest.email}
-                        secondary={guest.name || 'No name provided'}
+                      <ListItemText 
+                        primary={
+                          <Box component="span" sx={{ display: 'flex', alignItems: 'center' }}>
+                            {guest.email}
+                            {guest.notificationSent && (
+                              <Chip 
+                                label="Sent" 
+                                size="small" 
+                                color="success" 
+                                sx={{ ml: 1, height: 20, fontSize: '0.65rem' }} 
+                              />
+                            )}
+                          </Box>
+                        }
+                        secondary={guest.name || ''}
+                        primaryTypographyProps={{ variant: 'body2' }}
+                        secondaryTypographyProps={{ variant: 'caption' }}
                       />
                     </ListItem>
                   ))}
                 </List>
                 
-                <Button
-                  variant="contained"
-                  fullWidth
-                  color="primary"
-                  startIcon={<Send />}
-                  onClick={handleNotifyGuests}
-                  disabled={!alert.guests.some(guest => !guest.notificationSent)}
-                  sx={{ mt: 1 }}
-                >
-                  Send Notifications
-                </Button>
+                {selectedGuestIds.length > 0 && (
+                  <Button
+                    variant="outlined"
+                    startIcon={<Refresh />}
+                    size="small"
+                    sx={{ mt: 1 }}
+                    onClick={() => handleResendToGuests(selectedGuestIds)}
+                  >
+                    Resend to {selectedGuestIds.length} selected
+                  </Button>
+                )}
+                
+                {notifiedGuestsCount > 0 && notifiedGuestsCount < totalGuestsCount && (
+                  <Button
+                    variant="outlined"
+                    startIcon={<Email />}
+                    size="small"
+                    sx={{ mt: 1, ml: selectedGuestIds.length > 0 ? 1 : 0 }}
+                    onClick={handleNotifyGuests}
+                  >
+                    Notify Remaining ({totalGuestsCount - notifiedGuestsCount})
+                  </Button>
+                )}
               </Box>
+            )}
+          </Box>
+        )}
+        
+        {recipientType === 'team' && alert.teamMembers && alert.teamMembers.length > 0 && (
+          <Box sx={{ mb: 3 }}>
+            <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1 }}>
+              Team Members ({alert.teamMembers.length}):
+              {notifiedTeamCount > 0 && (
+                <Typography component="span" sx={{ ml: 1, color: 'success.main', fontSize: '0.8rem' }}>
+                  Team notified
+                </Typography>
+              )}
+            </Typography>
+            <List dense sx={{ maxHeight: '150px', overflow: 'auto' }}>
+              {alert.teamMembers.map((member, index) => (
+                <ListItem key={index} sx={{ py: 0.5 }}>
+                  <ListItemText 
+                    primary={
+                      <Box component="span" sx={{ display: 'flex', alignItems: 'center' }}>
+                        {member.name || member.email}
+                        {notifiedTeamCount > 0 && (
+                          <Chip 
+                            label="Notified" 
+                            size="small" 
+                            color="success" 
+                            sx={{ ml: 1, height: 20, fontSize: '0.65rem' }} 
+                          />
+                        )}
+                      </Box>
+                    }
+                    secondary={`${member.email} • ${member.role === 'manager' ? 'Manager' : 'Viewer'}`}
+                    primaryTypographyProps={{ variant: 'body2' }}
+                    secondaryTypographyProps={{ variant: 'caption' }}
+                  />
+                </ListItem>
+              ))}
+            </List>
+            
+            {notifiedTeamCount > 0 ? (
+              <Button
+                variant="outlined"
+                startIcon={<Refresh />}
+                size="small"
+                sx={{ mt: 1 }}
+                onClick={handleResendToTeam}
+              >
+                Resend to team
+              </Button>
             ) : (
-              <Typography variant="body2" color="text.secondary">
-                No guests added yet.
+              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>
+                Team will be notified when you forward the alert
               </Typography>
             )}
           </Box>
         )}
         
-        {activeTab === 'message_team' && (
-          <Box sx={{ mt: 3 }}>
-            <Paper 
-              elevation={0} 
-              sx={{ 
-                p: 3, 
-                bgcolor: '#f8f9fa', 
-                borderRadius: 2,
-                mb: 3
-              }}
-            >
-              <Typography variant="subtitle2" fontWeight="500" gutterBottom>
-                Here&apos;s your pre-written message for Team
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                Roads closures expected, resulting in delayed check-ins. Notify guests alternative routes, 
-                suggest early-check ins, and prepare staff for detour info.
-              </Typography>
-              <Box 
-                sx={{ 
-                  display: 'flex', 
-                  justifyContent: 'flex-start', 
-                  gap: 2,
-                  mt: 2
-                }}
-              >
-                <IconButton size="small" sx={{ color: 'text.secondary' }}>
-                  <Edit fontSize="small" />
-                </IconButton>
-                <IconButton size="small" sx={{ color: 'text.secondary' }}>
-                  <Save fontSize="small" />
-                </IconButton>
-                <IconButton 
-                  size="small" 
-                  sx={{ color: 'text.secondary' }}
-                  onClick={() => {
-                    setMessageContent('Roads closures expected, resulting in delayed check-ins. Notify guests alternative routes, suggest early-check ins, and prepare staff for detour info.');
-                  }}
-                >
-                  <Message fontSize="small" />
-                </IconButton>
-              </Box>
-            </Paper>
-            
-            <TextField
-              label="Your Message"
-              value={messageContent}
-              onChange={(e) => setMessageContent(e.target.value)}
-              fullWidth
-              multiline
-              rows={3}
-              margin="normal"
-              size="small"
-            />
-            
-            <Button
-              variant="contained"
-              fullWidth
-              color="primary"
-              startIcon={<Send />}
-              onClick={handleSendTeamMessage}
-              disabled={!messageContent.trim()}
-              sx={{ mt: 1 }}
-            >
-              Send Message
-            </Button>
-          </Box>
-        )}
+        <Typography variant="subtitle1" fontWeight="bold" sx={{ mt: 3, mb: 2 }}>
+          ADD INSTRUCTIONS
+        </Typography>
         
-        {activeTab === 'add_notes' && (
-          <Box sx={{ mt: 3 }}>
-            <TextField
-              label="Note"
-              value={noteContent}
-              onChange={(e) => setNoteContent(e.target.value)}
-              fullWidth
-              multiline
-              rows={3}
-              margin="normal"
-              size="small"
-            />
-            
-            <Button
-              variant="contained"
-              fullWidth
-              color="primary"
-              startIcon={<NoteAdd />}
-              onClick={handleAddNote}
-              disabled={!noteContent.trim()}
-              sx={{ mt: 1 }}
-            >
-              Add Note
-            </Button>
+        <TextField
+          fullWidth
+          multiline
+          rows={4}
+          placeholder="Add instructions here..."
+          value={instructions}
+          onChange={(e) => setInstructions(e.target.value)}
+          variant="outlined"
+          sx={{ mb: 2 }}
+        />
+        
+        <Button
+          variant="contained"
+          fullWidth
+          color="primary"
+          startIcon={sendingNotification ? undefined : <Send />}
+          onClick={handleForwardAlert}
+          disabled={sendingNotification || 
+            (recipientType === 'guests' && notifiedGuestsCount === totalGuestsCount && totalGuestsCount > 0) ||
+            (recipientType === 'team' && notifiedTeamCount > 0)}
+          sx={{ 
+            mt: 2,
+            mb: 3,
+            py: 1.5,
+            bgcolor: 'black',
+            '&:hover': { bgcolor: '#333' },
+            textTransform: 'uppercase',
+            fontWeight: 'bold'
+          }}
+        >
+          {sendingNotification ? (
+            <CircularProgress size={24} color="inherit" />
+          ) : recipientType === 'guests' && notifiedGuestsCount === totalGuestsCount && totalGuestsCount > 0 ? (
+            'ALL GUESTS NOTIFIED'
+          ) : recipientType === 'team' && notifiedTeamCount > 0 ? (
+            'TEAM NOTIFIED'
+          ) : (
+            'FORWARD ALERT'
+          )}
+        </Button>
+        
+        {/* Notification results */}
+        {(notificationSuccessCount > 0 || notificationFailCount > 0) && (
+          <Box sx={{ mb: 3, display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 2 }}>
+            {notificationSuccessCount > 0 && (
+              <Chip
+                icon={<Done />}
+                label={`${notificationSuccessCount} sent successfully`}
+                color="success"
+                size="small"
+              />
+            )}
+            {notificationFailCount > 0 && (
+              <Chip
+                icon={<Warning />}
+                label={`${notificationFailCount} failed`}
+                color="error"
+                size="small"
+              />
+            )}
           </Box>
         )}
+      </Box>
 
-        {/* Activity Log */}
-        <Box sx={{ mt: 4, mb: 4 }}>
-          <Typography variant="subtitle1" fontWeight="500" gutterBottom>
-            Activity Log
-          </Typography>
-          
-          {logsLoading ? (
-            <CircularProgress size={20} sx={{ my: 1 }} />
-          ) : actionLogs.length > 0 ? (
-            <>
-              <Box>
-                {getCurrentLogs().slice(0, 4).map((log, index) => (
-                  <Box
-                    key={log._id || index}
-                    sx={{
-                      py: 1,
-                      display: 'flex',
-                      flexDirection: 'column',
-                      borderBottom: index < getCurrentLogs().slice(0, 4).length - 1 ? '1px solid #f0f0f0' : 'none'
-                    }}
-                  >
-                    <Typography 
-                      variant="body2" 
-                      sx={{ 
-                        color: 'text.primary',
-                        fontWeight: 'medium'
-                      }}
-                    >
-                      {log.timestamp && format(new Date(log.timestamp), 'dd MMM h:mma')} – 
-                      {' '}
-                      {log.displayName || (typeof log.user === 'object' ? 
-                        (log.user.firstName && log.user.lastName ? 
-                          `${log.user.firstName} ${log.user.lastName}` : 
-                          log.user.email) : 'User')}
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      {log.actionDetails}
-                    </Typography>
-                  </Box>
-                ))}
-              </Box>
-              
-              {actionLogs.length > 4 && (
-                <Box display="flex" justifyContent="center">
-                  <Pagination 
-                    count={Math.ceil(actionLogs.length / logsPerPage)} 
-                    page={logsPage}
-                    onChange={handleLogsPageChange}
-                    size="small"
-                    sx={{ mt: 2 }}
-                  />
-                </Box>
-              )}
-            </>
-          ) : (
-            <Typography variant="body2" color="text.secondary">
-              No activity logged yet.
-            </Typography>
-          )}
+      {/* Activity Log */}
+      <Box sx={{ px: 3, py: 2 }}>
+        <Typography variant="subtitle1" fontWeight="bold">
+          ACTIVITY LOG
+        </Typography>
+        
+        {/* Status Chip */}
+        <Box sx={{ mt: 2, mb: 3 }}>
+          <Chip 
+            label={
+              alert.status === 'in_progress' ? 'In Progress' : 
+              alert.status === 'handled' ? 'Handled' : 'New'
+            }
+            size="medium"
+            sx={{ 
+              bgcolor: 
+                alert.status === 'in_progress' ? '#ff9800' : 
+                alert.status === 'handled' ? '#4caf50' : '#2196f3',
+              color: 'white',
+              fontWeight: 'medium',
+              px: 1
+            }}
+          />
         </Box>
         
-        {/* Admin/Manager Actions */}
-        {isAdmin || isManager ? (
+        {logsLoading ? (
+          <CircularProgress size={20} sx={{ my: 1 }} />
+        ) : actionLogs.length > 0 ? (
+          <Box sx={{ mb: 3 }}>
+            {actionLogs.slice(0, 5).map((log, index) => (
+              <Typography key={index} variant="body2" sx={{ mb: 1 }}>
+                {log.formattedDate || (log.timestamp && format(new Date(log.timestamp), 'dd MMM'))} {log.formattedTime || (log.timestamp && format(new Date(log.timestamp), 'h:mma'))} – {log.displayName} {log.actionDetails}
+              </Typography>
+            ))}
+          </Box>
+        ) : (
+          <Typography variant="body2" color="text.secondary">
+            No activity logged yet.
+          </Typography>
+        )}
+        
+        {/* Action Buttons */}
+        <Box sx={{ mt: 3 }}>
+          {alert.status !== 'handled' && (
+            <Button
+              variant="outlined"
+              fullWidth
+              onClick={() => handleStatusChange('handled')}
+              sx={{ 
+                mb: 2,
+                py: 1.5,
+                borderColor: '#4caf50',
+                color: '#4caf50',
+                '&:hover': { borderColor: '#4caf50', bgcolor: 'rgba(76, 175, 80, 0.1)' },
+                textTransform: 'none',
+                fontWeight: 'bold'
+              }}
+            >
+              Mark as Handled
+            </Button>
+          )}
+          
           <Button
-            variant="contained"
-            color="primary"
+            variant="outlined"
             fullWidth
-            onClick={handleResolve}
-            disabled={alert.status === 'resolved'}
-            sx={{
-              my: 2,
+            onClick={handleFollowToggle}
+            sx={{ 
               py: 1.5,
-              bgcolor: alert.status === 'resolved' ? 'success.main' : 'primary.main',
-              '&.Mui-disabled': {
-                bgcolor: 'success.light',
-                color: 'white'
-              }
+              borderColor: alert.isFollowing ? 'primary.main' : 'inherit',
+              color: alert.isFollowing ? 'primary.main' : 'inherit',
+              textTransform: 'none',
+              fontWeight: 'bold'
             }}
           >
-            {alert.status === 'resolved' ? 'Resolved' : 'Mark as Resolved'}
+            {alert.isFollowing ? 'Unfollow Alert' : 'Follow Alert'}
           </Button>
-        ) : null}
+        </Box>
       </Box>
     </Box>
   );

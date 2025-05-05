@@ -181,9 +181,16 @@ export interface ActionLog {
   userEmail?: string;
   displayName?: string;
   isCollaborator?: boolean;
-  actionType: 'flag' | 'resolve' | 'note_added' | 'notify_guests' | 'message_team' | 'edit' | 'copy_message';
+  actionType: 'flag' | 'resolve' | 'note_added' | 'notify_guests' | 'edit' | 'mark_handled';
   actionDetails?: string;
   timestamp: string;
+  formattedTime?: string;
+  formattedDate?: string;
+  teamMemberInfo?: {
+    name: string;
+    email: string;
+    role: string;
+  };
 }
 
 export interface Guest {
@@ -192,15 +199,6 @@ export interface Guest {
   name?: string;
   notificationSent: boolean;
   sentTimestamp?: string;
-}
-
-export interface TeamMessage {
-  _id: string;
-  content: string;
-  createdBy: User | string;
-  createdAt: string;
-  recipients?: string[];
-  isPreWritten: boolean;
 }
 
 export interface Note {
@@ -213,12 +211,20 @@ export interface Note {
 
 export interface ActionHubItem extends Alert {
   actionHubId: string;
-  status: 'pending' | 'resolved';
-  currentActiveTab?: 'notify_guests' | 'message_team' | 'add_notes';
+  status: 'new' | 'in_progress' | 'handled';
+  currentActiveTab?: 'notify_guests' | 'add_notes';
   guests?: Guest[];
-  teamMessages?: TeamMessage[];
   notes?: Note[];
   actionLogs?: ActionLog[];
-  resolvedBy?: User | string;
-  resolvedAt?: string;
+  handledBy?: User | string;
+  handledAt?: string;
+  teamMembers?: TeamMember[];
+}
+
+export interface TeamMember {
+  id: string;
+  name: string;
+  email: string;
+  role: 'viewer' | 'manager';
+  status: 'active' | 'restricted' | 'deleted' | 'invited' | 'accepted';
 } 

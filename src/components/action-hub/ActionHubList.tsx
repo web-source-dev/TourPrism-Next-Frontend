@@ -8,11 +8,14 @@ import {
   CardContent, 
   Button, 
   CircularProgress, 
+  Chip,
+  Divider
 } from '@mui/material';
 import { useRouter } from 'next/navigation';
-import { getFlaggedAlerts } from '@/services/action-hub';
+import { getFollowedAlerts } from '@/services/action-hub';
 import { Alert } from '@/types';
 import ActionStatusTabs from './ActionStatusTabs';
+import { format } from 'date-fns';
 
 const ActionHubList: React.FC = () => {
   const [alerts, setAlerts] = useState<Alert[]>([]);
@@ -25,13 +28,13 @@ const ActionHubList: React.FC = () => {
     const fetchAlerts = async () => {
       try {
         setLoading(true);
-        const data = await getFlaggedAlerts();
-        console.log('flag data ', data);
+        const data = await getFollowedAlerts();
+        console.log('followed alerts data ', data);
         setAlerts(data);
         setError(null);
       } catch (err) {
-        setError('Failed to load flagged alerts. Please try again later.');
-        console.error('Error loading flagged alerts:', err);
+        setError('Failed to load followed alerts. Please try again later.');
+        console.error('Error loading followed alerts:', err);
       } finally {
         setLoading(false);
       }
@@ -48,15 +51,33 @@ const ActionHubList: React.FC = () => {
     setTabValue(newValue);
   };
 
+  // Get relative time (e.g., "3h ago")
+  const getTimeAgo = (timestamp: string) => {
+    if (!timestamp) return '';
+    
+    const now = new Date();
+    const alertTime = new Date(timestamp);
+    const diffInHours = Math.floor((now.getTime() - alertTime.getTime()) / (1000 * 60 * 60));
+    
+    if (diffInHours < 24) {
+      return `${diffInHours}h ago`;
+    } else {
+      const diffInDays = Math.floor(diffInHours / 24);
+      return `${diffInDays}d ago`;
+    }
+  };
+
   // Filter alerts based on the selected tab
   const filteredAlerts = alerts.filter(alert => {
-    if (tabValue === 0) return alert.status === 'pending' || !alert.status; // Pending
-    if (tabValue === 1) return alert.status === 'resolved'; // Resolved
-    return true; // All alerts
+    if (tabValue === 0) return alert.status === 'new' || !alert.status; // New
+    if (tabValue === 1) return alert.status === 'in_progress'; // In Progress
+    if (tabValue === 2) return alert.status === 'handled'; // Handled
+    return true; // Fallback - show all
   });
 
-  const pendingCount = alerts.filter(alert => alert.status === 'pending' || !alert.status).length;
-  const resolvedCount = alerts.filter(alert => alert.status === 'resolved').length;
+  const newCount = alerts.filter(alert => alert.status === 'new' || !alert.status).length;
+  const inProgressCount = alerts.filter(alert => alert.status === 'in_progress').length;
+  const handledCount = alerts.filter(alert => alert.status === 'handled').length;
 
   if (loading) {
     return (
@@ -85,11 +106,25 @@ const ActionHubList: React.FC = () => {
 
   return (
     <Box>
+      <Box sx={{ px: 3, py: 2, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <Box>
+          <Typography variant="h6" fontWeight="bold" component="h1">
+            Action Hub
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
+            Manage the alerts you're following
+          </Typography>
+        </Box>
+        <Box>
+          {/* Filter icon would go here */}
+        </Box>
+      </Box>
+
       <ActionStatusTabs
         tabValue={tabValue}
-        pendingCount={pendingCount}
-        resolvedCount={resolvedCount}
-        totalCount={alerts.length}
+        newCount={newCount}
+        inProgressCount={inProgressCount}
+        handledCount={handledCount}
         onTabChange={handleTabChange}
       />
 
@@ -104,52 +139,91 @@ const ActionHubList: React.FC = () => {
           {filteredAlerts.map((alert) => (
             <Card 
               key={alert._id}
-              elevation={1}
+              elevation={0}
               sx={{ 
-                mb: 2,
+                mb: 3,
                 borderRadius: 1,
-                overflow: 'hidden'
+                overflow: 'hidden',
+                boxShadow: 'none',
+                border: '1px solid #eaeaea'
               }}
             >
-              <CardContent sx={{ p: 3 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', px: 2, pt: 2, pb: 1 }}>
+                <Typography variant="body2" color="text.secondary" sx={{ flex: 1 }}>
+                  {getTimeAgo(alert.createdAt)}
+                </Typography>
+                <Chip 
+                  label={
+                    alert.status === 'in_progress' ? 'In Progress' : 
+                    alert.status === 'handled' ? 'Handled' : 'New'
+                  }
+                  size="small"
+                  sx={{ 
+                    bgcolor: 
+                      alert.status === 'in_progress' ? '#ff9800' : 
+                      alert.status === 'handled' ? '#4caf50' : '#2196f3',
+                    color: 'white',
+                    fontWeight: 'medium',
+                    px: 1
+                  }}
+                />
+              </Box>
+              
+              <CardContent sx={{ pt: 1, pb: 2, px: 2 }}>
                 <Typography variant="h6" fontWeight="bold" gutterBottom>
                   {alert.title || 'Untitled Alert'}
                 </Typography>
                 
-                <Box display="flex" flexDirection="column" gap={0.5} mb={2}>
-                  <Box display="flex">
-                    <Typography variant="body2" fontWeight="500" width="80px">
-                      Location:
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                  {alert.description ? 
+                    (alert.description.length > 120 ? 
+                      `${alert.description.substring(0, 120)}...` : 
+                      alert.description) : 
+                    'No description available'}
+                </Typography>
+                
+                <Box sx={{ display: 'flex', mb: 2 }}>
+                  <Box sx={{ width: {xs: '100%', md: '33%'} }}>
+                    <Typography variant="caption" fontWeight="bold" display="block" color="text.secondary">
+                      Location
                     </Typography>
-                    <Typography variant="body2" color="text.secondary">
+                    <Typography variant="body2">
                       {alert.city || 'Unknown location'}
                     </Typography>
                   </Box>
-                  
-                  <Box display="flex">
-                    <Typography variant="body2" fontWeight="500" width="80px">
-                      Date:
+                  <Box sx={{ width: {xs: '100%', md: '33%'} }}>
+                    <Typography variant="caption" fontWeight="bold" display="block" color="text.secondary">
+                      Start Date
                     </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      {alert.expectedStart 
-                        ? `May ${new Date(alert.expectedStart).getDate()} - ${alert.expectedEnd ? new Date(alert.expectedEnd).getDate() : ''}`
-                        : 'Not specified'}
+                    <Typography variant="body2">
+                      {alert.expectedStart ? 
+                        format(new Date(alert.expectedStart), 'dd MMM h:mma') : 
+                        '—'}
                     </Typography>
                   </Box>
-                  
-                  <Box display="flex">
-                    <Typography variant="body2" fontWeight="500" width="80px">
-                      Status:
+                  <Box sx={{ width: {xs: '100%', md: '33%'} }}>
+                    <Typography variant="caption" fontWeight="bold" display="block" color="text.secondary">
+                      End Date
                     </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      {alert.status ? alert.status.charAt(0).toUpperCase() + alert.status.slice(1) : 'Pending'}
+                    <Typography variant="body2">
+                      {alert.expectedEnd ? 
+                        format(new Date(alert.expectedEnd), 'dd MMM h:mma') : 
+                        '—'}
                     </Typography>
                   </Box>
                 </Box>
                 
+                <Box sx={{ mb: 3 }}>
+                  <Typography variant="caption" fontWeight="bold" display="block" color="text.secondary">
+                    Impact Level
+                  </Typography>
+                  <Typography variant="body2">
+                    {alert.impact || 'Not specified'}
+                  </Typography>
+                </Box>
+                
                 <Button 
                   variant="contained"
-                  color="primary"
                   fullWidth
                   onClick={() => handleAlertClick(alert._id)}
                   sx={{ 
@@ -157,10 +231,12 @@ const ActionHubList: React.FC = () => {
                     '&:hover': {
                       bgcolor: '#333'
                     },
-                    textTransform: 'none'
+                    textTransform: 'uppercase',
+                    fontWeight: 'bold',
+                    py: 1
                   }}
                 >
-                  Open Action
+                  Manage Alert
                 </Button>
               </CardContent>
             </Card>

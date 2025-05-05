@@ -2,14 +2,35 @@ import { Alert, ActionHubItem } from '../types';
 import { api } from './api';
 
 /**
- * Fetch all flagged alerts in the user's Action Hub
+ * Fetch all followed alerts in the user's Action Hub
  */
-export const getFlaggedAlerts = async (): Promise<Alert[]> => {
+export const getFollowedAlerts = async (): Promise<Alert[]> => {
   try {
     const response = await api.get('/api/action-hub');
     return response.data as Alert[];
   } catch (error) {
-    console.error('Error fetching flagged alerts:', error);
+    console.error('Error fetching followed alerts:', error);
+    throw error;
+  }
+};
+
+/**
+ * For backward compatibility - will fetch the same data as getFollowedAlerts
+ * @deprecated Use getFollowedAlerts instead
+ */
+export const getFlaggedAlerts = async (): Promise<Alert[]> => {
+  return getFollowedAlerts();
+};
+
+/**
+ * Follow/unfollow an alert and add it to Action Hub
+ */
+export const followAlert = async (alertId: string): Promise<{ following: boolean; numberOfFollows: number }> => {
+  try {
+    const response = await api.post(`/api/action-hub/follow/${alertId}`);
+    return response.data as { following: boolean; numberOfFollows: number };
+  } catch (error) {
+    console.error(`Error following alert ${alertId}:`, error);
     throw error;
   }
 };
@@ -41,14 +62,25 @@ export const flagAlert = async (alertId: string): Promise<{ isFlagged: boolean; 
 };
 
 /**
- * Resolve flags for an alert (admin/manager only)
+ * Mark the status of an Action Hub item
  */
-export const resolveAlertFlags = async (id: string): Promise<{ message: string; status: string }> => {
+export const markAlertStatus = async (id: string, status: 'new' | 'in_progress' | 'handled'): Promise<{ message: string; status: string }> => {
   try {
-    const response = await api.post(`/api/action-hub/${id}/resolve`);
-    return response.data as { message: string; status: string };
+    // First, try using the status endpoint
+    try {
+      const response = await api.post(`/api/action-hub/${id}/status`, { status });
+      return response.data as { message: string; status: string };
+    } catch (statusError) {
+      // If the status endpoint doesn't work, use the resolve endpoint for 'handled' status
+      if (status === 'handled') {
+        const response = await api.post(`/api/action-hub/${id}/resolve`, { status });
+        return response.data as { message: string; status: string };
+      } else {
+        throw statusError; // Re-throw if not handled status
+      }
+    }
   } catch (error) {
-    console.error(`Error resolving flags for alert ${id}:`, error);
+    console.error(`Error updating status for alert ${id}:`, error);
     throw error;
   }
 };
@@ -56,7 +88,7 @@ export const resolveAlertFlags = async (id: string): Promise<{ message: string; 
 /**
  * Set the active tab for an Action Hub item
  */
-export const setActiveTab = async (id: string, tab: 'notify_guests' | 'message_team' | 'add_notes'): Promise<{ message: string; currentActiveTab: string }> => {
+export const setActiveTab = async (id: string, tab: 'notify_guests' | 'add_notes'): Promise<{ message: string; currentActiveTab: string }> => {
   try {
     const response = await api.post(`/api/action-hub/${id}/tab`, { tab });
     return response.data as { message: string; currentActiveTab: string };
@@ -80,28 +112,6 @@ export const addNote = async (id: string, content: string): Promise<{ message: s
 };
 
 /**
- * Add a team message for an Action Hub item
- */
-export const addTeamMessage = async (
-  id: string, 
-  content: string, 
-  recipients?: string[], 
-  isPreWritten?: boolean
-): Promise<{ message: string; teamMessage: unknown }> => {
-  try {
-    const response = await api.post(`/api/action-hub/${id}/message`, { 
-      content, 
-      recipients, 
-      isPreWritten 
-    });
-    return response.data as { message: string; teamMessage: unknown };
-  } catch (error) {
-    console.error(`Error adding team message to ${id}:`, error);
-    throw error;
-  }
-};
-
-/**
  * Add guests for notification
  */
 export const addGuests = async (id: string, guests: { email: string; name?: string }[]): Promise<{ message: string; guests: unknown[] }> => {
@@ -117,13 +127,21 @@ export const addGuests = async (id: string, guests: { email: string; name?: stri
 /**
  * Send notifications to guests
  */
-export const notifyGuests = async (id: string, message: string, guestIds?: string[]): Promise<{ message: string; notifiedGuests: number }> => {
+export const notifyGuests = async (id: string, message: string, guestIds?: string[]): Promise<{ 
+  message: string; 
+  notifiedGuests: number;
+  emailResults?: { email: string; success: boolean; }[];
+}> => {
   try {
     const response = await api.post(`/api/action-hub/${id}/notify`, { 
       message, 
       guestIds 
     });
-    return response.data as { message: string; notifiedGuests: number };
+    return response.data as { 
+      message: string; 
+      notifiedGuests: number;
+      emailResults: { email: string; success: boolean; }[];
+    };
   } catch (error) {
     console.error(`Error notifying guests for ${id}:`, error);
     throw error;
@@ -139,6 +157,27 @@ export const getActionLogs = async (id: string): Promise<unknown[]> => {
     return response.data as unknown[];
   } catch (error) {
     console.error(`Error fetching action logs for ${id}:`, error);
+    throw error;
+  }
+};
+
+/**
+ * Send notifications to team members (collaborators)
+ */
+export const notifyTeam = async (id: string, message: string): Promise<{ 
+  message: string; 
+  notifiedTeamMembers: number;
+  emailResults?: { email: string; success: boolean; }[];
+}> => {
+  try {
+    const response = await api.post(`/api/action-hub/${id}/notify-team`, { message });
+    return response.data as { 
+      message: string; 
+      notifiedTeamMembers: number;
+      emailResults: { email: string; success: boolean; }[];
+    };
+  } catch (error) {
+    console.error(`Error notifying team members for ${id}:`, error);
     throw error;
   }
 };
