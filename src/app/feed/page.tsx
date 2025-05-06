@@ -1364,9 +1364,11 @@ export default function Feed() {
                   </Box>
                   
                   {/* Flag Button */}
-                  <i className="ri-circle-fill" style={{ fontSize: '5px', color: '#777' }}></i>
-                  <Box
-                    onClick={() => handleFlagAlert(alert._id)}
+                  {location.pathname === '/feedfsaf' && (
+                    <>
+                      <i className="ri-circle-fill" style={{ fontSize: '5px', color: '#777' }}></i>
+                      <Box
+                        onClick={() => handleFlagAlert(alert._id)}
                     sx={{
                       display: 'flex',
                       alignItems: 'center',
@@ -1390,6 +1392,8 @@ export default function Feed() {
                       {alert.flagged ? 'Flagged' : 'Flag'}
                     </Typography>
                   </Box>
+                  </>
+                  )}
                 </Box>
                 <Divider sx={{ my: 1 }} />
               </Paper>
