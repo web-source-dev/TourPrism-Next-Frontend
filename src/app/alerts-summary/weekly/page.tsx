@@ -156,7 +156,7 @@ export default function WeeklyForecast() {
               There are currently no disruptions reported for your operating regions in the upcoming week.
             </Typography>
             <Typography variant="body2" sx={{ mt: 1 }}>
-              This could mean your selected regions have no significant disruptions expected, or any minor issues don't meet your alert criteria.
+              This could mean your selected regions have no significant disruptions expected, or any minor issues don&apos;t meet your alert criteria.
             </Typography>
           </Alert>
           <Button 
