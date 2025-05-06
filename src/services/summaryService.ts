@@ -121,27 +121,66 @@ export const generateSummary = async (data: GenerateSummaryRequest): Promise<Gen
     
     // If no alerts were found, return a friendly empty state
     if (!response.data.summary.alerts?.length) {
+      const location = data.locations && data.locations.length > 0 
+        ? data.locations[0].city 
+        : 'Selected Region';
+      
       return {
         success: true,
         summary: {
           ...response.data.summary,
-          title: data.title || 'No Alerts Found',
-          description: 'No disruptions were found matching your criteria.',
+          title: data.title || `No Alerts Found for ${location}`,
+          description: `No disruptions were found for ${location} matching your criteria.`,
           alerts: [],
           duplicates: [],
-          htmlContent: '<div class="no-alerts-message"><p>Your selected region is currently clear of any reported disruptions.</p></div>'
+          htmlContent: `
+            <div class="no-alerts-message" style="text-align: center; padding: 30px; margin: 20px 0; background-color: #f5f5f5; border-radius: 8px; border-left: 4px solid #2196f3;">
+              <h2 style="color: #333; margin-bottom: 20px;">No Alerts Found</h2>
+              <p style="color: #666; margin-bottom: 15px;">Your selected area is currently clear of any reported disruptions matching your criteria.</p>
+              <p style="color: #666; margin-bottom: 10px;">This means there are no significant events to report at this time.</p>
+              <p style="color: #666;">Please check back later for updates or modify your search criteria.</p>
+            </div>
+          `
         }
       };
     }
     
     return response.data;
-// 138:19  Error: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
   } catch (error: unknown) {
     console.error('Error generating summary:', error);
-    // Create a more detailed error message for logging
     
-//  Error: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
-    const errorDetail = (error as unknown as { response?: { data?: { message?: string } } }).response?.data?.message || (error as unknown as { message?: string }).message || 'Unknown error';
+    // Try to determine if this is a "no alerts" response misrepresented as an error
+    const errorObj = error as { response?: { data?: { message?: string, success?: boolean } } };
+    const errorMessage = errorObj.response?.data?.message || '';
+    
+    if (errorMessage.toLowerCase().includes('no alerts') || 
+        errorMessage.toLowerCase().includes('no disruptions')) {
+      // This is actually a "no data" situation, not an error
+      const location = data.locations && data.locations.length > 0 
+        ? data.locations[0].city 
+        : 'Selected Region';
+      
+      return {
+        success: true,
+        summary: {
+          title: data.title || `No Alerts Found for ${location}`,
+          description: `No disruptions were found for ${location} matching your criteria.`,
+          alerts: [],
+          duplicates: [],
+          htmlContent: `
+            <div class="no-alerts-message" style="text-align: center; padding: 30px; margin: 20px 0; background-color: #f5f5f5; border-radius: 8px; border-left: 4px solid #2196f3;">
+              <h2 style="color: #333; margin-bottom: 20px;">No Alerts Found</h2>
+              <p style="color: #666; margin-bottom: 15px;">Your selected area is currently clear of any reported disruptions matching your criteria.</p>
+              <p style="color: #666; margin-bottom: 10px;">This means there are no significant events to report at this time.</p>
+              <p style="color: #666;">Please check back later for updates or modify your search criteria.</p>
+            </div>
+          `
+        }
+      };
+    }
+    
+    // Create a more detailed error message for logging
+    const errorDetail = errorObj.response?.data?.message || (error as Error).message || 'Unknown error';
     console.error(`Summary generation failed: ${errorDetail}`);
     
     // Return a user-friendly error state that can be displayed
@@ -153,10 +192,10 @@ export const generateSummary = async (data: GenerateSummaryRequest): Promise<Gen
         alerts: [],
         duplicates: [],
         htmlContent: `
-          <div class="error-message" style="text-align: center; padding: 30px; margin: 20px 0;">
-            <h2 style="color: #666;">Unable to Generate Summary</h2>
-            <p style="color: #888; margin-bottom: 10px;">We couldn't generate a complete report at this time.</p>
-            <p style="color: #888;">Please try again in a few moments. If the issue persists, contact support.</p>
+          <div class="error-message" style="text-align: center; padding: 30px; margin: 20px 0; background-color: #fff0f0; border-radius: 8px; border-left: 4px solid #f44336;">
+            <h2 style="color: #d32f2f;">Unable to Generate Summary</h2>
+            <p style="color: #666; margin-bottom: 10px;">We couldn't generate a complete report at this time.</p>
+            <p style="color: #666;">Please try again in a few moments. If the issue persists, contact support.</p>
           </div>
         `
       }

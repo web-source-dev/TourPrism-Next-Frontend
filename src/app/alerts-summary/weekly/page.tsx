@@ -10,6 +10,7 @@ import Layout from '@/components/Layout';
 export default function WeeklyForecast() {
   const router = useRouter();
   const [error, setError] = useState('');
+  const [noAlertsFound, setNoAlertsFound] = useState(false);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -20,6 +21,13 @@ export default function WeeklyForecast() {
         const response = await getUpcomingForecasts(7);
         
         if (response.success && response.forecast) {
+          // Check if there are any alerts found
+          if (!response.forecast.alerts || response.forecast.alerts.length === 0) {
+            setNoAlertsFound(true);
+            setLoading(false);
+            return;
+          }
+          
           // Now create a forecast with the data so we have a PDF but don't auto-save it
           const today = new Date();
           const nextWeek = addDays(today, 7);
@@ -47,8 +55,14 @@ export default function WeeklyForecast() {
             } else if (response.forecast.pdfUrl) {
               router.push(`/alerts-summary/weekly-forecast?pdf=${encodeURIComponent(response.forecast.pdfUrl)}`);
             } else {
-              // If no PDF URL is returned but the API call was successful, still show the forecast page
-              router.push('/alerts-summary/weekly-forecast');
+              // If no alerts were found but the call was successful
+              if (!saveResponse.summary.alerts || saveResponse.summary.alerts.length === 0) {
+                setNoAlertsFound(true);
+                setLoading(false);
+              } else {
+                // If no PDF URL is returned but the API call was successful, still show the forecast page
+                router.push('/alerts-summary/weekly-forecast');
+              }
             }
           } catch (saveError) {
             console.error('Error saving forecast:', saveError);
@@ -57,18 +71,25 @@ export default function WeeklyForecast() {
             if (response.forecast.pdfUrl) {
               router.push(`/alerts-summary/weekly-forecast?pdf=${encodeURIComponent(response.forecast.pdfUrl)}`);
             } else {
-              // Otherwise, just show the forecast page without a PDF
-              router.push('/alerts-summary/weekly-forecast');
+              // Check if this is a "no alerts" situation
+              if ((saveError as Error).toString().includes('No alerts found') || 
+                 (!response.forecast.alerts || response.forecast.alerts.length === 0)) {
+                setNoAlertsFound(true);
+              } else {
+                // This is a genuine error
+                setError('We encountered an issue while preparing your forecast. Please try again.');
+              }
+              setLoading(false);
             }
           }
         } else {
           // No forecast data available - show empty state
-          router.push('/alerts-summary/weekly-forecast');
+          setNoAlertsFound(true);
+          setLoading(false);
         }
       } catch (error) {
         console.error('Error generating weekly forecast:', error);
         setError('We encountered an issue while preparing your forecast. Please try again.');
-      } finally {
         setLoading(false);
       }
     };
@@ -102,6 +123,46 @@ export default function WeeklyForecast() {
             variant="contained" 
             onClick={() => {
               setError('');
+              router.push('/alerts-summary');
+            }}
+            sx={{ mt: 2 }}
+          >
+            Return to Summary Page
+          </Button>
+        </Box>
+      </Layout>
+    );
+  }
+
+  if (noAlertsFound) {
+    return (
+      <Layout isFooter={false}>
+        <Box sx={{ p: 3 }}>
+          <Alert 
+            severity="info" 
+            sx={{ 
+              mb: 2,
+              '& .MuiAlert-message': {
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 1
+              }
+            }}
+          >
+            <Typography variant="subtitle1" fontWeight="medium">
+              No Alerts Found
+            </Typography>
+            <Typography variant="body2">
+              There are currently no disruptions reported for your operating regions in the upcoming week.
+            </Typography>
+            <Typography variant="body2" sx={{ mt: 1 }}>
+              This could mean your selected regions have no significant disruptions expected, or any minor issues don't meet your alert criteria.
+            </Typography>
+          </Alert>
+          <Button 
+            variant="contained" 
+            onClick={() => {
+              setNoAlertsFound(false);
               router.push('/alerts-summary');
             }}
             sx={{ mt: 2 }}
