@@ -366,12 +366,12 @@ export const generatePdfOnDemand = async (summaryId: string): Promise<string | n
     
     console.warn('PDF generation responded with success=true but no PDF URL', response.data);
     return null;
-  } catch (error: any) {
+  } catch (error: unknown) {
     // Log the detailed error for debugging
     console.error('Error generating PDF on demand:', error);
     
     // Check if this is a "no alerts" situation (which isn't actually an error)
-    const errorMessage = error.response?.data?.message || '';
+    const errorMessage = (error as { response?: { data?: { message?: string } } }).response?.data?.message || '';
     if (errorMessage.toLowerCase().includes('no alerts') || 
         errorMessage.toLowerCase().includes('no disruptions')) {
       console.log('Detected "no alerts" situation during PDF generation');
