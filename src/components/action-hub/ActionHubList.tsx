@@ -15,6 +15,7 @@ import { getFollowedAlerts } from '@/services/action-hub';
 import { Alert } from '@/types';
 import ActionStatusTabs from './ActionStatusTabs';
 import { format } from 'date-fns';
+import { useAuth } from '@/context/AuthContext';
 
 const ActionHubList: React.FC = () => {
   const [alerts, setAlerts] = useState<Alert[]>([]);
@@ -22,6 +23,11 @@ const ActionHubList: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [tabValue, setTabValue] = useState<number>(0);
   const router = useRouter();
+  const { isCollaboratorViewer } = useAuth();
+
+  const isViewOnly = () => {
+    return isCollaboratorViewer;
+  };
 
   useEffect(() => {
     const fetchAlerts = async () => {
@@ -235,7 +241,7 @@ const ActionHubList: React.FC = () => {
                     py: 1
                   }}
                 >
-                  Manage Alert
+                  {isViewOnly() ? 'View Alert' : 'Manage Alert'}
                 </Button>
               </CardContent>
             </Card>

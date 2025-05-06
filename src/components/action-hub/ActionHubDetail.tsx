@@ -44,6 +44,7 @@ import {
 } from '@mui/icons-material';
 import { format } from 'date-fns';
 import { getTimeAgo } from '@/utils/getTimeAgo';
+import { useAuth } from '@/context/AuthContext';
 
 interface ActionHubDetailProps {
   alertId: string;
@@ -70,6 +71,16 @@ const ActionHubDetail: React.FC<ActionHubDetailProps> = ({ alertId }) => {
   const [notificationSuccessCount, setNotificationSuccessCount] = useState<number>(0);
   const [notificationFailCount, setNotificationFailCount] = useState<number>(0);
   const [selectedGuestIds, setSelectedGuestIds] = useState<string[]>([]);
+  
+  // Get auth context to check user roles
+  const { 
+    isCollaboratorViewer,
+  } = useAuth();
+  
+  // Helper function to check if user is view-only
+  const isViewOnly = () => {
+    return isCollaboratorViewer;
+  };
   
   console.log(activeTab);
   const router = useRouter();
@@ -705,6 +716,7 @@ const ActionHubDetail: React.FC<ActionHubDetailProps> = ({ alertId }) => {
               margin="dense"
               size="small"
               sx={{ mb: 1 }}
+              disabled={isViewOnly()}
             />
             
             <TextField
@@ -715,6 +727,7 @@ const ActionHubDetail: React.FC<ActionHubDetailProps> = ({ alertId }) => {
               margin="dense"
               size="small"
               sx={{ mb: 1 }}
+              disabled={isViewOnly()}
             />
             
             <Button
@@ -722,7 +735,7 @@ const ActionHubDetail: React.FC<ActionHubDetailProps> = ({ alertId }) => {
               size="small"
               sx={{ mt: 1 }}
               onClick={handleAddGuest}
-              disabled={!guestEmail.trim()}
+              disabled={!guestEmail.trim() || isViewOnly()}
             >
               Add Guest
             </Button>
@@ -761,6 +774,9 @@ const ActionHubDetail: React.FC<ActionHubDetailProps> = ({ alertId }) => {
                         </Box>
                       }
                       onClick={() => {
+                        // Don't allow selection for view-only users
+                        if (isViewOnly()) return;
+                        
                         // Toggle selection of this guest for resending
                         setSelectedGuestIds(prev => 
                           prev.includes(guest._id) 
@@ -798,6 +814,7 @@ const ActionHubDetail: React.FC<ActionHubDetailProps> = ({ alertId }) => {
                     size="small"
                     sx={{ mt: 1 }}
                     onClick={() => handleResendToGuests(selectedGuestIds)}
+                    disabled={isViewOnly()}
                   >
                     Resend to {selectedGuestIds.length} selected
                   </Button>
@@ -810,6 +827,7 @@ const ActionHubDetail: React.FC<ActionHubDetailProps> = ({ alertId }) => {
                     size="small"
                     sx={{ mt: 1, ml: selectedGuestIds.length > 0 ? 1 : 0 }}
                     onClick={handleNotifyGuests}
+                    disabled={isViewOnly()}
                   >
                     Notify Remaining ({totalGuestsCount - notifiedGuestsCount})
                   </Button>
@@ -861,6 +879,7 @@ const ActionHubDetail: React.FC<ActionHubDetailProps> = ({ alertId }) => {
                 size="small"
                 sx={{ mt: 1 }}
                 onClick={handleResendToTeam}
+                disabled={isViewOnly()}
               >
                 Resend to team
               </Button>
@@ -885,6 +904,7 @@ const ActionHubDetail: React.FC<ActionHubDetailProps> = ({ alertId }) => {
           onChange={(e) => setInstructions(e.target.value)}
           variant="outlined"
           sx={{ mb: 2 }}
+          disabled={isViewOnly()}
         />
         
         <Button
@@ -895,7 +915,8 @@ const ActionHubDetail: React.FC<ActionHubDetailProps> = ({ alertId }) => {
           onClick={handleForwardAlert}
           disabled={sendingNotification || 
             (recipientType === 'guests' && notifiedGuestsCount === totalGuestsCount && totalGuestsCount > 0) ||
-            (recipientType === 'team' && notifiedTeamCount > 0)}
+            (recipientType === 'team' && notifiedTeamCount > 0) ||
+            isViewOnly()}
           sx={{ 
             mt: 2,
             mb: 3,
@@ -988,6 +1009,7 @@ const ActionHubDetail: React.FC<ActionHubDetailProps> = ({ alertId }) => {
               variant="outlined"
               fullWidth
               onClick={() => handleStatusChange('handled')}
+              disabled={isViewOnly()}
               sx={{ 
                 mb: 2,
                 py: 1.5,
@@ -1006,6 +1028,7 @@ const ActionHubDetail: React.FC<ActionHubDetailProps> = ({ alertId }) => {
             variant="outlined"
             fullWidth
             onClick={handleFollowToggle}
+            disabled={isViewOnly()}
             sx={{ 
               py: 1.5,
               borderColor: alert.isFollowing ? 'primary.main' : 'inherit',

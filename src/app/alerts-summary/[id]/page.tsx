@@ -24,7 +24,7 @@ import {
   ArrowForward as ArrowForwardIcon,
 } from '@mui/icons-material';
 import { format, parseISO } from 'date-fns';
-
+import { useAuth } from '@/context/AuthContext';
 // Import the summaryService
 import { 
   getSummaryById,
@@ -57,6 +57,12 @@ export default function ForecastDetail() {
   const [saved, setSaved] = useState(false);
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   
+  const { isCollaboratorViewer } = useAuth();
+
+  const isViewOnly = () => {
+    return isCollaboratorViewer;
+  };
+
   // Extract the ID from params and query params
   const id = params?.id as string;
   
@@ -218,7 +224,7 @@ export default function ForecastDetail() {
 
   const handleSave = async () => {
     // Only proceed if not already saved
-    if (saved || !forecast) return;
+    if (saved || !forecast || isViewOnly()) return;
     
     try {
       setLoading(true);
@@ -343,6 +349,25 @@ export default function ForecastDetail() {
     } catch (error) {
       console.error('Error downloading forecast:', error);
       setError('Failed to download the forecast. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleShare = async () => {
+    if (saved || !forecast) return;
+    
+    try {
+      setLoading(true);
+      
+      window.navigator.share({
+        title: forecast.title,
+        text: forecast.description,
+        url: window.location.href
+      });
+    } catch (error) {
+      console.error('Error sharing forecast:', error);
+      setError('Failed to share the forecast. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -618,15 +643,22 @@ export default function ForecastDetail() {
             color: '#666'
           }
         }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <DownloadIcon onClick={handleDownload} fontSize="small" sx={{ mr: 1 }} />
+          <Box onClick={handleDownload} sx={{ display: 'flex',cursor:'pointer', alignItems: 'center', justifyContent: 'center' }}>
+            <DownloadIcon fontSize="small" sx={{ mr: 1 }} />
             <Typography variant="body2">Download</Typography>
           </Box>
-          <Box sx={{ borderLeft: '1px solid #f0f0f0', borderRight: '1px solid #f0f0f0', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <Box onClick={handleShare} sx={{ borderLeft: '1px solid #f0f0f0',cursor:'pointer', borderRight: '1px solid #f0f0f0', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <ArrowForwardIcon fontSize="small" sx={{ mr: 1 }} />
             <Typography variant="body2">Share</Typography>
           </Box>
-          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={handleSave}>
+          <Box sx={{ 
+            display: 'flex', 
+            alignItems: 'center', 
+            justifyContent: 'center',
+            opacity: isViewOnly() ? 0.5 : 1,
+            cursor: isViewOnly() ? 'not-allowed' : 'pointer'
+          }} onClick={handleSave}
+          >
             {saved ? <BookmarkIcon fontSize="small" sx={{ mr: 1 }} /> : <BookmarkBorderIcon fontSize="small" sx={{ mr: 1 }} />}
             <Typography variant="body2">Save</Typography>
           </Box>

@@ -124,7 +124,7 @@ const sortAlertsByFilter = (alerts: AlertType[], sortBy: string) => {
 
 export default function Feed() {
   const router = useRouter();
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, isCollaboratorViewer } = useAuth();
   const [alerts, setAlerts] = useState<AlertType[]>([]);
   const [loading, setLoading] = useState(true);
   const [totalCount, setTotalCount] = useState(0);
@@ -153,6 +153,10 @@ export default function Feed() {
     timeRange: 0,
     distance: 50
   });
+
+  const isViewOnly = () => {
+    return isCollaboratorViewer;
+  };
 
   // Socket.io reference
   const socketRef = useRef<Socket | null>(null);
@@ -1337,7 +1341,7 @@ export default function Feed() {
                   {/* Use text with bell icon instead of button */}
                   <i className="ri-circle-fill" style={{ fontSize: '5px', color: '#777' }}></i>
                   <Box
-                    onClick={() => handleFollowUpdate(alert._id)}
+                    onClick={() => isViewOnly() ? null : handleFollowUpdate(alert._id || '')}
                     sx={{
                       display: 'flex',
                       alignItems: 'center',
@@ -1345,7 +1349,8 @@ export default function Feed() {
                       cursor: 'pointer',
                       color: alert.isFollowing ? 'primary.main' : 'text.secondary',
                       fontWeight: alert.isFollowing ? 500 : 400,
-                      '&:hover': { color: 'primary.main' }
+                      '&:hover': { color: `isViewOnly() ? 'text.secondary' : 'primary.main'` },
+                      opacity: isViewOnly() ? 0.5 : 1
                     }}
                   >
                     {alert.isFollowing ? (

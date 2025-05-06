@@ -29,6 +29,7 @@ import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { format, parseISO, addDays } from 'date-fns';
+import { useAuth } from '@/context/AuthContext';
 
 // Google Places Autocomplete
 import { useLoadScript } from '@react-google-maps/api';
@@ -87,6 +88,14 @@ export default function DisruptionForecast() {
   const [impact, setImpact] = useState('');
   
   // Weekly forecast date range (for display)
+
+  
+const { isCollaboratorViewer } = useAuth();
+
+const isViewOnly = () => {
+  return isCollaboratorViewer;
+};
+
 
   const weeklyStartDate = new Date()
   const weeklyEndDate = addDays(new Date(), 7)
@@ -426,7 +435,12 @@ export default function DisruptionForecast() {
                 <ArrowForwardIcon fontSize="small" />
               </Tooltip>
             </Box>
-            <Box onClick={() => handleSaveWeeklyForecast()}>
+            <Box onClick={() => isViewOnly() ? null : handleSaveWeeklyForecast()}
+              sx={{
+                opacity: isViewOnly() ? 0.5 : 1,
+                cursor: isViewOnly() ? 'not-allowed' : 'pointer'
+              }}
+            >
               <Tooltip title="Save Report">
                 <BookmarkBorderIcon fontSize="small" />
               </Tooltip>
@@ -463,6 +477,11 @@ export default function DisruptionForecast() {
                 value={alertCategory}
                 label="Alert Category"
                 onChange={(e) => setAlertCategory(e.target.value)}
+                disabled={isViewOnly()}
+                sx={{
+                  opacity: isViewOnly() ? 0.5 : 1,
+                  cursor: isViewOnly() ? 'not-allowed' : 'pointer'
+                }}
               >
                 {ALERT_TYPES.map((type) => (
                   <MenuItem key={type.value} value={type.value}>
@@ -499,6 +518,11 @@ export default function DisruptionForecast() {
                     value={startDate}
                     onChange={(newValue) => setStartDate(newValue)}
                     slotProps={{ textField: { fullWidth: true } }}
+                    disabled={isViewOnly()}
+                    sx={{
+                      opacity: isViewOnly() ? 0.5 : 1,
+                      cursor: isViewOnly() ? 'not-allowed' : 'pointer'
+                    }}
                   />
                 </Box>
                 <Box sx={{ width: '50%' }}>
@@ -507,6 +531,11 @@ export default function DisruptionForecast() {
                     value={endDate}
                     onChange={(newValue) => setEndDate(newValue)}
                     slotProps={{ textField: { fullWidth: true } }}
+                    disabled={isViewOnly()}
+                    sx={{
+                      opacity: isViewOnly() ? 0.5 : 1,
+                      cursor: isViewOnly() ? 'not-allowed' : 'pointer'
+                    }}
                   />
                 </Box>
               </Stack>
@@ -525,8 +554,12 @@ export default function DisruptionForecast() {
               <TextField
                 label="Location"
                 fullWidth
-                disabled
+                disabled={isViewOnly()}
                 placeholder="Loading location search..."
+                sx={{
+                  opacity: isViewOnly() ? 0.5 : 1,
+                  cursor: isViewOnly() ? 'not-allowed' : 'pointer'
+                }}
               />
             )}
           </Box>
@@ -541,6 +574,11 @@ export default function DisruptionForecast() {
                 value={impact}
                 label="Impact"
                 onChange={(e) => setImpact(e.target.value)}
+                disabled={isViewOnly()}
+                sx={{
+                  opacity: isViewOnly() ? 0.5 : 1,
+                  cursor: isViewOnly() ? 'not-allowed' : 'pointer'
+                }}
               >
                 {IMPACT_LEVELS.map((level) => (
                   <MenuItem key={level.value} value={level.value}>
@@ -556,9 +594,11 @@ export default function DisruptionForecast() {
               variant="contained" 
               fullWidth 
               onClick={handleGenerateForecast}
-              disabled={loading}
+              disabled={loading || isViewOnly()}
               sx={{ 
                 py: 1.5,
+                opacity: isViewOnly() ? 0.5 : 1,
+                cursor: isViewOnly() ? 'not-allowed' : 'pointer',
                 backgroundColor: '#000',
                 '&:hover': {
                   backgroundColor: '#333',
@@ -628,7 +668,12 @@ export default function DisruptionForecast() {
                         <ArrowForwardIcon fontSize="small" onClick={() => handleShareForecast(forecast._id)} />
                       </Tooltip>
                     </Box>
-                    <Box onClick={() => handleDeleteForecast(forecast._id)}>
+                    <Box onClick={() => isViewOnly() ? null : handleDeleteForecast(forecast._id)}
+                      sx={{
+                        opacity: isViewOnly() ? 0.5 : 1,
+                        cursor: isViewOnly() ? 'not-allowed' : 'pointer'
+                      }}
+                    >
                       <Tooltip title="Delete Report">
                         <DeleteIcon fontSize="small" />
                       </Tooltip>
