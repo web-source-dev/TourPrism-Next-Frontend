@@ -314,6 +314,12 @@ export const scheduleSummary = async (data: {
 // Update the downloadPdf function to handle backend URLs properly
 export const downloadPdf = async (pdfUrl: string, filename: string = 'forecast.pdf'): Promise<boolean> => {
   try {
+    // Validate inputs
+    if (!pdfUrl) {
+      console.error('downloadPdf called with empty URL');
+      return false;
+    }
+    
     // Make sure we have a complete URL
     const fullPdfUrl = pdfUrl.startsWith('http') 
       ? pdfUrl 
@@ -323,9 +329,24 @@ export const downloadPdf = async (pdfUrl: string, filename: string = 'forecast.p
     const link = document.createElement('a');
     link.href = fullPdfUrl;
     link.setAttribute('download', filename);
+    
+    // Test that the URL is accessible before trying to download
+    try {
+      const response = await fetch(fullPdfUrl, { method: 'HEAD' });
+      if (!response.ok) {
+        console.error(`PDF URL returned status ${response.status}: ${fullPdfUrl}`);
+        return false;
+      }
+    } catch (fetchError) {
+      console.error('Error testing PDF URL:', fetchError);
+      // Continue anyway - some servers don't support HEAD requests
+    }
+    
+    // Trigger the download
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+    
     return true;
   } catch (error) {
     console.error('Error downloading PDF:', error);
@@ -337,13 +358,26 @@ export const downloadPdf = async (pdfUrl: string, filename: string = 'forecast.p
 export const generatePdfOnDemand = async (summaryId: string): Promise<string | null> => {
   try {
     // Special endpoint to specifically generate a PDF for an existing summary
-    const response = await api.post<{success: boolean; pdfUrl: string}>(`/api/summaries/${summaryId}/generate-pdf`);
+    const response = await api.post<{success: boolean; pdfUrl: string; message?: string}>(`/api/summaries/${summaryId}/generate-pdf`);
+    
     if (response.data.success && response.data.pdfUrl) {
       return response.data.pdfUrl;
     }
+    
+    console.warn('PDF generation responded with success=true but no PDF URL', response.data);
     return null;
-  } catch (error) {
+  } catch (error: any) {
+    // Log the detailed error for debugging
     console.error('Error generating PDF on demand:', error);
+    
+    // Check if this is a "no alerts" situation (which isn't actually an error)
+    const errorMessage = error.response?.data?.message || '';
+    if (errorMessage.toLowerCase().includes('no alerts') || 
+        errorMessage.toLowerCase().includes('no disruptions')) {
+      console.log('Detected "no alerts" situation during PDF generation');
+    }
+    
+    // Return null to let the caller handle the fallback
     return null;
   }
 };

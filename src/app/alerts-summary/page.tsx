@@ -348,34 +348,86 @@ const isViewOnly = () => {
       // Get the summary details to access the PDF URL
       const response = await getSummaryById(id);
       
-      if (response.success) {
-        if (response.summary.pdfUrl) {
-          // Use the downloadPdf utility
-          await downloadPdf(
-            response.summary.pdfUrl,
-            `${response.summary.title.replace(/\s+/g, '_')}.pdf`
-          );
-        } else {
-          // No PDF available, generate one
-          const pdfUrl = await generatePdfOnDemand(id);
-          
-          if (pdfUrl) {
-            await downloadPdf(
-              pdfUrl,
-              `${response.summary.title.replace(/\s+/g, '_')}.pdf`
-            );
-          } else {
-            setError('Failed to generate PDF. Please try again.');
-          }
+      if (!response.success) {
+        setError('Failed to retrieve forecast details. Please try again.');
+        setLoading(false);
+        return;
+      }
+      
+      const summary = response.summary;
+      const hasAlerts = summary.includedAlerts && summary.includedAlerts.length > 0;
+      
+      // Check if this is a "No Alerts" forecast that needs special handling
+      const isNoAlertsForecast = 
+        summary.title.includes('No Alerts') || 
+        (summary.description && summary.description.includes('No disruptions')) ||
+        !hasAlerts;
+      
+      if (summary.pdfUrl) {
+        // Use the downloadPdf utility with the existing PDF URL
+        const success = await downloadPdf(
+          summary.pdfUrl,
+          `${summary.title.replace(/\s+/g, '_')}.pdf`
+        );
+        
+        if (!success) {
+          // If download fails, try to regenerate
+          regeneratePdf(id, summary, isNoAlertsForecast);
         }
       } else {
-        setError('Failed to retrieve forecast details. Please try again.');
+        // No PDF available, generate one
+        await regeneratePdf(id, summary, isNoAlertsForecast);
       }
     } catch (error) {
       console.error('Error downloading forecast:', error);
       setError('Failed to download forecast. Please try again.');
     } finally {
       setLoading(false);
+    }
+  };
+  
+  // Helper function to regenerate a PDF when the existing one fails or doesn't exist
+  const regeneratePdf = async (id: string, summary: Summary, isNoAlertsForecast: boolean) => {
+    try {
+      // Try to generate the PDF on demand via the API
+      const pdfUrl = await generatePdfOnDemand(id);
+      
+      if (pdfUrl) {
+        await downloadPdf(
+          pdfUrl,
+          `${summary.title.replace(/\s+/g, '_')}.pdf`
+        );
+      } else if (isNoAlertsForecast) {
+        // For "No Alerts" forecasts, generate a new PDF with appropriate "No Alerts" content
+        const noAlertsData = {
+          title: summary.title || "Disruption Forecast - No Alerts",
+          description: summary.description || `No disruptions found for the requested period`,
+          summaryType: 'forecast' as const,
+          startDate: summary.timeRange.startDate,
+          endDate: summary.timeRange.endDate,
+          locations: summary.locations || [],
+          generatePDF: true,
+          autoSave: false // Don't save a new summary, just generate the PDF
+        };
+        
+        const noAlertsResponse = await generateSummary(noAlertsData);
+        
+        if (noAlertsResponse.success && noAlertsResponse.summary.pdfUrl) {
+          await downloadPdf(
+            noAlertsResponse.summary.pdfUrl,
+            `${summary.title.replace(/\s+/g, '_')}.pdf`
+          );
+        } else {
+          // If all else fails, show a user-friendly message specifically for no alerts case
+          setError('We encountered an issue creating your "No Alerts" report. Your selected regions currently have no reported disruptions.');
+        }
+      } else {
+        // This is a regular forecast with content but PDF generation failed
+        setError('Failed to generate PDF. Please try again.');
+      }
+    } catch (error) {
+      console.error('Error regenerating PDF:', error);
+      setError('Failed to generate PDF. Please try again.');
     }
   };
 
