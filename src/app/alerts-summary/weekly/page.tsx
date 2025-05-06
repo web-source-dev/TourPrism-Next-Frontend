@@ -10,12 +10,12 @@ import Layout from '@/components/Layout';
 export default function WeeklyForecast() {
   const router = useRouter();
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const generateWeeklyForecast = async () => {
       try {
-        // Set loading state
-        
+        setLoading(true);
         // Get the forecast with proper MainOperatingRegions
         const response = await getUpcomingForecasts(7);
         
@@ -39,49 +39,74 @@ export default function WeeklyForecast() {
             includedAlerts: response.forecast.alerts || []
           };
 
-          const saveResponse = await generateSummary(data);
-          
-          if (saveResponse.success && saveResponse.summary.pdfUrl) {
-            // Need to pass the full data through the URL to preserve the original forecast
-            router.push(`/alerts-summary/weekly-forecast?pdf=${encodeURIComponent(saveResponse.summary.pdfUrl)}`);
-          } else if (response.forecast.pdfUrl) {
-            // Navigate but include the PDF URL directly from the first response if available
-            router.push(`/alerts-summary/weekly-forecast?pdf=${encodeURIComponent(response.forecast.pdfUrl)}`);
-          } else {
-            // Otherwise, just show the non-persistent weekly forecast
-            router.push('/alerts-summary/weekly-forecast');
+          try {
+            const saveResponse = await generateSummary(data);
+            
+            if (saveResponse.success && saveResponse.summary.pdfUrl) {
+              router.push(`/alerts-summary/weekly-forecast?pdf=${encodeURIComponent(saveResponse.summary.pdfUrl)}`);
+            } else if (response.forecast.pdfUrl) {
+              router.push(`/alerts-summary/weekly-forecast?pdf=${encodeURIComponent(response.forecast.pdfUrl)}`);
+            } else {
+              // If no PDF URL is returned but the API call was successful, still show the forecast page
+              router.push('/alerts-summary/weekly-forecast');
+            }
+          } catch (saveError) {
+            console.error('Error saving forecast:', saveError);
+            
+            // If generating a summary fails but we have a PDF URL from the forecast, use that
+            if (response.forecast.pdfUrl) {
+              router.push(`/alerts-summary/weekly-forecast?pdf=${encodeURIComponent(response.forecast.pdfUrl)}`);
+            } else {
+              // Otherwise, just show the forecast page without a PDF
+              router.push('/alerts-summary/weekly-forecast');
+            }
           }
         } else {
-          // If there's an issue, set an error message
-          setError('Failed to generate weekly forecast. Please try again later.');
+          // No forecast data available - show empty state
+          router.push('/alerts-summary/weekly-forecast');
         }
       } catch (error) {
         console.error('Error generating weekly forecast:', error);
-        setError('An unexpected error occurred. Please try again later.');
+        setError('We encountered an issue while preparing your forecast. Please try again.');
+      } finally {
+        setLoading(false);
       }
     };
 
     generateWeeklyForecast();
   }, [router]);
 
-  const handleRetry = () => {
-    setError('');
-    router.push('/alerts-summary'); // Go back to main page to try again
-  };
-
   if (error) {
     return (
       <Layout isFooter={false}>
         <Box sx={{ p: 3 }}>
-          <Alert severity="error" sx={{ mb: 2 }}>
-            {error}
+          <Alert 
+            severity="warning" 
+            sx={{ 
+              mb: 2,
+              '& .MuiAlert-message': {
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 1
+              }
+            }}
+          >
+            <Typography variant="subtitle1" fontWeight="medium">
+              {error}
+            </Typography>
+            <Typography variant="body2">
+              This might be due to a temporary connection issue.
+            </Typography>
           </Alert>
           <Button 
             variant="contained" 
-            onClick={handleRetry} 
+            onClick={() => {
+              setError('');
+              router.push('/alerts-summary');
+            }}
             sx={{ mt: 2 }}
           >
-            Try Again
+            Return to Summary Page
           </Button>
         </Box>
       </Layout>
@@ -90,22 +115,43 @@ export default function WeeklyForecast() {
 
   return (
     <Layout isFooter={false}>
-    <Box
-      sx={{
-        display: 'flex',
-        flexDirection: 'column',
-        justifyContent: 'center',
-        alignItems: 'center',
-        minHeight: '60vh',
-        gap: 2,
-      }}
-    >
-      <CircularProgress size={40} />
-      <Typography variant="h6">Generating your weekly forecast...</Typography>
-      <Typography variant="body2" color="text.secondary">
-        This may take a moment as we analyze upcoming disruptions in your operating regions.
-      </Typography>
-    </Box>
+      <Box
+        sx={{
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'center',
+          alignItems: 'center',
+          minHeight: '60vh',
+          gap: 2,
+          p: 3
+        }}
+      >
+        {loading ? (
+          <>
+            <CircularProgress size={40} />
+            <Typography variant="h6">Preparing Your Weekly Forecast</Typography>
+            <Typography variant="body2" color="text.secondary" textAlign="center">
+              We&apos;re analyzing upcoming disruptions in your operating regions. This should only take a moment.
+            </Typography>
+          </>
+        ) : (
+          <>
+            <Typography variant="h6">Weekly Forecast Ready</Typography>
+            <Typography variant="body2" color="text.secondary" textAlign="center">
+              Your weekly forecast is ready. Click the button below to view it.
+            </Typography>
+            <Button
+              variant="contained"
+              onClick={() => {
+                router.push('/alerts-summary/weekly-forecast');
+              }}
+              sx={{ mt: 2 }}
+            >
+              View Weekly Forecast
+            </Button>
+          </>
+        )}
+      </Box>
     </Layout>
   );
-} 
+}
