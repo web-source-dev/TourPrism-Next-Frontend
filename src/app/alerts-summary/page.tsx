@@ -79,6 +79,7 @@ export default function DisruptionForecast() {
   const [error, setError] = useState('');
   const [activeSection, setActiveSection] = useState('weekly');
   const [savedForecasts, setSavedForecasts] = useState<Summary[]>([]);
+  const [weeklyAlertCount, setWeeklyAlertCount] = useState<number | null>(null);
   
   // Form state for custom forecast
   const [alertCategory, setAlertCategory] = useState('');
@@ -107,7 +108,22 @@ const isViewOnly = () => {
 
   useEffect(() => {
     loadSavedForecasts();
+    checkWeeklyAlerts();
   }, []);
+
+  const checkWeeklyAlerts = async () => {
+    try {
+      const response = await getUpcomingForecasts(7);
+      if (response.success && response.forecast) {
+        const alertCount = response.forecast.alerts?.length || 0;
+        setWeeklyAlertCount(alertCount);
+      }
+    } catch (error) {
+      console.error('Error checking weekly alerts:', error);
+      // Don't show an error to the user, just set count to null
+      setWeeklyAlertCount(null);
+    }
+  };
 
   const loadSavedForecasts = async () => {
     try {
@@ -207,14 +223,47 @@ const isViewOnly = () => {
       // Get the forecast with proper MainOperatingRegions
       const response = await getUpcomingForecasts(7);
       
-      if (response.success && response.forecast?.pdfUrl) {
-        // Download the PDF using the URL from the forecast
-        await downloadPdf(
-          response.forecast.pdfUrl,
-          `Weekly_Forecast_${format(new Date(), 'yyyy-MM-dd')}.pdf`
-        );
+      if (response.success) {
+        // Check if we have alerts
+        const hasAlerts = response.forecast?.alerts && response.forecast.alerts.length > 0;
+        
+        if (response.forecast?.pdfUrl) {
+          // Download the PDF using the URL from the forecast
+          await downloadPdf(
+            response.forecast.pdfUrl,
+            `Weekly_Forecast_${format(new Date(), 'yyyy-MM-dd')}.pdf`
+          );
+        } else if (!hasAlerts) {
+          // Create a special "No alerts" PDF
+          const noAlertsData = {
+            title: "Weekly Disruption Forecast - No Alerts",
+            description: `No disruptions found for ${format(new Date(), 'dd MMM yyyy')} to ${format(addDays(new Date(), 7), 'dd MMM yyyy')}`,
+            summaryType: 'forecast' as const,
+            startDate: new Date().toISOString(),
+            endDate: addDays(new Date(), 7).toISOString(),
+            generatePDF: true,
+            autoSave: false,
+            // Use the user regions from the response if available
+            locations: response.forecast?.userRegions || []
+          };
+          
+          // Generate the PDF with "no alerts" content
+          const noAlertsResponse = await generateSummary(noAlertsData);
+          
+          if (noAlertsResponse.success && noAlertsResponse.summary.pdfUrl) {
+            await downloadPdf(
+              noAlertsResponse.summary.pdfUrl,
+              `Weekly_Forecast_No_Alerts_${format(new Date(), 'yyyy-MM-dd')}.pdf`
+            );
+          } else {
+            // Only show an error if we can't even generate a "no alerts" PDF
+            setError('No alerts found in your operating regions for the upcoming week. We\'ve prepared a blank report for you.');
+          }
+        } else {
+          setError('Failed to generate the weekly forecast PDF. Please try again.');
+        }
       } else {
-        setError('Failed to generate the weekly forecast PDF. Please try again.');
+        setError('Failed to retrieve weekly forecast data. Please try again.');
       }
     } catch (error) {
       console.error('Error generating weekly forecast:', error);
@@ -232,31 +281,50 @@ const isViewOnly = () => {
       // Get the forecast with proper MainOperatingRegions
       const forecastResponse = await getUpcomingForecasts(7);
       
-      if (!forecastResponse.success || !forecastResponse.forecast) {
+      if (!forecastResponse.success) {
         setError('Failed to generate weekly forecast. Please try again.');
         return;
       }
 
+      // Check if we have alerts
+      const hasAlerts = forecastResponse.forecast?.alerts && forecastResponse.forecast.alerts.length > 0;
+      
       // Now save the forecast with the data we got, including MainOperatingRegions
       const data = {
-        title: forecastResponse.forecast.title,
-        description: forecastResponse.forecast.description || `Weekly forecast for ${format(new Date(), 'dd MMM yyyy')}`,
+        title: forecastResponse.forecast?.title || "Weekly Disruption Forecast",
+        description: forecastResponse.forecast?.description || 
+                    (hasAlerts 
+                      ? `Weekly forecast for ${format(new Date(), 'dd MMM yyyy')}` 
+                      : `No disruptions found for the week of ${format(new Date(), 'dd MMM yyyy')}`),
         summaryType: 'forecast' as const,
-        startDate: forecastResponse.forecast.timeRange.startDate,
-        endDate: forecastResponse.forecast.timeRange.endDate,
+        startDate: forecastResponse.forecast?.timeRange?.startDate || new Date().toISOString(),
+        endDate: forecastResponse.forecast?.timeRange?.endDate || addDays(new Date(), 7).toISOString(),
         generatePDF: true,
         autoSave: true,
-        locations: forecastResponse.forecast.userRegions || [], // Use userRegions for locations
-        alertCategory: forecastResponse.forecast.alertCategory,
-        impact: forecastResponse.forecast.impact,
-        includedAlerts: forecastResponse.forecast.alerts || [] // Include the alerts from the forecast
+        locations: forecastResponse.forecast?.userRegions || [], // Use userRegions for locations
+        alertCategory: forecastResponse.forecast?.alertCategory,
+        impact: forecastResponse.forecast?.impact,
+        includedAlerts: forecastResponse.forecast?.alerts || [] // Include the alerts from the forecast
       };
+
+      // If we have no alerts, add a special flag to ensure proper handling
+      if (!hasAlerts) {
+        // Include metadata to indicate this is an empty report
+        data.description = `No disruptions found for the week of ${format(new Date(), 'dd MMM yyyy')}`;
+        data.title = "Weekly Disruption Forecast - No Alerts";
+      }
 
       const response = await generateSummary(data);
       
       if (response.success && response.summary.savedSummaryId) {
         // Navigate to the saved forecast view
         router.push(`/alerts-summary/${response.summary.savedSummaryId}`);
+      } else if (!hasAlerts && response.success) {
+        // If no alerts but the save was "successful", still direct them to the summary page
+        // This might happen when we generate a "no alerts" PDF
+        router.push(`/alerts-summary`);
+        // Show a message
+        setError('No alerts found in your operating regions. A blank report has been saved.');
       } else {
         setError('Failed to save the weekly forecast. Please try again.');
       }
@@ -386,7 +454,10 @@ const isViewOnly = () => {
             </Typography>
 
             <Typography variant="body1" fontWeight="medium" sx={{ mb: 2 }}>
-              Multiple Alerts for this Week.
+              {weeklyAlertCount === null ? 'Loading alerts...' :
+                weeklyAlertCount === 0 ? 'No alerts for this week.' :
+                weeklyAlertCount === 1 ? '1 Alert for this week.' :
+                `${weeklyAlertCount} Alerts for this week.`}
             </Typography>
 
             <Button 
