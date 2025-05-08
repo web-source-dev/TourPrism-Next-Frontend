@@ -28,7 +28,7 @@ interface UserCardProps {
   user: User;
   onViewProfile: (user: User) => void;
   onChangeRole: (user: User) => void;
-  onRestrictUser: (user: User, status: string) => void;
+  onRestrictUser: (user: User) => void;
   onDeleteUser: (user: User) => void;
 }
 
@@ -187,7 +187,7 @@ const UserCard: React.FC<UserCardProps> = ({
             <Divider />
             <MenuItem 
               onClick={() => {
-                onRestrictUser(user, user.status === 'restricted' || user.status === 'deleted' ? 'active' : 'restricted');
+                onRestrictUser(user);
                 handleClose();
               }}
               sx={{ color: user.status === 'deleted' ? 'success.main' : user.status === 'restricted' ? 'success.main' : 'error.main' }}

@@ -24,7 +24,7 @@ import {
   Email as EmailIcon,
 } from '@mui/icons-material';
 import { User } from '@/types';
-import { getUserProfile } from '@/services/api';
+import { getUserById } from '@/services/api';
 
 interface ProfileModalProps {
   open: boolean;
@@ -81,7 +81,7 @@ const ProfileModal: React.FC<ProfileModalProps> = ({ open, onClose, user }) => {
         setLoading(true);
         setError(null);
         try {
-          const { user: fetchedUser } = await getUserProfile();
+          const { user: fetchedUser } = await getUserById(user._id);
           setDetailedUser(fetchedUser);
         } catch (err) {
           console.error('Error fetching user details:', err);
@@ -168,6 +168,7 @@ const ProfileModal: React.FC<ProfileModalProps> = ({ open, onClose, user }) => {
       PaperProps={{
         sx: {
           borderRadius: 2,
+          padding: 3,
           boxShadow: '0 8px 16px rgba(0,0,0,0.1)'
         }
       }}
@@ -200,19 +201,6 @@ const ProfileModal: React.FC<ProfileModalProps> = ({ open, onClose, user }) => {
             {/* User Header */}
             <Box sx={{ p: 3, bgcolor: '#f9f9f9' }}>
               <Stack direction="row" spacing={2} alignItems="center">
-                <Box>
-                  <Avatar
-                    sx={{
-                      bgcolor: getRoleColor(detailedUser.role).bg,
-                      color: getRoleColor(detailedUser.role).color,
-                      width: 80,
-                      height: 80,
-                      fontSize: '2rem',
-                    }}
-                  >
-                    {getNameInitials()}
-                  </Avatar>
-                </Box>
                 <Box sx={{ flexGrow: 1 }}>
                   <Typography variant="h5" fontWeight="bold">
                     {detailedUser.firstName || ''} {detailedUser.lastName || ''}

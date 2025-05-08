@@ -619,6 +619,16 @@ export const getUserProfile = async (): Promise<{ user: User }> => {
   }
 };
 
+// Get user by ID (for admin panel)
+export const getUserById = async (userId: string): Promise<{ user: User }> => {
+  try {
+    const response = await api.get<{ user: User }>(`/api/admin/users/${userId}`);
+    return response.data;
+  } catch (error) {
+    throw getErrorMessage(error as CustomAxiosError);
+  }
+};
+
 export const deleteUser = async (userId: string): Promise<{ success: boolean }> => {
   try {
     const response = await api.delete<{ success: boolean }>(`/api/admin/users/${userId}`);

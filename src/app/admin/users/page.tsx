@@ -130,6 +130,8 @@ export default function UsersManagement() {
   const handleRestrictUser = (user: User) => {
     setSelectedUser(user);
     // Check user's current status to determine the action
+    // For 'deleted' and 'restricted' users, enable them
+    // For 'active' and any other status, restrict them
     setModalAction(user.status === 'restricted' || user.status === 'deleted' ? 'enable' : 'restrict');
     setRestrictModalOpen(true);
   };

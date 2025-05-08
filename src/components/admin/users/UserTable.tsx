@@ -29,7 +29,7 @@ interface UserTableProps {
   users: User[];
   onViewProfile: (user: User) => void;
   onChangeRole: (user: User) => void;
-  onRestrictUser: (user: User, status: string) => void;
+  onRestrictUser: (user: User) => void;
   onDeleteUser: (user: User) => void;
 }
 
@@ -215,7 +215,7 @@ const UserTable: React.FC<UserTableProps> = ({
             <Divider />
             <MenuItem
               onClick={() => {
-                onRestrictUser(selectedUser, selectedUser.status === 'restricted' || selectedUser.status === 'deleted' ? 'active' : 'restricted');
+                onRestrictUser(selectedUser);
                 handleCloseMenu();
               }}
               sx={{ color: selectedUser.status === 'deleted' ? 'success.main' : selectedUser.status === 'restricted' ? 'success.main' : 'error.main' }}
