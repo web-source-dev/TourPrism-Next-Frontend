@@ -47,17 +47,17 @@ const ALERT_TYPE_MAP: Record<string, string[]> = {
 
 // Define target audience options
 const TARGET_AUDIENCE_OPTIONS = [
-  "Hotels", 
-  "Tour Operators", 
-  "Travel Agencies", 
-  "DMOs", 
-  "Airlines", 
-  "Cruise Lines", 
-  "OTAs", 
-  "Event Managers", 
-  "Attractions", 
-  "Car Rentals", 
-  "Tour Guides", 
+  "Hotels",
+  "Tour Operators",
+  "Travel Agencies",
+  "DMOs",
+  "Airlines",
+  "Cruise Lines",
+  "OTAs",
+  "Event Managers",
+  "Attractions",
+  "Car Rentals",
+  "Tour Guides",
   "Other"
 ];
 
@@ -143,7 +143,7 @@ export default function EditAlertPage() {
 
   // Permission check
   const canEditAlert = isAdmin || isManager || isEditor;
-  
+
   // Setup autocomplete for impact locations - wrap with useCallback before other hooks use it
   const setupImpactLocationAutocomplete = useCallback(() => {
     if (typeof window !== 'undefined' && window.google && window.google.maps) {
@@ -153,7 +153,7 @@ export default function EditAlertPage() {
           fields: ['place_id', 'geometry', 'name', 'formatted_address', 'address_components'],
         };
         const autocomplete = new google.maps.places.Autocomplete(impactInput, autocompleteOptions);
-        
+
         // Listen for place selection
         autocomplete.addListener('place_changed', () => {
           const place = autocomplete.getPlace();
@@ -161,7 +161,7 @@ export default function EditAlertPage() {
             // Extract city and country
             let city = '';
             let country = '';
-            
+
             place.address_components?.forEach(component => {
               if (component.types.includes('locality')) {
                 city = component.long_name;
@@ -169,7 +169,7 @@ export default function EditAlertPage() {
                 country = component.long_name;
               }
             });
-            
+
             // Add to impact locations list
             const newImpactLocation = {
               placeId: place.place_id,
@@ -178,13 +178,13 @@ export default function EditAlertPage() {
               city: city || place.name || '',
               country: country,
             };
-            
+
             // Update form values
             setFormValues(prev => ({
               ...prev,
               impactLocations: [...(prev.impactLocations || []), newImpactLocation]
             }));
-            
+
             // Clear the input
             if (impactInput) {
               impactInput.value = '';
@@ -205,7 +205,7 @@ export default function EditAlertPage() {
 
       // Initialize impact locations from existing data if available
       const impactLocations = alertData.impactLocations || [];
-      
+
       // If there's no origin data but legacy location data exists, use that as origin
       const formattedData = {
         ...alertData,
@@ -215,13 +215,13 @@ export default function EditAlertPage() {
         originCity: alertData.originCity || alertData.city,
         impactLocations: impactLocations,
         // Convert string targetAudience to array if needed
-        targetAudience: Array.isArray(alertData.targetAudience) 
-          ? alertData.targetAudience 
+        targetAudience: Array.isArray(alertData.targetAudience)
+          ? alertData.targetAudience
           : alertData.targetAudience ? [alertData.targetAudience] : []
       };
-      
+
       setFormValues(formattedData);
-      
+
       // Set available alert types based on category
       if (alertData.alertCategory) {
         setAvailableAlertTypes(ALERT_TYPE_MAP[alertData.alertCategory] || []);
@@ -249,7 +249,7 @@ export default function EditAlertPage() {
           fields: ['place_id', 'geometry', 'name', 'formatted_address', 'address_components'],
         };
         const autocomplete = new google.maps.places.Autocomplete(originInput, autocompleteOptions);
-        
+
         // Listen for place selection
         autocomplete.addListener('place_changed', () => {
           const place = autocomplete.getPlace();
@@ -257,7 +257,7 @@ export default function EditAlertPage() {
             // Extract city and country
             let city = '';
             let country = '';
-            
+
             place.address_components?.forEach(component => {
               if (component.types.includes('locality')) {
                 city = component.long_name;
@@ -265,7 +265,7 @@ export default function EditAlertPage() {
                 country = component.long_name;
               }
             });
-            
+
             setFormValues(prev => ({
               ...prev,
               originPlaceId: place.place_id,
@@ -287,7 +287,7 @@ export default function EditAlertPage() {
   useEffect(() => {
     // Avoid multiple attempts to load the script
     if (mapsScriptAttempted) return;
-    
+
     // Mark that we've attempted to load the script
     setMapsScriptAttempted(true);
 
@@ -302,12 +302,12 @@ export default function EditAlertPage() {
     googleMapsScript.src = `https://maps.googleapis.com/maps/api/js?key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}&libraries=places`;
     googleMapsScript.async = true;
     googleMapsScript.defer = true;
-    
+
     googleMapsScript.onload = () => {
       console.log('Google Maps API loaded successfully');
       setGoogleLoaded(true);
     };
-    
+
     googleMapsScript.onerror = () => {
       console.error('Failed to load Google Maps API');
       // Still need to fetch alert data even if Maps fails
@@ -315,7 +315,7 @@ export default function EditAlertPage() {
         fetchAlertDetails();
       }
     };
-    
+
     document.head.appendChild(googleMapsScript);
   }, [canEditAlert, mapsScriptAttempted, fetchAlertDetails]);
 
@@ -323,7 +323,7 @@ export default function EditAlertPage() {
   useEffect(() => {
     if (formValues.alertCategory) {
       setAvailableAlertTypes(ALERT_TYPE_MAP[formValues.alertCategory] || []);
-      
+
       // Clear the alert type if it's not valid for the new category
       if (formValues.alertType && !ALERT_TYPE_MAP[formValues.alertCategory]?.includes(formValues.alertType)) {
         setFormValues(prev => ({ ...prev, alertType: '' }));
@@ -340,7 +340,7 @@ export default function EditAlertPage() {
       const redirectTimer = setTimeout(() => {
         router.push('/admin/alerts');
       }, 2000);
-      
+
       return () => clearTimeout(redirectTimer);
     }
   }, [canEditAlert, router]);
@@ -362,10 +362,6 @@ export default function EditAlertPage() {
     setFormValues(prev => ({ ...prev, [name]: value }));
   };
 
-  const handleTargetAudienceChange = (event: React.SyntheticEvent, newValue: string[]) => {
-    setFormValues(prev => ({ ...prev, targetAudience: newValue }));
-  };
-
   // Handle removing an impact location
   const handleRemoveImpactLocation = (indexToRemove: number) => {
     setFormValues(prev => ({
@@ -376,19 +372,19 @@ export default function EditAlertPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     // Double-check permissions
     if (!canEditAlert) {
       setTimeout(() => {
-      setSnackbar({
-        open: true,
-        message: 'You do not have permission to edit alerts',
+        setSnackbar({
+          open: true,
+          message: 'You do not have permission to edit alerts',
           severity: 'error'
         });
       }, 2000);
       return;
     }
-    
+
     setSaving(true);
     setError(null);
 
@@ -399,7 +395,7 @@ export default function EditAlertPage() {
         message: 'Alert updated successfully',
         severity: 'success'
       });
-      
+
       // Wait a moment to show the success message before redirecting
       setTimeout(() => {
         window.location.href = '/admin/alerts';
@@ -428,10 +424,10 @@ export default function EditAlertPage() {
   if (loading && canEditAlert) {
     return (
       <AdminLayout>
-        <Box sx={{ 
-          display: 'flex', 
-          justifyContent: 'center', 
-          alignItems: 'center', 
+        <Box sx={{
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
           height: '70vh',
           flexDirection: 'column',
           gap: 2
@@ -448,11 +444,11 @@ export default function EditAlertPage() {
   if (error && !alert && canEditAlert) {
     return (
       <AdminLayout>
-        <Box sx={{ 
-          textAlign: 'center', 
-          p: 6, 
-          maxWidth: 600, 
-          mx: 'auto', 
+        <Box sx={{
+          textAlign: 'center',
+          p: 6,
+          maxWidth: 600,
+          mx: 'auto',
           mt: 4,
           borderRadius: 3,
           backgroundColor: alpha(theme.palette.error.light, 0.05),
@@ -466,16 +462,16 @@ export default function EditAlertPage() {
             There was a problem loading the alert information. Please try again or contact support if the issue persists.
           </Typography>
           <Box sx={{ display: 'flex', justifyContent: 'center', gap: 2 }}>
-            <StyledButton 
-              variant="contained" 
+            <StyledButton
+              variant="contained"
               onClick={fetchAlertDetails}
               startIcon={<i className="ri-refresh-line" />}
               sx={{ minWidth: 120 }}
             >
               Try Again
             </StyledButton>
-            <StyledButton 
-              variant="outlined" 
+            <StyledButton
+              variant="outlined"
               onClick={handleCancel}
               startIcon={<i className="ri-arrow-left-line" />}
               sx={{ minWidth: 160 }}
@@ -490,16 +486,16 @@ export default function EditAlertPage() {
 
   return (
     <AdminLayout>
-      <Box 
-        sx={{ 
+      <Box
+        sx={{
           maxWidth: 1200,
           mx: 'auto',
           mb: 4,
         }}
       >
         <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 1 }}>
-          <Button 
-            variant="text" 
+          <Button
+            variant="text"
             onClick={handleCancel}
             startIcon={<i className="ri-arrow-left-line" />}
             sx={{ mr: 1 }}
@@ -531,43 +527,45 @@ export default function EditAlertPage() {
                 <StyledTextField
                   name="title"
                   label="Title"
-                  fullWidth
                   variant="outlined"
                   value={formValues.title || ''}
                   onChange={handleInputChange}
-                  sx={{ flex: '1 1 60%', minWidth: '250px' }}
+                  sx={{ flex: '1 1 48%', minWidth: '250px' }}
                   placeholder="Enter a descriptive title for the alert"
                 />
                 
-                <StyledFormControl sx={{ flex: '1 1 30%', minWidth: '200px' }}>
-                  <InputLabel id="status-label">Status</InputLabel>
-                  <Select
-                    labelId="status-label"
-                    id="status"
-                    name="status"
-                    value={formValues.status || 'pending'}
-                    label="Status"
-                    onChange={handleSelectChange}
-                  >
-                    <MenuItem value="pending">Pending</MenuItem>
-                    <MenuItem value="approved">Approved</MenuItem>
-                    <MenuItem value="rejected">Rejected</MenuItem>
-                    <MenuItem value="archived">Archived</MenuItem>
-                    <MenuItem value="deleted">Deleted</MenuItem>
-                  </Select>
-                </StyledFormControl>
+                <StyledTextField
+                  name="linkToSource"
+                  label="Link to Source"
+                  variant="outlined"
+                  value={formValues.linkToSource || ''}
+                  onChange={handleInputChange}
+                  placeholder="Enter a URL linking to more information about this alert"
+                  sx={{ flex: '1 1 48%', minWidth: '250px' }}
+                />
                 
                 <StyledTextField
                   name="description"
-                  label="Description"
-                  fullWidth
+                  label="Issue"
                   multiline
                   rows={4}
                   variant="outlined"
                   value={formValues.description || ''}
                   onChange={handleInputChange}
-                  sx={{ width: '100%' }}
+                  sx={{ flex: '1 1 48%', minWidth: '250px' }}
                   placeholder="Provide a detailed description of the alert"
+                />
+                
+                <StyledTextField
+                  name="recommendedAction"
+                  label="Recommendation"
+                  variant="outlined"
+                  value={formValues.recommendedAction || ''}
+                  onChange={handleInputChange}
+                  placeholder="What actions should be taken in response to this alert?"
+                  multiline
+                  rows={4}
+                  sx={{ flex: '1 1 48%', minWidth: '250px' }}
                 />
               </Box>
             </SectionContent>
@@ -597,7 +595,7 @@ export default function EditAlertPage() {
                 }}
                 sx={{ mb: 2 }}
               />
-              
+
               {formValues.originCity && (
                 <LocationCard>
                   <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 2, color: theme.palette.primary.main }}>
@@ -615,7 +613,7 @@ export default function EditAlertPage() {
                         readOnly: true,
                       }}
                     />
-                    
+
                     <StyledTextField
                       name="originCountry"
                       label="Country"
@@ -627,7 +625,7 @@ export default function EditAlertPage() {
                         readOnly: true,
                       }}
                     />
-                    
+
                     <StyledTextField
                       name="originLatitude"
                       label="Latitude"
@@ -638,7 +636,7 @@ export default function EditAlertPage() {
                       onChange={handleInputChange}
                       sx={{ flex: '1 1 30%', minWidth: '150px' }}
                     />
-                    
+
                     <StyledTextField
                       name="originLongitude"
                       label="Longitude"
@@ -654,7 +652,7 @@ export default function EditAlertPage() {
               )}
             </SectionContent>
           </StyledSection>
-          
+
           {/* Impact Locations Information */}
           <StyledSection>
             <SectionHeader>
@@ -679,7 +677,7 @@ export default function EditAlertPage() {
                 }}
                 sx={{ mb: 2 }}
               />
-              
+
               {formValues.impactLocations && formValues.impactLocations.length > 0 && (
                 <Box sx={{ width: '100%', mt: 2 }}>
                   <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 2, color: theme.palette.primary.main }}>
@@ -711,11 +709,11 @@ export default function EditAlertPage() {
                       />
                     ))}
                   </Box>
-                  
-                  <Box 
-                    sx={{ 
-                      mt: 2, 
-                      pt: 2, 
+
+                  <Box
+                    sx={{
+                      mt: 2,
+                      pt: 2,
                       borderTop: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
                       display: 'flex',
                       alignItems: 'center',
@@ -732,8 +730,8 @@ export default function EditAlertPage() {
                           severity: 'info'
                         });
                       }}
-                      sx={{ 
-                        textTransform: 'none', 
+                      sx={{
+                        textTransform: 'none',
                         color: theme.palette.text.secondary,
                         '&:hover': {
                           backgroundColor: 'transparent',
@@ -770,7 +768,7 @@ export default function EditAlertPage() {
                   sx={{ flex: '1 1 45%', minWidth: '250px' }}
                   helperText="When is this alert expected to start?"
                 />
-                
+
                 <StyledTextField
                   name="expectedEnd"
                   label="Expected End"
@@ -814,7 +812,7 @@ export default function EditAlertPage() {
                     <MenuItem value="Natural Disaster">Natural Disaster</MenuItem>
                   </Select>
                 </StyledFormControl>
-                
+
                 <StyledFormControl sx={{ flex: '1 1 45%', minWidth: '250px' }}>
                   <InputLabel id="alert-type-label">Alert Type</InputLabel>
                   <Select
@@ -831,8 +829,8 @@ export default function EditAlertPage() {
                     ))}
                   </Select>
                 </StyledFormControl>
-                
-                <StyledFormControl sx={{ flex: '1 1 30%', minWidth: '200px' }}>
+
+                <StyledFormControl sx={{ flex: '1 1 45%', minWidth: '250px' }}>
                   <InputLabel id="risk-label">Risk Level</InputLabel>
                   <Select
                     labelId="risk-label"
@@ -847,8 +845,8 @@ export default function EditAlertPage() {
                     <MenuItem value="High">High</MenuItem>
                   </Select>
                 </StyledFormControl>
-                
-                <StyledFormControl sx={{ flex: '1 1 30%', minWidth: '200px' }}>
+
+                <StyledFormControl sx={{ flex: '1 1 45%', minWidth: '250px' }}>
                   <InputLabel id="impact-label">Impact Severity</InputLabel>
                   <Select
                     labelId="impact-label"
@@ -858,13 +856,13 @@ export default function EditAlertPage() {
                     label="Impact Severity"
                     onChange={handleSelectChange}
                   >
-                    <MenuItem value="Minor">Minor</MenuItem>
+                    <MenuItem value="Minor">Low</MenuItem>
                     <MenuItem value="Moderate">Moderate</MenuItem>
-                    <MenuItem value="Severe">Severe</MenuItem>
+                    <MenuItem value="Severe">High</MenuItem>
                   </Select>
                 </StyledFormControl>
-                
-                <StyledFormControl sx={{ flex: '1 1 30%', minWidth: '200px' }}>
+
+                <StyledFormControl sx={{ flex: '1 1 45%', display: 'none', minWidth: '250px' }}>
                   <InputLabel id="priority-label">Priority</InputLabel>
                   <Select
                     labelId="priority-label"
@@ -892,60 +890,81 @@ export default function EditAlertPage() {
               </Typography>
             </SectionHeader>
             <SectionContent>
-              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+              <Box sx={{ display: 'flex', gap: 3 }}>
+
+
                 <StyledFormControl sx={{ width: '100%' }}>
+
                   <Autocomplete
                     multiple
                     id="targetAudience"
-                    options={TARGET_AUDIENCE_OPTIONS}
-                    value={Array.isArray(formValues.targetAudience) ? formValues.targetAudience : formValues.targetAudience ? [formValues.targetAudience] : []}
-                    onChange={handleTargetAudienceChange}
+                    options={TARGET_AUDIENCE_OPTIONS.filter(option =>
+                      !formValues.targetAudience?.includes(option)
+                    )}
+                    value={[]} // Always empty as we handle selection outside
+                    onChange={(event, newValue) => {
+                      if (newValue.length > 0) {
+                        const lastSelected = newValue[newValue.length - 1];
+                        setFormValues(prev => ({
+                          ...prev,
+                          targetAudience: [...(Array.isArray(prev.targetAudience) ? prev.targetAudience : []), lastSelected]
+                        }));
+                      }
+                    }}
                     renderInput={(params) => (
                       <StyledTextField
                         {...params}
                         variant="outlined"
-                        label="Target Audience"
+                        label="Select target audiences"
                         placeholder="Select target audiences"
                       />
                     )}
-                    renderTags={(value, getTagProps) =>
-                      value.map((option, index) => (
+                  />
+                  {Array.isArray(formValues.targetAudience) && formValues.targetAudience.length > 0 && (
+                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mt: 2 }}>
+                      {formValues.targetAudience.map((option, index) => (
                         <Chip
                           label={option}
-                          {...getTagProps({ index })}
                           key={index}
-                          sx={{ 
+                          onDelete={() => {
+                            const newValue = [...formValues.targetAudience as string[]];
+                            newValue.splice(index, 1);
+                            setFormValues(prev => ({ ...prev, targetAudience: newValue }));
+                          }}
+                          sx={{
                             borderRadius: '16px',
                             backgroundColor: alpha(theme.palette.primary.main, 0.1),
                             color: theme.palette.primary.main,
-                            fontWeight: 500
+                            fontWeight: 500,
+                            '& .MuiChip-deleteIcon': {
+                              color: theme.palette.primary.main,
+                              '&:hover': {
+                                color: theme.palette.error.main,
+                              }
+                            }
                           }}
                         />
-                      ))
-                    }
-                  />
+                      ))}
+                    </Box>
+                  )}
                 </StyledFormControl>
-                
-                <StyledTextField
-                  name="recommendedAction"
-                  label="Recommended Action"
-                  variant="outlined"
-                  value={formValues.recommendedAction || ''}
-                  onChange={handleInputChange}
-                  placeholder="What actions should be taken in response to this alert?"
-                  multiline
-                  rows={3}
-                />
-                
-                <StyledTextField
-                  name="linkToSource"
-                  label="Link to Source"
-                  variant="outlined"
-                  value={formValues.linkToSource || ''}
-                  onChange={handleInputChange}
-                  placeholder="Enter a URL linking to more information about this alert"
-                  fullWidth
-                />
+                <StyledFormControl sx={{ width: '100%' }}>
+                  <InputLabel id="status-label">Status</InputLabel>
+                  <Select
+                    labelId="status-label"
+                    id="status"
+                    name="status"
+                    value={formValues.status || 'pending'}
+                    label="Status"
+                    onChange={handleSelectChange}
+                  >
+                    <MenuItem value="pending">Pending</MenuItem>
+                    <MenuItem value="approved">Approved</MenuItem>
+                    <MenuItem value="rejected">Rejected</MenuItem>
+                    <MenuItem value="archived">Archived</MenuItem>
+                    <MenuItem value="deleted">Deleted</MenuItem>
+                  </Select>
+                </StyledFormControl>
               </Box>
             </SectionContent>
           </StyledSection>
@@ -980,8 +999,8 @@ export default function EditAlertPage() {
         onClose={handleCloseSnackbar}
         anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
       >
-        <MuiAlert 
-          onClose={handleCloseSnackbar} 
+        <MuiAlert
+          onClose={handleCloseSnackbar}
           severity={snackbar.severity}
           variant="filled"
           sx={{ width: '100%', borderRadius: 2 }}
