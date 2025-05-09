@@ -145,6 +145,9 @@ export default function CreateAlertPage() {
     severity: 'success' as 'success' | 'error' | 'info' | 'warning'
   });
 
+  const [customAudience, setCustomAudience] = useState('');
+  const [showCustomAudienceInput, setShowCustomAudienceInput] = useState(false);
+
   // Permission check
   const canCreateAlert = isAdmin || isManager || isEditor;
 
@@ -285,6 +288,45 @@ export default function CreateAlertPage() {
       impactLocations: prev.impactLocations?.filter((_, index) => index !== indexToRemove)
     }));
   };
+
+  // Add function to select all target audiences
+  const handleSelectAllAudiences = () => {
+    // Filter out "Other" from the selection as it requires custom input
+    const allPredefinedOptions = TARGET_AUDIENCE_OPTIONS.filter(option => option !== "Other");
+    
+    // Get current audience selections
+    const currentAudience = Array.isArray(formValues.targetAudience) ? formValues.targetAudience : [];
+    
+    // Keep custom entries (entries that aren't in TARGET_AUDIENCE_OPTIONS)
+    const customEntries = currentAudience.filter(
+      entry => !TARGET_AUDIENCE_OPTIONS.includes(entry)
+    );
+    
+    // Combine custom entries with all predefined options, avoiding duplicates with Set
+    const combinedAudience = [...new Set([...customEntries, ...allPredefinedOptions])];
+    
+    setFormValues(prev => ({ ...prev, targetAudience: combinedAudience }));
+  };
+
+  // Add function to handle custom audience input
+  const handleAddCustomAudience = () => {
+    if (customAudience.trim()) {
+      setFormValues(prev => ({
+        ...prev,
+        targetAudience: [...(Array.isArray(prev.targetAudience) ? prev.targetAudience : []), customAudience.trim()]
+      }));
+      setCustomAudience('');
+    }
+  };
+
+  // Check if "Other" is selected to show the custom input
+  useEffect(() => {
+    if (Array.isArray(formValues.targetAudience) && formValues.targetAudience.includes('Other')) {
+      setShowCustomAudienceInput(true);
+    } else {
+      setShowCustomAudienceInput(false);
+    }
+  }, [formValues.targetAudience]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -767,6 +809,24 @@ export default function CreateAlertPage() {
               <Box sx={{ display: 'flex', gap: 3 }}>
 
                 <StyledFormControl sx={{ width: '100%' }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                    <Button
+                      variant="outlined"
+                      size="small"
+                      onClick={handleSelectAllAudiences}
+                      startIcon={<i className="ri-checkbox-multiple-line" />}
+                      sx={{ 
+                        mr: 1, 
+                        textTransform: 'none',
+                        borderRadius: '8px',
+                      }}
+                    >
+                      Select All
+                    </Button>
+                    <Typography variant="caption" color="text.secondary">
+                      (quickly select all predefined audiences)
+                    </Typography>
+                  </Box>
 
                   <Autocomplete
                     multiple
@@ -793,6 +853,41 @@ export default function CreateAlertPage() {
                       />
                     )}
                   />
+
+                  {/* Custom audience input field when "Other" is selected */}
+                  {showCustomAudienceInput && (
+                    <Box sx={{ mt: 2, display: 'flex', alignItems: 'flex-start', gap: 1 }}>
+                      <StyledTextField
+                        fullWidth
+                        label="Custom audience"
+                        value={customAudience}
+                        onChange={(e) => setCustomAudience(e.target.value)}
+                        placeholder="Enter custom target audience"
+                        size="small"
+                        variant="outlined"
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            handleAddCustomAudience();
+                          }
+                        }}
+                      />
+                      <Button
+                        variant="contained"
+                        size="small"
+                        onClick={handleAddCustomAudience}
+                        disabled={!customAudience.trim()}
+                        sx={{ 
+                          minWidth: '36px', 
+                          height: '40px',
+                          borderRadius: '8px'
+                        }}
+                      >
+                        <i className="ri-add-line" />
+                      </Button>
+                    </Box>
+                  )}
+
                   {Array.isArray(formValues.targetAudience) && formValues.targetAudience.length > 0 && (
                     <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mt: 2 }}>
                       {formValues.targetAudience.map((option, index) => (
