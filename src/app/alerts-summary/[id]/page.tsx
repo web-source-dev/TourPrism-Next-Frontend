@@ -389,12 +389,11 @@ export default function ForecastDetail() {
     
     // Otherwise, try to determine the category from the alert type
     const categoryMap = {
-      "Weather": ["Flood", "Rain", "Heat Warning", "Storm", "Snow", "Fog"],
-      "Transport": ["Strike", "Delay", "Cancellation", "Infrastructure Issue", "Traffic"],
-      "Health": ["Outbreak", "Epidemic", "Pandemic", "Contamination"],
-      "Civil Unrest": ["Protest", "Riot", "Strike", "Demonstration"],
-      "General Safety": ["Terrorism", "Crime", "Cyber Attack", "Data Breach"],
-      "Natural Disaster": ["Earthquake", "Tsunami", "Volcanic Activity", "Wildfire", "Landslide"]
+      "Industrial Action": ["Strike", "Work-to-Rule", "Labor Dispute"],
+      "Extreme Weather": ["Storm", "Flooding", "Heatwave", "Wildfire", "Snow"],
+      "Infrastructure Failures": ["Power Outage", "IT & System Failure", "Transport Service Suspension", "Road, Rail & Tram Closure", "Repairs or Delays"],
+      "Public Safety Incidents": ["Protest", "Crime", "Terror Threats", "Travel Advisory"],
+      "Festivals and Events": ["Citywide Festival", "Sporting Event", "Concerts and Stadium Events", "Parades and Ceremonies"]
     };
     
     for (const [category, types] of Object.entries(categoryMap)) {

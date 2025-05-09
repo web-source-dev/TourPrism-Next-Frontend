@@ -11,7 +11,6 @@ import {
   Divider,
   Stack,
   Chip,
-  Avatar,
   CircularProgress,
   List,
   ListItem,
@@ -139,25 +138,7 @@ const ProfileModal: React.FC<ProfileModalProps> = ({ open, onClose, user }) => {
     }
   };
 
-  const getNameInitials = () => {
-    if (!detailedUser) return '';
-    
-    let initials = '';
-    
-    if (detailedUser.firstName) {
-      initials += detailedUser.firstName[0];
-    }
-    
-    if (detailedUser.lastName) {
-      initials += detailedUser.lastName[0];
-    }
-    
-    if (!initials && detailedUser.email) {
-      initials = detailedUser.email[0].toUpperCase();
-    }
-    
-    return initials;
-  };
+
 
   return (
     <Dialog

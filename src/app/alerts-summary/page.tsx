@@ -53,12 +53,11 @@ import Layout from '@/components/Layout';
 
 // Define the category-type mapping to match admin create page
 const ALERT_TYPE_MAP = {
-  "Weather": ["Flood", "Rain", "Heat Warning", "Storm", "Snow", "Fog", "Other"],
-  "Transport": ["Strike", "Delay", "Cancellation", "Infrastructure Issue", "Traffic", "Other"],
-  "Health": ["Outbreak", "Epidemic", "Pandemic", "Contamination", "Other"],
-  "Civil Unrest": ["Protest", "Riot", "Strike", "Demonstration", "Other"],
-  "General Safety": ["Terrorism", "Crime", "Cyber Attack", "Data Breach", "Other"],
-  "Natural Disaster": ["Earthquake", "Tsunami", "Volcanic Activity", "Wildfire", "Landslide", "Other"]
+  "Industrial Action": ["Strike", "Work-to-Rule", "Labor Dispute", "Other"],
+  "Extreme Weather": ["Storm", "Flooding", "Heatwave", "Wildfire", "Snow", "Other"],
+  "Infrastructure Failures": ["Power Outage", "IT & System Failure", "Transport Service Suspension", "Road, Rail & Tram Closure", "Repairs or Delays", "Other"],
+  "Public Safety Incidents": ["Protest", "Crime", "Terror Threats", "Travel Advisory", "Other"],
+  "Festivals and Events": ["Citywide Festival", "Sporting Event", "Concerts and Stadium Events", "Parades and Ceremonies", "Other"]
 };
 
 // Convert the map to the format needed for the dropdown

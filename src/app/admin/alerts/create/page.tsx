@@ -32,12 +32,11 @@ import Script from 'next/script';
 
 // Define the category-type mapping
 const ALERT_TYPE_MAP: Record<string, string[]> = {
-  "Weather": ["Flood", "Rain", "Heat Warning", "Storm", "Snow", "Fog", "Other"],
-  "Transport": ["Strike", "Delay", "Cancellation", "Infrastructure Issue", "Traffic", "Other"],
-  "Health": ["Outbreak", "Epidemic", "Pandemic", "Contamination", "Other"],
-  "Civil Unrest": ["Protest", "Riot", "Strike", "Demonstration", "Other"],
-  "General Safety": ["Terrorism", "Crime", "Cyber Attack", "Data Breach", "Other"],
-  "Natural Disaster": ["Earthquake", "Tsunami", "Volcanic Activity", "Wildfire", "Landslide", "Other"]
+  "Industrial Action": ["Strike", "Work-to-Rule", "Labor Dispute", "Other"],
+  "Extreme Weather": ["Storm", "Flooding", "Heatwave", "Wildfire", "Snow", "Other"],
+  "Infrastructure Failures": ["Power Outage", "IT & System Failure", "Transport Service Suspension", "Road, Rail & Tram Closure", "Repairs or Delays", "Other"],
+  "Public Safety Incidents": ["Protest", "Crime", "Terror Threats", "Travel Advisory", "Other"],
+  "Festivals and Events": ["Citywide Festival", "Sporting Event", "Concerts and Stadium Events", "Parades and Ceremonies", "Other"]
 };
 
 // Define target audience options
@@ -680,12 +679,11 @@ export default function CreateAlertPage() {
                     label="Alert Category"
                     onChange={handleSelectChange}
                   >
-                    <MenuItem value="Weather">Weather</MenuItem>
-                    <MenuItem value="Transport">Transport</MenuItem>
-                    <MenuItem value="Health">Health</MenuItem>
-                    <MenuItem value="Civil Unrest">Civil Unrest</MenuItem>
-                    <MenuItem value="General Safety">General Safety</MenuItem>
-                    <MenuItem value="Natural Disaster">Natural Disaster</MenuItem>
+                    <MenuItem value="Industrial Action">Industrial Action</MenuItem>
+                    <MenuItem value="Extreme Weather">Extreme Weather</MenuItem>
+                    <MenuItem value="Infrastructure Failures">Infrastructure Failures</MenuItem>
+                    <MenuItem value="Public Safety Incidents">Public Safety Incidents</MenuItem>
+                    <MenuItem value="Festivals and Events">Festivals and Events</MenuItem>
                   </Select>
                 </StyledFormControl>
 
